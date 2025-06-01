@@ -60,7 +60,7 @@ A cute and charming Telegram bot that brings soft chats, sweet flirts, and a coz
 
 ## 🌸 Getting Started
 
-1. Visit [@SakuraBot](https://t.me/SakuraBot) on Telegram  
+1. Visit [@SluttySakuraBot](https://t.me/SluttySakuraBot) on Telegram  
 2. Press `/start`  
 3. Pick a vibe or command  
 4. Dive into sweet chats and cute moments!
@@ -70,7 +70,7 @@ A cute and charming Telegram bot that brings soft chats, sweet flirts, and a coz
 ## 👤 Creator
 
 Crafted with love by **Asadul Islam (Asad)**  
-Telegram: [@SakuraBot](https://t.me/SakuraBot)
+Telegram: [@asad_ofc](https://t.me/asad_ofc)
 
 ---
 
