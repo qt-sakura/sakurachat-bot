@@ -98,5 +98,5 @@ This bot is built for wholesome fun and free use.
 ---
 
 > **Sakura Bot** — *Soft talks. Sweet vibes.*  
-[Start now → @SakuraBot](https://t.me/SakuraBot)
+[Start now → @SluttySakuraBot](https://t.me/SluttySakuraBot)
 
