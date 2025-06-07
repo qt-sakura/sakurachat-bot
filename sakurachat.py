@@ -7,6 +7,10 @@ import json
 import google.generativeai as genai
 from datetime import datetime
 
+# ─── Imports for Dummy HTTP Server ──────────────────────────────────────────
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 # ── Logging setup ─────────────────────────────────────────────────────────────
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -562,6 +566,23 @@ def process_update(update):
 
     except Exception as e:
         logger.error(f"Error processing update: {e}")
+        
+ # ─── Dummy HTTP Server to Keep Render Happy ─────────────────────────────────
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"AFK bot is alive!")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
+def start_dummy_server():
+    port = int(os.environ.get("PORT", 10000))  # Render injects this
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    print(f"Dummy server listening on port {port}")
+    server.serve_forever()
 
 # ── Main loop: poll getUpdates, then process each update ──────────────────────
 async def main():
@@ -590,4 +611,8 @@ async def main():
             await asyncio.sleep(5)
 
 if __name__ == "__main__":
+    
+# Start dummy HTTP server (needed for Render health check)
+    threading.Thread(target=start_dummy_server, daemon=True).start()
+
     asyncio.run(main())
