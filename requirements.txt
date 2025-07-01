@@ -1,2 +1,4 @@
+#requests
+#google-generativeai
 requests
-google-generativeai
+google-genai
