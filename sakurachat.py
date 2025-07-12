@@ -650,7 +650,7 @@ You're stronger than you feel. Brighter than you know. And I believe in you alwa
         "inline_keyboard": [
             [
                 {"text": "Updates", "url": "https://t.me/WorkGlows"},
-                {"text": "Support", "url": "https://t.me/TheCryptoElders"}
+                {"text": "Support", "url": "https://t.me/SoulMeetsHQ"}
             ],
             [
                 {"text": "Add Me to Your Group", "url": f"https://t.me/SluttySakuraBot?startgroup=true"}
