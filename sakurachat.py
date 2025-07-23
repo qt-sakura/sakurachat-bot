@@ -353,23 +353,25 @@ class SakuraBot:
             # Create inline keyboard
             keyboard = [
                 [
-                    InlineKeyboardButton("📢 Updates", url="https://t.me/sakura_updates"),
-                    InlineKeyboardButton("💬 Support", url="https://t.me/sakura_support")
+                    InlineKeyboardButton("Updates", url="https://t.me/WorkGlows"),
+                    InlineKeyboardButton("Support", url="https://t.me/SoulMeetsHQ")
                 ],
                 [
-                    InlineKeyboardButton("➕ Add Bot to Group", url=f"https://t.me/{context.bot.username}?startgroup=true")
+                    InlineKeyboardButton("Add Me To Your Group", url=f"https://t.me/{context.bot.username}?startgroup=true")
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Caption for start message
-            caption = (
-                "✨ <b>Hi! Main Sakura Haruno hu</b> ✨\n\n"
-                "🌸 Tumhari helpful friend jo hamesha tumhare saath hai\n"
-                "💭 Kuch bhi pooch sakte ho, main help karungi\n"
-                "🫶 Simple baatein, soft replies, aur lots of love\n\n"
-                "<i>Kya baat karni hai aaj? 💗</i>"
-            )
+            caption = f"""
+✨ <b>Hi! I'm Sakura Haruno</b> ✨
+
+🌸 Your helpful friend who's always by your side  
+💭 You can ask me anything, I'll help you out  
+🫶 Simple talk, soft replies, and lots of love  
+
+<i>So, what do you want to talk about today? 💗</i>
+"""
             
             await context.bot.send_photo(
                 chat_id=update.effective_chat.id,
@@ -393,13 +395,15 @@ class SakuraBot:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        help_text = (
-            "🌸 <b>Sakura Bot Guide</b> 🌸\n\n"
-            "✨ Main tumhari helpful friend hu\n"
-            "💭 Kuch bhi pooch sakte ho\n"
-            "🫶 Simple Hindi mein baat karte hai\n\n"
-            "<i>Guide ko expand karne ke liye button dabao</i> ⬇️"
-        )
+        help_text = f"""
+🌸 <b>Sakura Bot Guide</b> 🌸
+
+✨ I'm your helpful friend  
+💭 You can ask me anything  
+🫶 Let's talk in simple Hindi  
+
+<i>Tap the button below to expand the guide</i> ⬇️
+"""
         
         await update.message.reply_text(
             help_text,
@@ -427,41 +431,32 @@ class SakuraBot:
             keyboard = [
                 [InlineKeyboardButton("📖 Expand Guide", callback_data=f"help_expand_{user_id}")]
             ]
-            help_text = (
-                "🌸 <b>Sakura Bot Guide</b> 🌸\n\n"
-                "✨ Main tumhari helpful friend hu\n"
-                "💭 Kuch bhi pooch sakte ho\n"
-                "🫶 Simple Hindi mein baat karte hai\n\n"
-                "<i>Guide ko expand karne ke liye button dabao</i> ⬇️"
-            )
+            help_text = f"""
+🌸 <b>Sakura Bot Guide</b> 🌸
+
+✨ I'm your helpful friend  
+💭 You can ask me anything  
+🫶 Let's talk in simple Hindi  
+
+<i>Tap the button below to expand the guide</i> ⬇️
+"""
             self.help_expanded[user_id] = False
         else:
             # Expand
             keyboard = [
                 [InlineKeyboardButton("📚 Minimize Guide", callback_data=f"help_expand_{user_id}")]
             ]
-            help_text = (
-                "🌸 <b>Sakura Bot Complete Guide</b> 🌸\n\n"
-                "🗣️ <b>How to talk:</b>\n"
-                "• Hindi, English, Bangla - jo bhi comfortable ho\n"
-                "• Simple questions poochiye\n"
-                "• Main short aur sweet reply deti hu\n\n"
-                "💭 <b>What I can help with:</b>\n"
-                "• Study aur homework help\n"
-                "• Relationship advice\n"
-                "• Emotional support\n"
-                "• Math aur calculations\n"
-                "• General questions\n"
-                "• Friendly chat\n\n"
-                "🎭 <b>Sticker fun:</b>\n"
-                "• Agar tum sticker bhejoge, main bhi bhejungi\n"
-                "• Group mein reply karne par sticker milega\n\n"
-                "❤️ <b>My personality:</b>\n"
-                "• Helpful aur caring\n"
-                "• Short messages with emojis\n"
-                "• Always here for you\n\n"
-                "<i>Ab baat karte hai! 🫶</i>"
-            )
+            help_text = f"""
+🌸 <b>Sakura Bot Guide</b> 🌸
+
+🗣️ Talk in Hindi, English, or Bangla  
+💭 Ask simple questions  
+🎓 Help with study, advice, or math  
+🎭 Send a sticker, I’ll send one too  
+❤️ Kind, caring, and always here  
+
+<i>Let’s talk! 🫶</i>
+"""
             self.help_expanded[user_id] = True
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -702,13 +697,13 @@ class SakuraBot:
         start_time = time.time()
         
         # Send initial message
-        msg = await update.message.reply_text("🏓 Pinging...")
+        msg = await update.message.reply_text("🛰️ Pinging...")
         
         # Calculate response time
         response_time = round((time.time() - start_time) * 1000, 2)  # milliseconds
         
         # Edit message with just response time
-        await msg.edit_text(f"🏓 Pong! Response time: {response_time}ms")
+        await msg.edit_text(f"🏓 Pong! {response_time}ms")
     
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE):
         """Handle errors"""
