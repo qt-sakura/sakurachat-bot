@@ -3,6 +3,8 @@ import logging
 import os
 import random
 import time
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from collections import defaultdict, deque
 from typing import List, Optional
 
@@ -766,6 +768,23 @@ def main():
         logger.info("Bot stopped by user")
     except Exception as e:
         logger.error(f"Fatal error: {e}")
+        
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"AFK bot is alive!")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
+def start_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    print(f"Dummy server listening on port {port}")
+    server.serve_forever()
 
 if __name__ == "__main__":
+    threading.Thread(target=start_dummy_server, daemon=True).start()
     main()
