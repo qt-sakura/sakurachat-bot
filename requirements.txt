@@ -2,4 +2,4 @@
 #google-generativeai
 requests
 google-genai
-python-telegram-bot==20.8
+python-telegram-bot==20.7
