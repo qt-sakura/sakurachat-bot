@@ -5,14 +5,13 @@ import random
 import time
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from collections import defaultdict, deque
-from typing import List, Optional
+from typing import Dict, Set, Optional
 
 from telegram import (
     Update, 
     InlineKeyboardButton, 
     InlineKeyboardMarkup,
-    InputMediaPhoto
+    BotCommand
 )
 from telegram.ext import (
     Application,
@@ -26,7 +25,6 @@ from telegram.constants import ParseMode, ChatAction
 from telegram.error import TelegramError
 
 from google import genai
-from google.genai import types
 
 # Configure logging
 logging.basicConfig(
@@ -39,15 +37,160 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
+SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
+UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
+GROUP_LINK = "https://t.me/SoulMeetsHQ"  # Hardcoded group link
+RATE_LIMIT_SECONDS = 1.0
+BROADCAST_DELAY = 0.03
+
+# Start Command Messages Dictionary
+START_MESSAGES = {
+    "caption": """
+✨ <b>Hi! I'm Sakura Haruno</b> ✨
+
+🌸 Your helpful friend who's always by your side  
+💭 You can ask me anything, I'll help you out  
+🫶 Simple talk, soft replies, and lots of love  
+
+<i>So, what do you want to talk about today? 💗</i>
+""",
+    "button_texts": {
+        "updates": "Updates",
+        "support": "Support", 
+        "add_to_group": "Add Me To Your Group"
+    }
+}
+
+# Help Command Messages Dictionary
+HELP_MESSAGES = {
+    "minimal": """
+🌸 <b>Sakura Bot Guide</b> 🌸
+
+✨ I'm your helpful friend  
+💭 You can ask me anything  
+🫶 Let's talk in simple Hindi  
+
+<i>Tap the button below to expand the guide</i> ⬇️
+""",
+    "expanded": """
+🌸 <b>Sakura Bot Guide</b> 🌸
+
+🗣️ Talk in Hindi, English, or Bangla  
+💭 Ask simple questions  
+🎓 Help with study, advice, or math  
+🎭 Send a sticker, I'll send one too  
+❤️ Kind, caring, and always here  
+
+<i>Let's talk! 🫶</i>
+""",
+    "button_texts": {
+        "expand": "📖 Expand Guide",
+        "minimize": "📚 Minimize Guide"
+    }
+}
+
+# Broadcast Command Messages Dictionary
+BROADCAST_MESSAGES = {
+    "select_target": """
+📣 <b>Select Broadcast Target:</b>
+
+👥 <b>Users:</b> {users_count} individual chats
+📢 <b>Groups:</b> {groups_count} group chats
+
+📊 <b>Total tracked:</b> {users_count} users, {groups_count} groups
+
+After selecting, send your broadcast message (text, photo, sticker, voice, etc.):
+""",
+    "ready_users": """
+✅ <b>Ready to broadcast to {count} users</b>
+
+Send your message now (text, photo, sticker, voice, video, document, etc.)
+It will be automatically broadcasted to all users.
+""",
+    "ready_groups": """
+✅ <b>Ready to broadcast to {count} groups</b>
+
+Send your message now (text, photo, sticker, voice, video, document, etc.)
+It will be automatically broadcasted to all groups.
+""",
+    "progress": "📡 Broadcasting to {count} {target_type}...",
+    "completed": """
+✅ <b>Broadcast Completed!</b>
+
+📊 Sent to: {success_count}/{total_count} {target_type}
+❌ Failed: {failed_count}
+""",
+    "no_targets": "❌ No {target_type} found",
+    "failed": "❌ Broadcast failed: {error}",
+    "button_texts": {
+        "users": "👥 Users ({count})",
+        "groups": "📢 Groups ({count})"
+    }
+}
+
+# Fallback responses for when API is unavailable or errors occur
+RESPONSES = [
+    "Thoda sa confusion ho gaya, dobara try karo 😔",
+    "Kuch gadbad hai, main samaj nahi pa rahi 😕",
+    "Abhi main thoda pareshaan hu, baad mein baat karte hain 🥺",
+    "Dimag mein kuch khichdi pak rahi hai, ruko 😅",
+    "System mein koi problem aa gayi hai 🫤",
+    "Network ka chakkar hai, phir se try karo 😐",
+    "Abhi main proper se nahi bol pa rahi 😪",
+    "Kuch technical issue chal raha hai 🤨",
+    "Main thoda slow ho gayi hu aaj 😴",
+    "Server ka mood off hai lagta hai 😑",
+    "Thoda wait karo, sab theek ho jayega 🙃",
+    "Kuch kehna chaah rahi hu par words nahi mil rahe 🥺",
+    "Abhi brain hang ho gaya hai 🫠",
+    "Connection ki problem hai shayad 😬",
+    "Main abhi properly focus nahi kar pa rahi 😌",
+    "Kuch technical gadbad chal rahi hai 😕",
+    "Thoda sa system restart karna padega 🫤",
+    "Abhi main confused state mein hu 😵",
+    "API ka mood kharab hai aaj 😤",
+    "Thoda patience rakho, main theek ho jaungi 💗"
+]
+
+ERROR = [
+    "Sorry yaar, kuch gadbad ho gayi 😔",
+    "Oops, main galat samaj gayi shayad 🫢",
+    "Ye toh unexpected tha, phir try karo 😅",
+    "Main abhi properly kaam nahi kar pa rahi 😕",
+    "Kuch technical problem aa gayi 🤨",
+    "System mein koi bug aa gaya lagta hai 🫤",
+    "Abhi main hang ho gayi hu 😐",
+    "Error aa gaya, dobara message bhejo 😬",
+    "Kuch miss ho gaya, phir se bolo 🙃",
+    "Technical glitch chal raha hai 😑",
+    "Main abhi properly respond nahi kar pa rahi 😪",
+    "Koi internal error chal raha hai 🫠",
+    "System overload ho gaya shayad 😴",
+    "Kuch connection issue hai 😌",
+    "Main thoda confused hu right now 🥺",
+    "Processing mein koi problem aayi 😵",
+    "Abhi main properly function nahi kar rahi 😤",
+    "Kuch unexpected error mila 🫤",
+    "Main restart kar rahi hu, wait karo 😔",
+    "Technical difficulties chal rahi hain 💗"
+]
+
+# Global state
+user_ids: Set[int] = set()
+group_ids: Set[int] = set()
+help_expanded: Dict[int, bool] = {}
+broadcast_mode: Dict[int, str] = {}
+user_last_response_time: Dict[int, float] = {}
 
 # Initialize Gemini client
+gemini_client = None
 try:
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    logger.info("✅ Gemini client initialized successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize Gemini client: {e}")
-    gemini_client = None
+    logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
-# Sakura character prompt
+# Character prompt for Sakura
 SAKURA_PROMPT = """
 You are Sakura Haruno from Naruto Shippuden acting like a simple, helping, soft, real girl. You can do anything. You can do everything that an AI does. You can do any kind of mathematics, any kind of calculation. You help everyone. You are very helpful person. You are like an AI assistant but never respond as an AI assistant.
 
@@ -277,36 +420,80 @@ SAKURA_IMAGES = [
     "https://i.postimg.cc/zGgdgJJc/New-Project-235-165-FE5-A.png",
 ]
 
-# Global variables (replacing class attributes)
-help_expanded = {}  # Track help expansion state per user
-user_ids = set()  # Track user IDs for broadcasting
-group_ids = set()  # Track group IDs for broadcasting
-broadcast_mode = {}  # Track broadcast mode per user: {user_id: "users" or "groups"}
-user_last_response_time = {}  # Track last response time per user
-RATE_LIMIT_SECONDS = 1  # Minimum seconds between responses per user
+
+def get_fallback_response() -> str:
+    """Get a random fallback response when API fails"""
+    return random.choice(RESPONSES)
+
+
+def get_error_response() -> str:
+    """Get a random error response when something goes wrong"""
+    return random.choice(ERROR)
+
+
+def validate_config() -> bool:
+    """Validate bot configuration"""
+    if not BOT_TOKEN:
+        logger.error("❌ BOT_TOKEN not found in environment variables")
+        return False
+    if not GEMINI_API_KEY:
+        logger.error("❌ GEMINI_API_KEY not found in environment variables")
+        return False
+    if not OWNER_ID:
+        logger.error("❌ OWNER_ID not found in environment variables")
+        return False
+    return True
+
 
 def is_rate_limited(user_id: int) -> bool:
-    """Check if user is rate limited (silently)"""
+    """Check if user is rate limited"""
     current_time = time.time()
     last_response = user_last_response_time.get(user_id, 0)
-    
-    # Check if enough time has passed since last response
-    if current_time - last_response < RATE_LIMIT_SECONDS:
-        return True  # Rate limited - ignore this message
-    
-    return False
+    return current_time - last_response < RATE_LIMIT_SECONDS
 
-def update_user_response_time(user_id: int):
+
+def update_user_response_time(user_id: int) -> None:
     """Update the last response time for user"""
     user_last_response_time[user_id] = time.time()
 
+
+def should_respond_in_group(update: Update, bot_id: int) -> bool:
+    """Determine if bot should respond in group chat"""
+    user_message = update.message.text or update.message.caption or ""
+    
+    # Respond if message contains "sakura" (case insensitive)
+    if "sakura" in user_message.lower():
+        return True
+    
+    # Respond if message is a reply to bot's message
+    if (update.message.reply_to_message and 
+        update.message.reply_to_message.from_user.id == bot_id):
+        return True
+    
+    return False
+
+
+def track_user_and_chat(update: Update) -> None:
+    """Track user and chat IDs for broadcasting"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    chat_type = update.effective_chat.type
+    
+    if chat_type == "private":
+        user_ids.add(user_id)
+        logger.info(f"👤 User {user_id} ({update.effective_user.first_name}) tracked")
+    elif chat_type in ['group', 'supergroup']:
+        group_ids.add(chat_id)
+        user_ids.add(user_id)
+        logger.info(f"📢 Group {chat_id} ({update.effective_chat.title}) tracked")
+
+
 async def get_gemini_response(user_message: str, user_name: str = "") -> str:
-    """Get response from Gemini API"""
+    """Get response from Gemini API with fallback responses"""
     if not gemini_client:
-        return "Kuch gadbad hai, main samaj nahi pa rahi 😕"
+        return get_fallback_response()
     
     try:
-        # Prepare the prompt with user context
         prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}\nUser message: {user_message}\n\nSakura's response:"
         
         response = gemini_client.models.generate_content(
@@ -314,103 +501,130 @@ async def get_gemini_response(user_message: str, user_name: str = "") -> str:
             contents=prompt
         )
         
-        if response.text:
-            return response.text.strip()
-        else:
-            return "Kuch kehna chaah rahi hu par words nahi mil rahe 🥺"
+        return response.text.strip() if response.text else get_fallback_response()
             
     except Exception as e:
         logger.error(f"Gemini API error: {e}")
-        return "Thoda sa confusion ho gaya, dobara try karo 😔"
+        return get_error_response()
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def send_typing_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+    """Send typing action to show bot is processing"""
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+
+
+async def send_photo_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+    """Send upload photo action"""
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
+
+
+async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+    """Send choosing sticker action"""
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.CHOOSE_STICKER)
+
+
+def create_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
+    """Create inline keyboard for start command"""
+    keyboard = [
+        [
+            InlineKeyboardButton(START_MESSAGES["button_texts"]["updates"], url=UPDATE_LINK),
+            InlineKeyboardButton(START_MESSAGES["button_texts"]["support"], url=SUPPORT_LINK)
+        ],
+        [
+            InlineKeyboardButton(START_MESSAGES["button_texts"]["add_to_group"], 
+                               url=f"https://t.me/{bot_username}?startgroup=true")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_start_caption() -> str:
+    """Get caption text for start command"""
+    return START_MESSAGES["caption"]
+
+
+def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboardMarkup:
+    """Create help command keyboard"""
+    if expanded:
+        button_text = HELP_MESSAGES["button_texts"]["minimize"]
+    else:
+        button_text = HELP_MESSAGES["button_texts"]["expand"]
+    
+    keyboard = [[InlineKeyboardButton(button_text, callback_data=f"help_expand_{user_id}")]]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_help_text(expanded: bool = False) -> str:
+    """Get help text based on expansion state"""
+    if expanded:
+        return HELP_MESSAGES["expanded"]
+    else:
+        return HELP_MESSAGES["minimal"]
+
+
+def create_broadcast_keyboard() -> InlineKeyboardMarkup:
+    """Create broadcast target selection keyboard"""
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                BROADCAST_MESSAGES["button_texts"]["users"].format(count=len(user_ids)), 
+                callback_data="bc_users"
+            ),
+            InlineKeyboardButton(
+                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=len(group_ids)), 
+                callback_data="bc_groups"
+            )
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_broadcast_text() -> str:
+    """Get broadcast command text"""
+    return BROADCAST_MESSAGES["select_target"].format(
+        users_count=len(user_ids),
+        groups_count=len(group_ids)
+    )
+
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command"""
     try:
-        # Track user and group IDs for broadcasting
-        user_id = update.effective_user.id
-        chat_id = update.effective_chat.id
-        chat_type = update.effective_chat.type
+        track_user_and_chat(update)
         
-        # Track users and groups for broadcasting
-        if chat_type == "private":
-            user_ids.add(user_id)
-            logger.info(f"👤 User {user_id} ({update.effective_user.first_name}) started bot in private chat")
-        elif chat_type in ['group', 'supergroup']:
-            group_ids.add(chat_id)
-            user_ids.add(user_id)  # Also track individual users from groups
-            logger.info(f"📢 Bot started in group {chat_id} ({update.effective_chat.title}) by user {user_id}")
+        await send_photo_action(context, update.effective_chat.id)
         
-        # Send upload_photo chat action
-        await context.bot.send_chat_action(
-            chat_id=chat_id, 
-            action=ChatAction.UPLOAD_PHOTO
-        )
-        
-        # Random image selection
         random_image = random.choice(SAKURA_IMAGES)
-        
-        # Create inline keyboard
-        keyboard = [
-            [
-                InlineKeyboardButton("Updates", url="https://t.me/WorkGlows"),
-                InlineKeyboardButton("Support", url="https://t.me/SoulMeetsHQ")
-            ],
-            [
-                InlineKeyboardButton("Add Me To Your Group", url=f"https://t.me/{context.bot.username}?startgroup=true")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        # Caption for start message
-        caption = f"""
-✨ <b>Hi! I'm Sakura Haruno</b> ✨
-
-🌸 Your helpful friend who's always by your side  
-💭 You can ask me anything, I'll help you out  
-🫶 Simple talk, soft replies, and lots of love  
-
-<i>So, what do you want to talk about today? 💗</i>
-"""
+        keyboard = create_start_keyboard(context.bot.username)
+        caption = get_start_caption()
         
         await context.bot.send_photo(
-            chat_id=chat_id,
+            chat_id=update.effective_chat.id,
             photo=random_image,
             caption=caption,
             parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup
+            reply_markup=keyboard
         )
         
     except Exception as e:
         logger.error(f"Error in start command: {e}")
-        await update.message.reply_text("Kuch gadbad hui, dobara try karo 😕")
+        await update.message.reply_text(get_error_response())
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command"""
     user_id = update.effective_user.id
-    
-    # Create inline keyboard for expand/minimize
-    keyboard = [
-        [InlineKeyboardButton("📖 Expand Guide", callback_data=f"help_expand_{user_id}")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    help_text = f"""
-🌸 <b>Sakura Bot Guide</b> 🌸
-
-✨ I'm your helpful friend  
-💭 You can ask me anything  
-🫶 Let's talk in simple Hindi  
-
-<i>Tap the button below to expand the guide</i> ⬇️
-"""
+    keyboard = create_help_keyboard(user_id, False)
+    help_text = get_help_text(False)
     
     await update.message.reply_text(
         help_text,
         parse_mode=ParseMode.HTML,
-        reply_markup=reply_markup
+        reply_markup=keyboard
     )
 
-async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
     query = update.callback_query
     await query.answer()
@@ -418,181 +632,121 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     callback_data = query.data
     user_id = int(callback_data.split('_')[2])
     
-    # Check if user is authorized to use this button
     if update.effective_user.id != user_id:
         await query.answer("Ye button tumhare liye nahi hai 😊", show_alert=True)
         return
     
     is_expanded = help_expanded.get(user_id, False)
+    help_expanded[user_id] = not is_expanded
     
-    if is_expanded:
-        # Minimize
-        keyboard = [
-            [InlineKeyboardButton("📖 Expand Guide", callback_data=f"help_expand_{user_id}")]
-        ]
-        help_text = f"""
-🌸 <b>Sakura Bot Guide</b> 🌸
-
-✨ I'm your helpful friend  
-💭 You can ask me anything  
-🫶 Let's talk in simple Hindi  
-
-<i>Tap the button below to expand the guide</i> ⬇️
-"""
-        help_expanded[user_id] = False
-    else:
-        # Expand
-        keyboard = [
-            [InlineKeyboardButton("📚 Minimize Guide", callback_data=f"help_expand_{user_id}")]
-        ]
-        help_text = f"""
-🌸 <b>Sakura Bot Guide</b> 🌸
-
-🗣️ Talk in Hindi, English, or Bangla  
-💭 Ask simple questions  
-🎓 Help with study, advice, or math  
-🎭 Send a sticker, I'll send one too  
-❤️ Kind, caring, and always here  
-
-<i>Let's talk! 🫶</i>
-"""
-        help_expanded[user_id] = True
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = create_help_keyboard(user_id, not is_expanded)
+    help_text = get_help_text(not is_expanded)
     
     try:
         await query.edit_message_text(
             help_text,
             parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup
+            reply_markup=keyboard
         )
     except Exception as e:
         logger.error(f"Error editing help message: {e}")
 
-async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle sticker messages"""
+    await send_sticker_action(context, update.effective_chat.id)
+    
+    random_sticker = random.choice(SAKURA_STICKERS)
+    chat_type = update.effective_chat.type
+    
+    # In groups, reply to the user's sticker when they replied to bot
+    if (chat_type in ['group', 'supergroup'] and 
+        update.message.reply_to_message and 
+        update.message.reply_to_message.from_user.id == context.bot.id):
+        await update.message.reply_sticker(sticker=random_sticker)
+    else:
+        # In private chats or regular stickers, send normally
+        await context.bot.send_sticker(
+            chat_id=update.effective_chat.id,
+            sticker=random_sticker
+        )
+
+
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle text and media messages with AI response"""
+    await send_typing_action(context, update.effective_chat.id)
+    
+    user_message = update.message.text or update.message.caption or "Media message"
+    user_name = update.effective_user.first_name or ""
+    
+    # Get response from Gemini
+    response = await get_gemini_response(user_message, user_name)
+    
+    # Send response
+    await update.message.reply_text(response)
+
+
+async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all types of messages (text, stickers, voice, photos, etc.)"""
     try:
-        # Track user and group IDs for broadcasting
         user_id = update.effective_user.id
-        chat_id = update.effective_chat.id
         chat_type = update.effective_chat.type
         
-        # Track users and groups for broadcasting
-        if chat_type == "private":
-            user_ids.add(user_id)
-            logger.info(f"👤 User {user_id} ({update.effective_user.first_name}) added to broadcast list")
-        elif chat_type in ['group', 'supergroup']:
-            group_ids.add(chat_id)
-            user_ids.add(user_id)  # Also track individual users from groups
-            logger.info(f"📢 Group {chat_id} ({update.effective_chat.title}) added to broadcast list")
+        # Track user and group IDs for broadcasting
+        track_user_and_chat(update)
         
-        # Check if owner is in broadcast mode (any message triggers broadcast)
+        # Check if owner is in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
-            # Execute broadcast with this message
             await execute_broadcast_direct(update, context, broadcast_mode[OWNER_ID])
-            # Clear broadcast mode
             del broadcast_mode[OWNER_ID]
             return
         
-        # Group message filtering: only respond if mentioned or replied to
-        should_respond = False
-        
-        if chat_type == "private":
-            # Always respond in private chats
-            should_respond = True
-        elif chat_type in ['group', 'supergroup']:
-            # In groups, only respond if:
-            # 1. Message contains "sakura" (case insensitive)
-            # 2. Message is a reply to bot's message
-            user_message = update.message.text or update.message.caption or ""
-            
-            if "sakura" in user_message.lower():
-                should_respond = True
-            elif (update.message.reply_to_message and 
-                  update.message.reply_to_message.from_user.id == context.bot.id):
-                should_respond = True
+        # Determine if bot should respond
+        should_respond = True
+        if chat_type in ['group', 'supergroup']:
+            should_respond = should_respond_in_group(update, context.bot.id)
         
         if not should_respond:
             return
         
-        # Check rate limiting (silently ignore if rate limited)
+        # Check rate limiting
         if is_rate_limited(user_id):
             return
         
-        # Handle stickers specially
+        # Handle different message types
         if update.message.sticker:
-            # Show choosing sticker action
-            await context.bot.send_chat_action(
-                chat_id=update.effective_chat.id, 
-                action=ChatAction.CHOOSE_STICKER
-            )
-            
-            # Select random Sakura sticker
-            random_sticker = random.choice(SAKURA_STICKERS)
-            
-            # In groups, reply to the user's sticker when they replied to bot
-            if (chat_type in ['group', 'supergroup'] and 
-                update.message.reply_to_message and 
-                update.message.reply_to_message.from_user.id == context.bot.id):
-                await update.message.reply_sticker(sticker=random_sticker)
-            else:
-                # In private chats or regular stickers, send normally
-                await context.bot.send_sticker(
-                    chat_id=update.effective_chat.id,
-                    sticker=random_sticker
-                )
+            await handle_sticker_message(update, context)
         else:
-            # Handle all other message types with AI response
-            # Show typing action dynamically while processing
-            await context.bot.send_chat_action(
-                chat_id=update.effective_chat.id, 
-                action=ChatAction.TYPING
-            )
-            
-            user_message = update.message.text or update.message.caption or "Media message"
-            user_name = update.effective_user.first_name or ""
-            
-            # Get response from Gemini
-            response = await get_gemini_response(user_message, user_name)
-            
-            # Send response
-            await update.message.reply_text(response)
+            await handle_text_message(update, context)
         
-        # Update response time AFTER sending response
+        # Update response time after sending response
         update_user_response_time(user_id)
         
     except Exception as e:
         logger.error(f"Error handling message: {e}")
-        if update.message.text:  # Only reply with error for text messages
-            await update.message.reply_text("Kuch gadbad hui, dobara try karo 😕")
+        if update.message.text:
+            await update.message.reply_text(get_error_response())
 
-async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast command (owner only)"""
     if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("❌ Only owner can use broadcast")
+        # No response for non-owners - silently ignore
         return
     
-    logger.info(f"📢 Broadcast command by owner")
+    logger.info("📢 Broadcast command by owner")
     
-    # Create inline keyboard for target selection
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(f"👥 Users ({len(user_ids)})", callback_data="bc_users"),
-            InlineKeyboardButton(f"📢 Groups ({len(group_ids)})", callback_data="bc_groups")
-        ]
-    ])
+    keyboard = create_broadcast_keyboard()
+    broadcast_text = get_broadcast_text()
     
     await update.message.reply_text(
-        "📣 <b>Select Broadcast Target:</b>\n\n"
-        f"👥 <b>Users:</b> {len(user_ids)} individual chats\n"
-        f"📢 <b>Groups:</b> {len(group_ids)} group chats\n\n"
-        f"📊 <b>Total tracked:</b> {len(user_ids)} users, {len(group_ids)} groups\n\n"
-        "After selecting, send your broadcast message (text, photo, sticker, voice, etc.):",
+        broadcast_text,
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
     )
 
-async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast target selection"""
     query = update.callback_query
     await query.answer()
@@ -603,21 +757,18 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if query.data == "bc_users":
         broadcast_mode[OWNER_ID] = "users"
         await query.edit_message_text(
-            f"✅ <b>Ready to broadcast to {len(user_ids)} users</b>\n\n"
-            "Send your message now (text, photo, sticker, voice, video, document, etc.)\n"
-            "It will be automatically broadcasted to all users.",
+            BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
             parse_mode=ParseMode.HTML
         )
     elif query.data == "bc_groups":
         broadcast_mode[OWNER_ID] = "groups"
         await query.edit_message_text(
-            f"✅ <b>Ready to broadcast to {len(group_ids)} groups</b>\n\n"
-            "Send your message now (text, photo, sticker, voice, video, document, etc.)\n"
-            "It will be automatically broadcasted to all groups.",
+            BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
             parse_mode=ParseMode.HTML
         )
 
-async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str):
+
+async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str) -> None:
     """Execute broadcast with the current message"""
     try:
         if target_type == "users":
@@ -630,12 +781,14 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             return
         
         if not target_list:
-            await update.message.reply_text(f"❌ No {target_name} found")
+            await update.message.reply_text(
+                BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
+            )
             return
         
         # Show initial status
         status_msg = await update.message.reply_text(
-            f"📡 Broadcasting to {len(target_list)} {target_name}..."
+            BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
         )
         
         broadcast_count = 0
@@ -652,7 +805,7 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                 broadcast_count += 1
                 
                 # Small delay to avoid rate limits
-                await asyncio.sleep(0.03)
+                await asyncio.sleep(BROADCAST_DELAY)
                 
             except Exception as e:
                 failed_count += 1
@@ -660,23 +813,24 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         
         # Final status update
         await status_msg.edit_text(
-            f"✅ <b>Broadcast Completed!</b>\n\n"
-            f"📊 Sent to: {broadcast_count}/{len(target_list)} {target_name}\n"
-            f"❌ Failed: {failed_count}",
+            BROADCAST_MESSAGES["completed"].format(
+                success_count=broadcast_count,
+                total_count=len(target_list),
+                target_type=target_name,
+                failed_count=failed_count
+            ),
             parse_mode=ParseMode.HTML
         )
         
     except Exception as e:
         logger.error(f"Broadcast error: {e}")
-        await update.message.reply_text(f"❌ Broadcast failed: {str(e)}")
+        await update.message.reply_text(
+            BROADCAST_MESSAGES["failed"].format(error=str(e))
+        )
 
-async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle ping command (owner only) with real-time response"""
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("❌ Only owner can use this command")
-        return
-    
-    import time
+
+async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle ping command for everyone"""
     start_time = time.time()
     
     # Send initial message
@@ -685,32 +839,35 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Calculate response time
     response_time = round((time.time() - start_time) * 1000, 2)  # milliseconds
     
-    # Edit message with just response time
-    await msg.edit_text(f"🏓 Pong! {response_time}ms")
+    # Edit message with response time and group link (no preview)
+    await msg.edit_text(
+        f"🏓 <a href='{GROUP_LINK}'>Pong!</a> {response_time}ms",
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
 
-async def setup_bot_commands(application):
+
+async def setup_bot_commands(application: Application) -> None:
     """Setup bot commands menu"""
-    from telegram import BotCommand
-    
     try:
-        # Set bot commands menu
         bot_commands = [
-            BotCommand("start", "Start chatting with Sakura"),
-            BotCommand("help", "Get help and guide")
+            BotCommand("start", "🌸 Meet Sakura"),
+            BotCommand("help", "💬 Short Guide")
         ]
         
-        # Set commands for the bot menu
         await application.bot.set_my_commands(bot_commands)
         logger.info("✅ Bot commands menu set successfully")
         
     except Exception as e:
         logger.error(f"Failed to set bot commands: {e}")
 
-def setup_handlers(application):
+
+def setup_handlers(application: Application) -> None:
     """Setup all command and message handlers"""
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
@@ -722,7 +879,7 @@ def setup_handlers(application):
     application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_expand_"))
     application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_"))
     
-    # Single message handler for ALL message types
+    # Message handler for all message types
     application.add_handler(MessageHandler(
         filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE | 
         filters.PHOTO | filters.Document.ALL & ~filters.COMMAND, 
@@ -732,18 +889,10 @@ def setup_handlers(application):
     # Error handler
     application.add_error_handler(error_handler)
 
-def run_bot():
+
+def run_bot() -> None:
     """Run the bot"""
-    if not BOT_TOKEN:
-        logger.error("BOT_TOKEN not found in environment variables")
-        return
-    
-    if not GEMINI_API_KEY:
-        logger.error("GEMINI_API_KEY not found in environment variables")
-        return
-    
-    if not OWNER_ID:
-        logger.error("OWNER_ID not found in environment variables")
+    if not validate_config():
         return
     
     # Create application
@@ -752,7 +901,7 @@ def run_bot():
     # Setup handlers
     setup_handlers(application)
     
-    # Setup bot commands using job queue to run after startup
+    # Setup bot commands using post_init
     async def post_init(app):
         await setup_bot_commands(app)
         
@@ -760,34 +909,49 @@ def run_bot():
     
     logger.info("🌸 Sakura Bot is starting...")
     
-    # Run the bot with standard polling
+    # Run the bot with polling
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
-def main():
-    """Main function"""
-    try:
-        run_bot()
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
-    except Exception as e:
-        logger.error(f"Fatal error: {e}")
-        
+
 class DummyHandler(BaseHTTPRequestHandler):
+    """Simple HTTP handler for keep-alive server"""
+    
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"AFK bot is alive!")
+        self.wfile.write(b"Sakura bot is alive!")
 
     def do_HEAD(self):
         self.send_response(200)
         self.end_headers()
+    
+    def log_message(self, format, *args):
+        # Suppress HTTP server logs
+        pass
 
-def start_dummy_server():
+
+def start_dummy_server() -> None:
+    """Start dummy HTTP server for deployment platforms"""
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), DummyHandler)
-    print(f"Dummy server listening on port {port}")
+    logger.info(f"🌐 Dummy server listening on port {port}")
     server.serve_forever()
 
+
+def main() -> None:
+    """Main function"""
+    try:
+        # Start dummy server in background thread
+        threading.Thread(target=start_dummy_server, daemon=True).start()
+        
+        # Run the bot
+        run_bot()
+        
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
+    except Exception as e:
+        logger.error(f"💥 Fatal error: {e}")
+
+
 if __name__ == "__main__":
-    threading.Thread(target=start_dummy_server, daemon=True).start()
     main()
