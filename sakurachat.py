@@ -692,19 +692,26 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
 
-def setup_handlers(application):
-    """Setup all command and message handlers"""
+async def setup_bot_commands(application):
+    """Setup bot commands menu"""
     from telegram import BotCommand
     
-    # Set bot commands menu
-    bot_commands = [
-        BotCommand("start", "Start chatting with Sakura"),
-        BotCommand("help", "Get help and guide")
-    ]
-    
-    # Set commands for the bot menu
-    asyncio.create_task(application.bot.set_my_commands(bot_commands))
-    
+    try:
+        # Set bot commands menu
+        bot_commands = [
+            BotCommand("start", "Start chatting with Sakura"),
+            BotCommand("help", "Get help and guide")
+        ]
+        
+        # Set commands for the bot menu
+        await application.bot.set_my_commands(bot_commands)
+        logger.info("✅ Bot commands menu set successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to set bot commands: {e}")
+
+def setup_handlers(application):
+    """Setup all command and message handlers"""
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -725,7 +732,7 @@ def setup_handlers(application):
     # Error handler
     application.add_error_handler(error_handler)
 
-def run_bot():
+async def run_bot():
     """Run the bot"""
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN not found in environment variables")
@@ -745,15 +752,18 @@ def run_bot():
     # Setup handlers
     setup_handlers(application)
     
+    # Setup bot commands menu
+    await setup_bot_commands(application)
+    
     logger.info("🌸 Sakura Bot is starting...")
     
     # Run the bot
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    await application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 def main():
     """Main function"""
     try:
-        run_bot()
+        asyncio.run(run_bot())
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
