@@ -732,7 +732,7 @@ def setup_handlers(application):
     # Error handler
     application.add_error_handler(error_handler)
 
-async def run_bot():
+def run_bot():
     """Run the bot"""
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN not found in environment variables")
@@ -752,18 +752,21 @@ async def run_bot():
     # Setup handlers
     setup_handlers(application)
     
-    # Setup bot commands menu
-    await setup_bot_commands(application)
+    # Setup bot commands using job queue to run after startup
+    async def post_init(app):
+        await setup_bot_commands(app)
+        
+    application.post_init = post_init
     
     logger.info("🌸 Sakura Bot is starting...")
     
-    # Run the bot
-    await application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    # Run the bot with standard polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 def main():
     """Main function"""
     try:
-        asyncio.run(run_bot())
+        run_bot()
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
