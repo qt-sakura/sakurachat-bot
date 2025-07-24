@@ -46,7 +46,7 @@ BROADCAST_DELAY = 0.03
 # Start Command Messages Dictionary
 START_MESSAGES = {
     "caption": """
-✨ <b>Hi! I'm Sakura Haruno</b> ✨
+✨ <b>Hi {user_mention}! I'm Sakura Haruno</b> ✨
 
 🌸 Your helpful friend who's always by your side  
 💭 You can ask me anything, I'll help you out  
@@ -64,7 +64,7 @@ START_MESSAGES = {
 # Help Command Messages Dictionary
 HELP_MESSAGES = {
     "minimal": """
-🌸 <b>Sakura Bot Guide</b> 🌸
+🌸 <b>Sakura Bot Guide for {user_mention}</b> 🌸
 
 ✨ I'm your helpful friend  
 💭 You can ask me anything  
@@ -73,7 +73,7 @@ HELP_MESSAGES = {
 <i>Tap the button below to expand the guide</i> ⬇️
 """,
     "expanded": """
-🌸 <b>Sakura Bot Guide</b> 🌸
+🌸 <b>Sakura Bot Guide for {user_mention}</b> 🌸
 
 🗣️ Talk in Hindi, English, or Bangla  
 💭 Ask simple questions  
@@ -488,6 +488,14 @@ def track_user_and_chat(update: Update) -> None:
         logger.info(f"📢 Group {chat_id} ({update.effective_chat.title}) tracked")
 
 
+def get_user_mention(user) -> str:
+    """Create user mention for HTML parsing"""
+    if user.username:
+        return f'<a href="tg://user?id={user.id}">@{user.username}</a>'
+    else:
+        return f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
+
+
 async def get_gemini_response(user_message: str, user_name: str = "") -> str:
     """Get response from Gemini API with fallback responses"""
     if not gemini_client:
@@ -538,9 +546,9 @@ def create_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_start_caption() -> str:
-    """Get caption text for start command"""
-    return START_MESSAGES["caption"]
+def get_start_caption(user_mention: str) -> str:
+    """Get caption text for start command with user mention"""
+    return START_MESSAGES["caption"].format(user_mention=user_mention)
 
 
 def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboardMarkup:
@@ -554,12 +562,12 @@ def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboard
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_help_text(expanded: bool = False) -> str:
-    """Get help text based on expansion state"""
+def get_help_text(user_mention: str, expanded: bool = False) -> str:
+    """Get help text based on expansion state with user mention"""
     if expanded:
-        return HELP_MESSAGES["expanded"]
+        return HELP_MESSAGES["expanded"].format(user_mention=user_mention)
     else:
-        return HELP_MESSAGES["minimal"]
+        return HELP_MESSAGES["minimal"].format(user_mention=user_mention)
 
 
 def create_broadcast_keyboard() -> InlineKeyboardMarkup:
@@ -596,7 +604,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         random_image = random.choice(SAKURA_IMAGES)
         keyboard = create_start_keyboard(context.bot.username)
-        caption = get_start_caption()
+        user_mention = get_user_mention(update.effective_user)
+        caption = get_start_caption(user_mention)
         
         await context.bot.send_photo(
             chat_id=update.effective_chat.id,
@@ -615,7 +624,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Handle /help command"""
     user_id = update.effective_user.id
     keyboard = create_help_keyboard(user_id, False)
-    help_text = get_help_text(False)
+    user_mention = get_user_mention(update.effective_user)
+    help_text = get_help_text(user_mention, False)
     
     await update.message.reply_text(
         help_text,
@@ -640,7 +650,8 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     help_expanded[user_id] = not is_expanded
     
     keyboard = create_help_keyboard(user_id, not is_expanded)
-    help_text = get_help_text(not is_expanded)
+    user_mention = get_user_mention(update.effective_user)
+    help_text = get_help_text(user_mention, not is_expanded)
     
     try:
         await query.edit_message_text(
