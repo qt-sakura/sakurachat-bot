@@ -489,11 +489,9 @@ def track_user_and_chat(update: Update) -> None:
 
 
 def get_user_mention(user) -> str:
-    """Create user mention for HTML parsing"""
-    if user.username:
-        return f'<a href="tg://user?id={user.id}">@{user.username}</a>'
-    else:
-        return f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
+    """Create user mention for HTML parsing using first name"""
+    first_name = user.first_name or "Friend"
+    return f'<a href="tg://user?id={user.id}">{first_name}</a>'
 
 
 async def get_gemini_response(user_message: str, user_name: str = "") -> str:
