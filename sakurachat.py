@@ -11,7 +11,8 @@ from telegram import (
     Update, 
     InlineKeyboardButton, 
     InlineKeyboardMarkup,
-    BotCommand
+    BotCommand,
+    Message
 )
 from telegram.ext import (
     Application,
@@ -421,6 +422,50 @@ SAKURA_IMAGES = [
 ]
 
 
+def extract_user_info(msg: Message) -> Dict[str, any]:
+    """Extract user and chat information from message"""
+    logger.debug("🔍 Extracting user information from message")
+    u = msg.from_user
+    c = msg.chat
+    info = {
+        "user_id": u.id,
+        "username": u.username,
+        "full_name": u.full_name,
+        "chat_id": c.id,
+        "chat_type": c.type,
+        "chat_title": c.title or c.first_name or "",
+        "chat_username": f"@{c.username}" if c.username else "No Username",
+        "chat_link": f"https://t.me/{c.username}" if c.username else "No Link",
+    }
+    logger.info(
+        f"📑 User info extracted: {info['full_name']} (@{info['username']}) "
+        f"[ID: {info['user_id']}] in {info['chat_title']} [{info['chat_id']}] {info['chat_link']}"
+    )
+    return info
+
+
+def log_with_user_info(level: str, message: str, user_info: Dict[str, any]) -> None:
+    """Log message with user information"""
+    user_detail = (
+        f"👤 {user_info['full_name']} (@{user_info['username']}) "
+        f"[ID: {user_info['user_id']}] | "
+        f"💬 {user_info['chat_title']} [{user_info['chat_id']}] "
+        f"({user_info['chat_type']}) {user_info['chat_link']}"
+    )
+    full_message = f"{message} | {user_detail}"
+    
+    if level.upper() == "INFO":
+        logger.info(full_message)
+    elif level.upper() == "DEBUG":
+        logger.debug(full_message)
+    elif level.upper() == "WARNING":
+        logger.warning(full_message)
+    elif level.upper() == "ERROR":
+        logger.error(full_message)
+    else:
+        logger.info(full_message)
+
+
 def get_fallback_response() -> str:
     """Get a random fallback response when API fails"""
     return random.choice(RESPONSES)
@@ -473,19 +518,19 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
     return False
 
 
-def track_user_and_chat(update: Update) -> None:
+def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
     """Track user and chat IDs for broadcasting"""
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    chat_type = update.effective_chat.type
+    user_id = user_info["user_id"]
+    chat_id = user_info["chat_id"]
+    chat_type = user_info["chat_type"]
     
     if chat_type == "private":
         user_ids.add(user_id)
-        logger.info(f"👤 User {user_id} ({update.effective_user.first_name}) tracked")
+        log_with_user_info("INFO", f"👤 User tracked for broadcasting", user_info)
     elif chat_type in ['group', 'supergroup']:
         group_ids.add(chat_id)
         user_ids.add(user_id)
-        logger.info(f"📢 Group {chat_id} ({update.effective_chat.title}) tracked")
+        log_with_user_info("INFO", f"📢 Group and user tracked for broadcasting", user_info)
 
 
 def get_user_mention(user) -> str:
@@ -494,9 +539,14 @@ def get_user_mention(user) -> str:
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'
 
 
-async def get_gemini_response(user_message: str, user_name: str = "") -> str:
+async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None) -> str:
     """Get response from Gemini API with fallback responses"""
+    if user_info:
+        log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
+    
     if not gemini_client:
+        if user_info:
+            log_with_user_info("WARNING", "❌ Gemini client not available, using fallback response", user_info)
         return get_fallback_response()
     
     try:
@@ -507,25 +557,36 @@ async def get_gemini_response(user_message: str, user_name: str = "") -> str:
             contents=prompt
         )
         
-        return response.text.strip() if response.text else get_fallback_response()
+        ai_response = response.text.strip() if response.text else get_fallback_response()
+        
+        if user_info:
+            log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
+        
+        return ai_response
             
     except Exception as e:
-        logger.error(f"Gemini API error: {e}")
+        if user_info:
+            log_with_user_info("ERROR", f"❌ Gemini API error: {e}", user_info)
+        else:
+            logger.error(f"Gemini API error: {e}")
         return get_error_response()
 
 
-async def send_typing_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+async def send_typing_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send typing action to show bot is processing"""
+    log_with_user_info("DEBUG", "⌨️ Sending typing action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
 
-async def send_photo_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+async def send_photo_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send upload photo action"""
+    log_with_user_info("DEBUG", "📷 Sending photo upload action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
 
 
-async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send choosing sticker action"""
+    log_with_user_info("DEBUG", "🎭 Sending sticker choosing action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.CHOOSE_STICKER)
 
 
@@ -596,14 +657,19 @@ def get_broadcast_text() -> str:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command"""
     try:
-        track_user_and_chat(update)
+        user_info = extract_user_info(update.message)
+        log_with_user_info("INFO", "🌸 /start command received", user_info)
         
-        await send_photo_action(context, update.effective_chat.id)
+        track_user_and_chat(update, user_info)
+        
+        await send_photo_action(context, update.effective_chat.id, user_info)
         
         random_image = random.choice(SAKURA_IMAGES)
         keyboard = create_start_keyboard(context.bot.username)
         user_mention = get_user_mention(update.effective_user)
         caption = get_start_caption(user_mention)
+        
+        log_with_user_info("DEBUG", f"📷 Sending start photo: {random_image[:50]}...", user_info)
         
         await context.bot.send_photo(
             chat_id=update.effective_chat.id,
@@ -613,13 +679,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=keyboard
         )
         
+        log_with_user_info("INFO", "✅ Start command completed successfully", user_info)
+        
     except Exception as e:
-        logger.error(f"Error in start command: {e}")
+        user_info = extract_user_info(update.message)
+        log_with_user_info("ERROR", f"❌ Error in start command: {e}", user_info)
         await update.message.reply_text(get_error_response())
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command"""
+    user_info = extract_user_info(update.message)
+    log_with_user_info("INFO", "ℹ️ /help command received", user_info)
+    
     user_id = update.effective_user.id
     keyboard = create_help_keyboard(user_id, False)
     user_mention = get_user_mention(update.effective_user)
@@ -630,17 +702,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard
     )
+    
+    log_with_user_info("INFO", "✅ Help command completed successfully", user_info)
 
 
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
     query = update.callback_query
+    user_info = extract_user_info(query.message)
+    log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
+    
     await query.answer()
     
     callback_data = query.data
     user_id = int(callback_data.split('_')[2])
     
     if update.effective_user.id != user_id:
+        log_with_user_info("WARNING", "⚠️ Unauthorized help button access attempt", user_info)
         await query.answer("Ye button tumhare liye nahi hai 😊", show_alert=True)
         return
     
@@ -657,56 +735,76 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
         )
+        log_with_user_info("INFO", f"✅ Help message {'expanded' if not is_expanded else 'minimized'}", user_info)
     except Exception as e:
-        logger.error(f"Error editing help message: {e}")
+        log_with_user_info("ERROR", f"❌ Error editing help message: {e}", user_info)
 
 
 async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle sticker messages"""
-    await send_sticker_action(context, update.effective_chat.id)
+    user_info = extract_user_info(update.message)
+    log_with_user_info("INFO", "🎭 Sticker message received", user_info)
+    
+    await send_sticker_action(context, update.effective_chat.id, user_info)
     
     random_sticker = random.choice(SAKURA_STICKERS)
     chat_type = update.effective_chat.type
+    
+    log_with_user_info("DEBUG", f"📤 Sending random sticker: {random_sticker}", user_info)
     
     # In groups, reply to the user's sticker when they replied to bot
     if (chat_type in ['group', 'supergroup'] and 
         update.message.reply_to_message and 
         update.message.reply_to_message.from_user.id == context.bot.id):
         await update.message.reply_sticker(sticker=random_sticker)
+        log_with_user_info("INFO", "✅ Replied to user's sticker in group", user_info)
     else:
         # In private chats or regular stickers, send normally
         await context.bot.send_sticker(
             chat_id=update.effective_chat.id,
             sticker=random_sticker
         )
+        log_with_user_info("INFO", "✅ Sent sticker response", user_info)
 
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text and media messages with AI response"""
-    await send_typing_action(context, update.effective_chat.id)
-    
+    user_info = extract_user_info(update.message)
     user_message = update.message.text or update.message.caption or "Media message"
+    
+    log_with_user_info("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
+    
+    await send_typing_action(context, update.effective_chat.id, user_info)
+    
     user_name = update.effective_user.first_name or ""
     
     # Get response from Gemini
-    response = await get_gemini_response(user_message, user_name)
+    response = await get_gemini_response(user_message, user_name, user_info)
+    
+    log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
     
     # Send response
     await update.message.reply_text(response)
+    
+    log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
 
 async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all types of messages (text, stickers, voice, photos, etc.)"""
     try:
+        user_info = extract_user_info(update.message)
         user_id = update.effective_user.id
         chat_type = update.effective_chat.type
         
+        log_with_user_info("DEBUG", f"📨 Processing message in {chat_type}", user_info)
+        
         # Track user and group IDs for broadcasting
-        track_user_and_chat(update)
+        track_user_and_chat(update, user_info)
         
         # Check if owner is in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
-            await execute_broadcast_direct(update, context, broadcast_mode[OWNER_ID])
+            log_with_user_info("INFO", f"📢 Executing broadcast to {broadcast_mode[OWNER_ID]}", user_info)
+            await execute_broadcast_direct(update, context, broadcast_mode[OWNER_ID], user_info)
             del broadcast_mode[OWNER_ID]
             return
         
@@ -714,12 +812,15 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         should_respond = True
         if chat_type in ['group', 'supergroup']:
             should_respond = should_respond_in_group(update, context.bot.id)
-        
-        if not should_respond:
-            return
+            if not should_respond:
+                log_with_user_info("DEBUG", "🚫 Not responding to group message (no mention/reply)", user_info)
+                return
+            else:
+                log_with_user_info("INFO", "✅ Responding to group message (mentioned/replied)", user_info)
         
         # Check rate limiting
         if is_rate_limited(user_id):
+            log_with_user_info("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
         
         # Handle different message types
@@ -730,20 +831,24 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # Update response time after sending response
         update_user_response_time(user_id)
+        log_with_user_info("DEBUG", "⏰ Updated user response time", user_info)
         
     except Exception as e:
-        logger.error(f"Error handling message: {e}")
+        user_info = extract_user_info(update.message)
+        log_with_user_info("ERROR", f"❌ Error handling message: {e}", user_info)
         if update.message.text:
             await update.message.reply_text(get_error_response())
 
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast command (owner only)"""
+    user_info = extract_user_info(update.message)
+    
     if update.effective_user.id != OWNER_ID:
-        # No response for non-owners - silently ignore
+        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast command", user_info)
         return
     
-    logger.info("📢 Broadcast command by owner")
+    log_with_user_info("INFO", "📢 Broadcast command received from owner", user_info)
     
     keyboard = create_broadcast_keyboard()
     broadcast_text = get_broadcast_text()
@@ -753,15 +858,22 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
     )
+    
+    log_with_user_info("INFO", "✅ Broadcast selection menu sent", user_info)
 
 
 async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast target selection"""
     query = update.callback_query
+    user_info = extract_user_info(query.message)
+    
     await query.answer()
     
     if query.from_user.id != OWNER_ID:
+        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
         return
+    
+    log_with_user_info("INFO", f"🎯 Broadcast target selected: {query.data}", user_info)
     
     if query.data == "bc_users":
         broadcast_mode[OWNER_ID] = "users"
@@ -769,15 +881,17 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
             parse_mode=ParseMode.HTML
         )
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
     elif query.data == "bc_groups":
         broadcast_mode[OWNER_ID] = "groups"
         await query.edit_message_text(
             BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
             parse_mode=ParseMode.HTML
         )
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
 
 
-async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str) -> None:
+async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
     """Execute broadcast with the current message"""
     try:
         if target_type == "users":
@@ -789,10 +903,13 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         else:
             return
         
+        log_with_user_info("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
+        
         if not target_list:
             await update.message.reply_text(
                 BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
             )
+            log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
             return
         
         # Show initial status
@@ -804,7 +921,7 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         failed_count = 0
         
         # Broadcast the current message to all targets
-        for target_id in target_list:
+        for i, target_id in enumerate(target_list, 1):
             try:
                 await context.bot.copy_message(
                     chat_id=target_id,
@@ -812,6 +929,9 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                     message_id=update.message.message_id
                 )
                 broadcast_count += 1
+                
+                if i % 10 == 0:  # Log progress every 10 messages
+                    log_with_user_info("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)}", user_info)
                 
                 # Small delay to avoid rate limits
                 await asyncio.sleep(BROADCAST_DELAY)
@@ -831,8 +951,10 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             parse_mode=ParseMode.HTML
         )
         
+        log_with_user_info("INFO", f"✅ Broadcast completed: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
+        
     except Exception as e:
-        logger.error(f"Broadcast error: {e}")
+        log_with_user_info("ERROR", f"❌ Broadcast error: {e}", user_info)
         await update.message.reply_text(
             BROADCAST_MESSAGES["failed"].format(error=str(e))
         )
@@ -840,6 +962,9 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle ping command for everyone"""
+    user_info = extract_user_info(update.message)
+    log_with_user_info("INFO", "🏓 Ping command received", user_info)
+    
     start_time = time.time()
     
     # Send initial message
@@ -854,11 +979,27 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
     )
+    
+    log_with_user_info("INFO", f"✅ Ping completed: {response_time}ms", user_info)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
+    
+    # Try to extract user info if update has a message
+    if hasattr(update, 'message') and update.message:
+        try:
+            user_info = extract_user_info(update.message)
+            log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for error: {context.error}")
+    elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
+        try:
+            user_info = extract_user_info(update.callback_query.message)
+            log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
 async def setup_bot_commands(application: Application) -> None:
@@ -878,6 +1019,8 @@ async def setup_bot_commands(application: Application) -> None:
 
 def setup_handlers(application: Application) -> None:
     """Setup all command and message handlers"""
+    logger.info("🔧 Setting up bot handlers...")
+    
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -897,12 +1040,16 @@ def setup_handlers(application: Application) -> None:
     
     # Error handler
     application.add_error_handler(error_handler)
+    
+    logger.info("✅ All handlers setup completed")
 
 
 def run_bot() -> None:
     """Run the bot"""
     if not validate_config():
         return
+    
+    logger.info("🚀 Initializing Sakura Bot...")
     
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
@@ -913,6 +1060,7 @@ def run_bot() -> None:
     # Setup bot commands using post_init
     async def post_init(app):
         await setup_bot_commands(app)
+        logger.info("🌸 Sakura Bot initialization completed!")
         
     application.post_init = post_init
     
@@ -950,6 +1098,8 @@ def start_dummy_server() -> None:
 def main() -> None:
     """Main function"""
     try:
+        logger.info("🌸 Sakura Bot starting up...")
+        
         # Start dummy server in background thread
         threading.Thread(target=start_dummy_server, daemon=True).start()
         
