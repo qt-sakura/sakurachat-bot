@@ -37,7 +37,7 @@ class Colors:
     BOLD = '\033[1m'       # Bold text
 
 class ColoredFormatter(logging.Formatter):
-    """Custom formatter to add colors to log levels"""
+    """Custom formatter to add colors to entire log messages"""
     
     COLORS = {
         'DEBUG': Colors.GREEN,
@@ -50,11 +50,11 @@ class ColoredFormatter(logging.Formatter):
         # Get the original formatted message
         original_format = super().format(record)
         
-        # Add color based on log level
+        # Get color based on log level
         color = self.COLORS.get(record.levelname, Colors.RESET)
         
-        # Format: [COLOR][LEVEL][RESET] message
-        colored_format = f"{color}{Colors.BOLD}[{record.levelname}]{Colors.RESET} {original_format}"
+        # Apply color to the entire message
+        colored_format = f"{color}{original_format}{Colors.RESET}"
         
         return colored_format
 
@@ -72,9 +72,9 @@ def setup_colored_logging():
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)
     
-    # Create colored formatter
+    # Create colored formatter with enhanced format
     formatter = ColoredFormatter(
-        fmt='%(asctime)s - %(name)s - %(message)s',
+        fmt='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     console_handler.setFormatter(formatter)
