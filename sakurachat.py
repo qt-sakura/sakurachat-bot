@@ -11,7 +11,8 @@ from telegram import (
     Update, 
     InlineKeyboardButton, 
     InlineKeyboardMarkup,
-    BotCommand
+    BotCommand,
+    Message
 )
 from telegram.ext import (
     Application,
@@ -26,12 +27,42 @@ from telegram.error import TelegramError
 
 from google import genai
 
-# Configure logging
+# Configure logging with custom formatter
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter with colors and emojis"""
+    
+    COLORS = {
+        'DEBUG': '\033[36m',     # Cyan
+        'INFO': '\033[32m',      # Green
+        'WARNING': '\033[33m',   # Yellow
+        'ERROR': '\033[31m',     # Red
+        'CRITICAL': '\033[35m',  # Magenta
+        'RESET': '\033[0m'       # Reset
+    }
+    
+    def format(self, record):
+        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
+        record.levelname = f"{color}{record.levelname}{self.COLORS['RESET']}"
+        return super().format(record)
+
+# Setup logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+
+# Create specialized loggers
 logger = logging.getLogger(__name__)
+user_logger = logging.getLogger('user_interactions')
+bot_logger = logging.getLogger('bot_responses')
+
+# Apply custom formatter
+handler = logging.StreamHandler()
+handler.setFormatter(ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+user_logger.addHandler(handler)
+bot_logger.addHandler(handler)
+user_logger.setLevel(logging.INFO)
+bot_logger.setLevel(logging.INFO)
 
 # Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -421,6 +452,30 @@ SAKURA_IMAGES = [
 ]
 
 
+def extract_user_info(msg: Message) -> dict:
+    """Extract user and chat information from message"""
+    logger.debug("🔍 Extracting user information from message")
+    u = msg.from_user
+    c = msg.chat
+    info = {
+        "user_id": u.id,
+        "username": u.username,
+        "full_name": u.full_name,
+        "chat_id": c.id,
+        "chat_type": c.type,
+        "chat_title": c.title or c.first_name or "",
+        "chat_username": f"@{c.username}" if c.username else "No Username",
+        "chat_link": f"https://t.me/{c.username}" if c.username else "No Link",
+    }
+    
+    # Professional logging with structured format
+    user_logger.info(
+        f"📑 User: {info['full_name']} (@{info['username']}) "
+        f"[ID: {info['user_id']}] in {info['chat_title']} [{info['chat_id']}] {info['chat_link']}"
+    )
+    return info
+
+
 def get_fallback_response() -> str:
     """Get a random fallback response when API fails"""
     return random.choice(RESPONSES)
@@ -481,11 +536,9 @@ def track_user_and_chat(update: Update) -> None:
     
     if chat_type == "private":
         user_ids.add(user_id)
-        logger.info(f"👤 User {user_id} ({update.effective_user.first_name}) tracked")
     elif chat_type in ['group', 'supergroup']:
         group_ids.add(chat_id)
         user_ids.add(user_id)
-        logger.info(f"📢 Group {chat_id} ({update.effective_chat.title}) tracked")
 
 
 def get_user_mention(user) -> str:
@@ -596,8 +649,10 @@ def get_broadcast_text() -> str:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command"""
     try:
-        track_user_and_chat(update)
+        info = extract_user_info(update.message)
+        user_logger.info(f"📨 {info['full_name']} executed /start command")
         
+        track_user_and_chat(update)
         await send_photo_action(context, update.effective_chat.id)
         
         random_image = random.choice(SAKURA_IMAGES)
@@ -613,86 +668,142 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=keyboard
         )
         
+        bot_logger.info(f"🌸 Sent welcome photo with caption to {info['full_name']}")
+        
     except Exception as e:
         logger.error(f"Error in start command: {e}")
-        await update.message.reply_text(get_error_response())
+        error_msg = get_error_response()
+        await update.message.reply_text(error_msg)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command"""
-    user_id = update.effective_user.id
-    keyboard = create_help_keyboard(user_id, False)
-    user_mention = get_user_mention(update.effective_user)
-    help_text = get_help_text(user_mention, False)
-    
-    await update.message.reply_text(
-        help_text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard
-    )
+    try:
+        info = extract_user_info(update.message)
+        user_logger.info(f"📨 {info['full_name']} requested help")
+        
+        user_id = update.effective_user.id
+        keyboard = create_help_keyboard(user_id, False)
+        user_mention = get_user_mention(update.effective_user)
+        help_text = get_help_text(user_mention, False)
+        
+        await update.message.reply_text(
+            help_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard
+        )
+        
+        bot_logger.info(f"🌸 Sent help message to {info['full_name']}")
+        
+    except Exception as e:
+        logger.error(f"Error in help command: {e}")
 
 
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
-    query = update.callback_query
-    await query.answer()
-    
-    callback_data = query.data
-    user_id = int(callback_data.split('_')[2])
-    
-    if update.effective_user.id != user_id:
-        await query.answer("Ye button tumhare liye nahi hai 😊", show_alert=True)
-        return
-    
-    is_expanded = help_expanded.get(user_id, False)
-    help_expanded[user_id] = not is_expanded
-    
-    keyboard = create_help_keyboard(user_id, not is_expanded)
-    user_mention = get_user_mention(update.effective_user)
-    help_text = get_help_text(user_mention, not is_expanded)
-    
     try:
+        query = update.callback_query
+        await query.answer()
+        
+        info = extract_user_info(query.message)
+        user_logger.info(f"📨 {info['full_name']} toggled help expansion")
+        
+        callback_data = query.data
+        user_id = int(callback_data.split('_')[2])
+        
+        if update.effective_user.id != user_id:
+            await query.answer("Ye button tumhare liye nahi hai 😊", show_alert=True)
+            return
+        
+        is_expanded = help_expanded.get(user_id, False)
+        help_expanded[user_id] = not is_expanded
+        
+        keyboard = create_help_keyboard(user_id, not is_expanded)
+        user_mention = get_user_mention(update.effective_user)
+        help_text = get_help_text(user_mention, not is_expanded)
+        
         await query.edit_message_text(
             help_text,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
         )
+        
+        bot_logger.info(f"🌸 Updated help message for {info['full_name']}")
+        
     except Exception as e:
         logger.error(f"Error editing help message: {e}")
 
 
 async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle sticker messages"""
-    await send_sticker_action(context, update.effective_chat.id)
-    
-    random_sticker = random.choice(SAKURA_STICKERS)
-    chat_type = update.effective_chat.type
-    
-    # In groups, reply to the user's sticker when they replied to bot
-    if (chat_type in ['group', 'supergroup'] and 
-        update.message.reply_to_message and 
-        update.message.reply_to_message.from_user.id == context.bot.id):
-        await update.message.reply_sticker(sticker=random_sticker)
-    else:
-        # In private chats or regular stickers, send normally
-        await context.bot.send_sticker(
-            chat_id=update.effective_chat.id,
-            sticker=random_sticker
-        )
+    try:
+        info = extract_user_info(update.message)
+        sticker_emoji = update.message.sticker.emoji or "🎭"
+        user_logger.info(f"📨 {info['full_name']} sent sticker: {sticker_emoji}")
+        
+        await send_sticker_action(context, update.effective_chat.id)
+        
+        random_sticker = random.choice(SAKURA_STICKERS)
+        chat_type = update.effective_chat.type
+        
+        # In groups, reply to the user's sticker when they replied to bot
+        if (chat_type in ['group', 'supergroup'] and 
+            update.message.reply_to_message and 
+            update.message.reply_to_message.from_user.id == context.bot.id):
+            await update.message.reply_sticker(sticker=random_sticker)
+        else:
+            # In private chats or regular stickers, send normally
+            await context.bot.send_sticker(
+                chat_id=update.effective_chat.id,
+                sticker=random_sticker
+            )
+        
+        bot_logger.info(f"🌸 Sent sticker response to {info['full_name']}")
+        
+    except Exception as e:
+        logger.error(f"Error handling sticker: {e}")
 
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text and media messages with AI response"""
-    await send_typing_action(context, update.effective_chat.id)
-    
-    user_message = update.message.text or update.message.caption or "Media message"
-    user_name = update.effective_user.first_name or ""
-    
-    # Get response from Gemini
-    response = await get_gemini_response(user_message, user_name)
-    
-    # Send response
-    await update.message.reply_text(response)
+    try:
+        info = extract_user_info(update.message)
+        
+        await send_typing_action(context, update.effective_chat.id)
+        
+        user_message = update.message.text or update.message.caption or "Media message"
+        user_name = update.effective_user.first_name or ""
+        
+        # Determine message type for logging
+        message_type = "text"
+        if update.message.photo:
+            message_type = "photo"
+        elif update.message.voice:
+            message_type = "voice"
+        elif update.message.video_note:
+            message_type = "video_note"
+        elif update.message.document:
+            message_type = "document"
+        elif update.message.video:
+            message_type = "video"
+        
+        # Log user message with truncation for long messages
+        display_message = user_message[:100] + "..." if len(user_message) > 100 else user_message
+        user_logger.info(f"📨 {info['full_name']} sent {message_type}: {display_message}")
+        
+        # Get response from Gemini
+        response = await get_gemini_response(user_message, user_name)
+        
+        # Send response
+        await update.message.reply_text(response)
+        
+        # Log bot response
+        bot_logger.info(f"🌸 Replied to {info['full_name']}: {response}")
+        
+    except Exception as e:
+        logger.error(f"Error handling text message: {e}")
+        error_msg = get_error_response()
+        await update.message.reply_text(error_msg)
 
 
 async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -733,53 +844,69 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         
     except Exception as e:
         logger.error(f"Error handling message: {e}")
-        if update.message.text:
-            await update.message.reply_text(get_error_response())
+        if update.message and update.message.text:
+            error_msg = get_error_response()
+            await update.message.reply_text(error_msg)
 
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast command (owner only)"""
     if update.effective_user.id != OWNER_ID:
-        # No response for non-owners - silently ignore
         return
     
-    logger.info("📢 Broadcast command by owner")
-    
-    keyboard = create_broadcast_keyboard()
-    broadcast_text = get_broadcast_text()
-    
-    await update.message.reply_text(
-        broadcast_text,
-        reply_markup=keyboard,
-        parse_mode=ParseMode.HTML
-    )
+    try:
+        info = extract_user_info(update.message)
+        user_logger.info(f"📨 Owner {info['full_name']} initiated broadcast")
+        
+        keyboard = create_broadcast_keyboard()
+        broadcast_text = get_broadcast_text()
+        
+        await update.message.reply_text(
+            broadcast_text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML
+        )
+        
+        bot_logger.info(f"🌸 Sent broadcast menu to owner")
+        
+    except Exception as e:
+        logger.error(f"Error in broadcast command: {e}")
 
 
 async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast target selection"""
-    query = update.callback_query
-    await query.answer()
-    
-    if query.from_user.id != OWNER_ID:
-        return
-    
-    if query.data == "bc_users":
-        broadcast_mode[OWNER_ID] = "users"
-        await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
-            parse_mode=ParseMode.HTML
-        )
-    elif query.data == "bc_groups":
-        broadcast_mode[OWNER_ID] = "groups"
-        await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
-            parse_mode=ParseMode.HTML
-        )
+    try:
+        query = update.callback_query
+        await query.answer()
+        
+        if query.from_user.id != OWNER_ID:
+            return
+        
+        info = extract_user_info(query.message)
+        user_logger.info(f"📨 Owner selected broadcast target: {query.data}")
+        
+        if query.data == "bc_users":
+            broadcast_mode[OWNER_ID] = "users"
+            response_text = BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids))
+        elif query.data == "bc_groups":
+            broadcast_mode[OWNER_ID] = "groups"
+            response_text = BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids))
+        
+        await query.edit_message_text(response_text, parse_mode=ParseMode.HTML)
+        bot_logger.info(f"🌸 Ready for broadcast to {query.data}")
+        
+    except Exception as e:
+        logger.error(f"Error in broadcast callback: {e}")
 
 
 async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str) -> None:
     """Execute broadcast with the current message"""
     try:
+        info = extract_user_info(update.message)
+        user_message = update.message.text or update.message.caption or "Media broadcast"
+        display_message = user_message[:50] + "..." if len(user_message) > 50 else user_message
+        user_logger.info(f"📨 Owner broadcasting: {display_message}")
+        
         if target_type == "users":
             target_list = [uid for uid in user_ids if uid != OWNER_ID]
             target_name = "users"
@@ -790,15 +917,13 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             return
         
         if not target_list:
-            await update.message.reply_text(
-                BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
-            )
+            no_target_msg = BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
+            await update.message.reply_text(no_target_msg)
             return
         
         # Show initial status
-        status_msg = await update.message.reply_text(
-            BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
-        )
+        progress_msg = BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
+        status_msg = await update.message.reply_text(progress_msg)
         
         broadcast_count = 0
         failed_count = 0
@@ -812,8 +937,6 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                     message_id=update.message.message_id
                 )
                 broadcast_count += 1
-                
-                # Small delay to avoid rate limits
                 await asyncio.sleep(BROADCAST_DELAY)
                 
             except Exception as e:
@@ -821,39 +944,43 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                 logger.error(f"Failed to broadcast to {target_id}: {e}")
         
         # Final status update
-        await status_msg.edit_text(
-            BROADCAST_MESSAGES["completed"].format(
-                success_count=broadcast_count,
-                total_count=len(target_list),
-                target_type=target_name,
-                failed_count=failed_count
-            ),
-            parse_mode=ParseMode.HTML
+        completion_msg = BROADCAST_MESSAGES["completed"].format(
+            success_count=broadcast_count,
+            total_count=len(target_list),
+            target_type=target_name,
+            failed_count=failed_count
         )
+        
+        await status_msg.edit_text(completion_msg, parse_mode=ParseMode.HTML)
+        bot_logger.info(f"🌸 Broadcast completed: {broadcast_count}/{len(target_list)} {target_name}")
         
     except Exception as e:
         logger.error(f"Broadcast error: {e}")
-        await update.message.reply_text(
-            BROADCAST_MESSAGES["failed"].format(error=str(e))
-        )
+        error_msg = BROADCAST_MESSAGES["failed"].format(error=str(e))
+        await update.message.reply_text(error_msg)
 
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle ping command for everyone"""
-    start_time = time.time()
-    
-    # Send initial message
-    msg = await update.message.reply_text("🛰️ Pinging...")
-    
-    # Calculate response time
-    response_time = round((time.time() - start_time) * 1000, 2)  # milliseconds
-    
-    # Edit message with response time and group link (no preview)
-    await msg.edit_text(
-        f"🏓 <a href='{GROUP_LINK}'>Pong!</a> {response_time}ms",
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True
-    )
+    try:
+        info = extract_user_info(update.message)
+        user_logger.info(f"📨 {info['full_name']} pinged the bot")
+        
+        start_time = time.time()
+        msg = await update.message.reply_text("🛰️ Pinging...")
+        response_time = round((time.time() - start_time) * 1000, 2)
+        
+        ping_response = f"🏓 <a href='{GROUP_LINK}'>Pong!</a> {response_time}ms"
+        await msg.edit_text(
+            ping_response,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )
+        
+        bot_logger.info(f"🌸 Pong response sent to {info['full_name']} ({response_time}ms)")
+        
+    except Exception as e:
+        logger.error(f"Error in ping command: {e}")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
