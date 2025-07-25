@@ -778,8 +778,6 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await query.answer("Ye button tumhare liye nahi hai 😊", show_alert=True)
         return
     
-    # Send typing indicator before updating help message
-    await send_typing_action(context, update.effective_chat.id, user_info)
     
     is_expanded = help_expanded.get(user_id, False)
     help_expanded[user_id] = not is_expanded
