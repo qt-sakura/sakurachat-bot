@@ -27,12 +27,65 @@ from telegram.error import TelegramError
 
 from google import genai
 
-# Configure logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# Color codes for logging
+class Colors:
+    BLUE = '\033[94m'      # INFO/WARNING
+    GREEN = '\033[92m'     # DEBUG
+    YELLOW = '\033[93m'    # INFO
+    RED = '\033[91m'       # ERROR
+    RESET = '\033[0m'      # Reset color
+    BOLD = '\033[1m'       # Bold text
+
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter to add colors to log levels"""
+    
+    COLORS = {
+        'DEBUG': Colors.GREEN,
+        'INFO': Colors.YELLOW,
+        'WARNING': Colors.BLUE,
+        'ERROR': Colors.RED,
+    }
+    
+    def format(self, record):
+        # Get the original formatted message
+        original_format = super().format(record)
+        
+        # Add color based on log level
+        color = self.COLORS.get(record.levelname, Colors.RESET)
+        
+        # Format: [COLOR][LEVEL][RESET] message
+        colored_format = f"{color}{Colors.BOLD}[{record.levelname}]{Colors.RESET} {original_format}"
+        
+        return colored_format
+
+# Configure logging with colors
+def setup_colored_logging():
+    """Setup colored logging configuration"""
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    
+    # Remove existing handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    
+    # Create colored formatter
+    formatter = ColoredFormatter(
+        fmt='%(asctime)s - %(name)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    console_handler.setFormatter(formatter)
+    
+    # Add handler to logger
+    logger.addHandler(console_handler)
+    
+    return logger
+
+# Initialize colored logger
+logger = setup_colored_logging()
 
 # Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -692,6 +745,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "ℹ️ /help command received", user_info)
     
+    # Send typing indicator before processing help command
+    await send_typing_action(context, update.effective_chat.id, user_info)
+    
     user_id = update.effective_user.id
     keyboard = create_help_keyboard(user_id, False)
     user_mention = get_user_mention(update.effective_user)
@@ -721,6 +777,9 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         log_with_user_info("WARNING", "⚠️ Unauthorized help button access attempt", user_info)
         await query.answer("Ye button tumhare liye nahi hai 😊", show_alert=True)
         return
+    
+    # Send typing indicator before updating help message
+    await send_typing_action(context, update.effective_chat.id, user_info)
     
     is_expanded = help_expanded.get(user_id, False)
     help_expanded[user_id] = not is_expanded
