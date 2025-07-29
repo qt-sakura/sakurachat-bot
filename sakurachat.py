@@ -187,10 +187,10 @@ RESPONSES = [
     "Got a bit confused, try again 😔",
     "Something's off, I can't understand 😕",
     "I'm a little overwhelmed right now, let's talk later 🥺",
-    "My brain's all scrambled, hold on 😅",
+    "My brain’s all scrambled, hold on 😅",
     "There's some issue with the system 🫤",
     "Network's acting up, try once more 😐",
-    "I can't speak properly right now 😪",
+    "I can’t speak properly right now 😪",
     "Facing a technical issue 🤨",
     "I'm feeling a bit slow today 😴",
     "Looks like the server's having a bad day 😑",
@@ -199,31 +199,31 @@ RESPONSES = [
     "My brain just froze 🫠",
     "Might be a connection issue 😬",
     "Can't really focus at the moment 😌",
-    "There's some technical glitch going on 😕",
+    "There’s some technical glitch going on 😕",
     "Might need a quick system reboot 🫤",
     "I'm kinda in a confused state 😵",
     "The API seems moody today 😤",
-    "Just a little patience, I'll be fine 💗"
+    "Just a little patience, I’ll be fine 💗"
 ]
 
 ERROR = [
     "Sorry buddy, something went wrong 😔",
     "Oops, I think I misunderstood 🫢",
     "That was unexpected, try again 😅",
-    "I'm not working properly right now 😕",
-    "There's some technical problem 🤨",
+    "I’m not working properly right now 😕",
+    "There’s some technical problem 🤨",
     "Looks like there's a bug in the system 🫤",
-    "I'm kind of frozen at the moment 😐",
+    "I’m kind of frozen at the moment 😐",
     "Got an error, send the message again 😬",
     "Missed something there, say it again 🙃",
     "Facing a technical glitch 😑",
-    "I can't respond properly right now 😪",
-    "There's some internal error 🫠",
+    "I can’t respond properly right now 😪",
+    "There’s some internal error 🫠",
     "System might be overloaded 😴",
     "Seems like a connection issue 😌",
     "I'm a little confused right now 🥺",
     "There was a problem during processing 😵",
-    "I'm not functioning properly at the moment 😤",
+    "I’m not functioning properly at the moment 😤",
     "Ran into an unexpected error 🫤",
     "Restarting myself, please wait 😔",
     "Dealing with some technical difficulties 💗"
@@ -446,7 +446,7 @@ SAKURA_IMAGES = [
     "https://i.postimg.cc/tT2TTf1q/New-Project-235-CE958-B1.png",
     "https://i.postimg.cc/Xv6XD9Sb/New-Project-235-0-E24-C88.png",
     "https://i.postimg.cc/RhpNP89s/New-Project-235-FC3-A4-AD.png",
-    "https://i.postimg.cc/x841BwSF/New-Project-235-FFA9646.png",
+    "https://i.postimg.cc/x841BwFW/New-Project-235-FFA9646.png",
     "https://i.postimg.cc/5NC7HwSV/New-Project-235-A06-DD7-A.png",
     "https://i.postimg.cc/HnPqpdm9/New-Project-235-9-E45-B87.png",
     "https://i.postimg.cc/1tSPTmRg/New-Project-235-AB394-C0.png",
@@ -939,8 +939,11 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
             parse_mode=ParseMode.HTML
         )
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
+
+
 async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
-    """Execute broadcast with the current message using forward_message for forwarded messages and copy_message for original messages"""
+    """Execute broadcast with the current message"""
     try:
         if target_type == "users":
             target_list = [uid for uid in user_ids if uid != OWNER_ID]
@@ -960,15 +963,6 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
             return
         
-        # Check if the message is forwarded
-        is_forwarded = bool(update.message.forward_from or 
-                           update.message.forward_from_chat or 
-                           update.message.forward_sender_name or
-                           update.message.forward_date)
-        
-        broadcast_method = "forward_message" if is_forwarded else "copy_message"
-        log_with_user_info("INFO", f"📡 Using {broadcast_method} for broadcast (forwarded: {is_forwarded})", user_info)
-        
         # Show initial status
         status_msg = await update.message.reply_text(
             BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
@@ -980,23 +974,11 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         # Broadcast the current message to all targets
         for i, target_id in enumerate(target_list, 1):
             try:
-                if is_forwarded:
-                    # Use forward_message for forwarded messages
-                    await context.bot.forward_message(
-                        chat_id=target_id,
-                        from_chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id
-                    )
-                    log_with_user_info("DEBUG", f"📤 Forwarded message to {target_id}", user_info)
-                else:
-                    # Use copy_message for original messages
-                    await context.bot.copy_message(
-                        chat_id=target_id,
-                        from_chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id
-                    )
-                    log_with_user_info("DEBUG", f"📤 Copied message to {target_id}", user_info)
-                
+                await context.bot.copy_message(
+                    chat_id=target_id,
+                    from_chat_id=update.effective_chat.id,
+                    message_id=update.message.message_id
+                )
                 broadcast_count += 1
                 
                 if i % 10 == 0:  # Log progress every 10 messages
@@ -1020,7 +1002,7 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             parse_mode=ParseMode.HTML
         )
         
-        log_with_user_info("INFO", f"✅ Broadcast completed: {broadcast_count}/{len(target_list)} successful, {failed_count} failed using {broadcast_method}", user_info)
+        log_with_user_info("INFO", f"✅ Broadcast completed: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
         
     except Exception as e:
         log_with_user_info("ERROR", f"❌ Broadcast error: {e}", user_info)
