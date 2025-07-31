@@ -792,60 +792,120 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /help command"""
-    user_info = extract_user_info(update.message)
-    log_with_user_info("INFO", "ℹ️ /help command received", user_info)
-    
-    # Send typing indicator before processing help command
-    await send_typing_action(context, update.effective_chat.id, user_info)
-    
-    user_id = update.effective_user.id
-    keyboard = create_help_keyboard(user_id, False)
-    user_mention = get_user_mention(update.effective_user)
-    help_text = get_help_text(user_mention, False)
-    
-    await update.message.reply_text(
-        help_text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard
-    )
-    
-    log_with_user_info("INFO", "✅ Help command completed successfully", user_info)
+    """Handle /help command with random image"""
+    try:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("INFO", "ℹ️ /help command received", user_info)
+        
+        track_user_and_chat(update, user_info)
+        
+        # Step 1: React to the help message with random emoji (if enabled)
+        if EMOJI_REACT:
+            try:
+                random_emoji = random.choice(EMOJI_REACT)
+                
+                # Try the new API format first
+                try:
+                    reaction = [ReactionTypeEmoji(emoji=random_emoji)]
+                    await context.bot.set_message_reaction(
+                        chat_id=update.effective_chat.id,
+                        message_id=update.message.message_id,
+                        reaction=reaction
+                    )
+                    log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {random_emoji}", user_info)
+                
+                except ImportError:
+                    # Fallback to direct emoji string (older versions)
+                    try:
+                        await context.bot.set_message_reaction(
+                            chat_id=update.effective_chat.id,
+                            message_id=update.message.message_id,
+                            reaction=random_emoji
+                        )
+                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {random_emoji}", user_info)
+                    
+                    except Exception:
+                        # Try with list of strings
+                        await context.bot.set_message_reaction(
+                            chat_id=update.effective_chat.id,
+                            message_id=update.message.message_id,
+                            reaction=[random_emoji]
+                        )
+                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (list format): {random_emoji}", user_info)
+                
+            except Exception as e:
+                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+        
+        # Step 2: Send photo action indicator
+        await send_photo_action(context, update.effective_chat.id, user_info)
+        
+        # Step 3: Prepare help content
+        user_id = update.effective_user.id
+        keyboard = create_help_keyboard(user_id, False)
+        user_mention = get_user_mention(update.effective_user)
+        help_text = get_help_text(user_mention, False)
+        
+        # Step 4: Send help message with random image
+        random_image = random.choice(SAKURA_IMAGES)
+        log_with_user_info("DEBUG", f"📷 Sending help photo: {random_image[:50]}...", user_info)
+        
+        await context.bot.send_photo(
+            chat_id=update.effective_chat.id,
+            photo=random_image,
+            caption=help_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard
+        )
+        
+        log_with_user_info("INFO", "✅ Help command completed successfully", user_info)
+        
+    except Exception as e:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("ERROR", f"❌ Error in help command: {e}", user_info)
+        await update.message.reply_text(get_error_response())
 
 
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
-    query = update.callback_query
-    user_info = extract_user_info(query.message)
-    log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
-    
-    await query.answer()
-    
-    callback_data = query.data
-    user_id = int(callback_data.split('_')[2])
-    
-    if update.effective_user.id != user_id:
-        log_with_user_info("WARNING", "⚠️ Unauthorized help button access attempt", user_info)
-        await query.answer("This button isn't for you 💔", show_alert=True)
-        return
-    
-    
-    is_expanded = help_expanded.get(user_id, False)
-    help_expanded[user_id] = not is_expanded
-    
-    keyboard = create_help_keyboard(user_id, not is_expanded)
-    user_mention = get_user_mention(update.effective_user)
-    help_text = get_help_text(user_mention, not is_expanded)
-    
     try:
-        await query.edit_message_text(
-            help_text,
+        query = update.callback_query
+        user_info = extract_user_info(query.message)
+        log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
+        
+        await query.answer()
+        
+        callback_data = query.data
+        user_id = int(callback_data.split('_')[2])
+        
+        if update.effective_user.id != user_id:
+            log_with_user_info("WARNING", "⚠️ Unauthorized help button access attempt", user_info)
+            await query.answer("This button isn't for you 💔", show_alert=True)
+            return
+        
+        is_expanded = help_expanded.get(user_id, False)
+        help_expanded[user_id] = not is_expanded
+        
+        keyboard = create_help_keyboard(user_id, not is_expanded)
+        user_mention = get_user_mention(update.effective_user)
+        help_text = get_help_text(user_mention, not is_expanded)
+        
+        # Update the photo caption with new help text and keyboard
+        await query.edit_message_caption(
+            caption=help_text,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
         )
+        
         log_with_user_info("INFO", f"✅ Help message {'expanded' if not is_expanded else 'minimized'}", user_info)
+        
     except Exception as e:
+        user_info = extract_user_info(query.message) if query.message else {}
         log_with_user_info("ERROR", f"❌ Error editing help message: {e}", user_info)
+        # Fallback: answer the callback to prevent loading state
+        try:
+            await query.answer("Something went wrong 😔", show_alert=True)
+        except:
+            pass
 
 
 async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
