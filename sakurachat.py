@@ -1006,7 +1006,8 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
-    """Execute broadcast with the current message"""
+    """Execute broadcast with the current message - uses forward_message for forwarded messages, copy_message for regular messages
+    Compatible with python-telegram-bot==22.3"""
     try:
         if target_type == "users":
             target_list = [uid for uid in user_ids if uid != OWNER_ID]
@@ -1026,6 +1027,12 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
             return
         
+        # Check if the message is forwarded
+        is_forwarded = update.message.forward_origin is not None
+        broadcast_method = "forward" if is_forwarded else "copy"
+        
+        log_with_user_info("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
+        
         # Show initial status
         status_msg = await update.message.reply_text(
             BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
@@ -1033,27 +1040,19 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         
         broadcast_count = 0
         failed_count = 0
-        msg = update.message
-        
-        # Create a copy of target_list to safely modify during iteration
-        target_ids = target_list.copy()
         
         # Broadcast the current message to all targets
-        for i, target_id in enumerate(target_ids, 1):
+        for i, target_id in enumerate(target_list, 1):
             try:
-                # Check if message has forward attributes and if they exist
-                is_forwarded = (hasattr(msg, 'forward_from') and msg.forward_from) or \
-                              (hasattr(msg, 'forward_from_chat') and msg.forward_from_chat)
-                
                 if is_forwarded:
-                    # If it's a forwarded message, use forward_message to preserve attribution
+                    # Use forward_message for forwarded messages to preserve forwarding chain
                     await context.bot.forward_message(
                         chat_id=target_id,
-                        from_chat_id=msg.chat.id,
-                        message_id=msg.message_id
+                        from_chat_id=update.effective_chat.id,
+                        message_id=update.message.message_id
                     )
                 else:
-                    # Otherwise, use copy_message (better compatibility)
+                    # Use copy_message for regular messages
                     await context.bot.copy_message(
                         chat_id=target_id,
                         from_chat_id=update.effective_chat.id,
@@ -1063,7 +1062,7 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                 broadcast_count += 1
                 
                 if i % 10 == 0:  # Log progress every 10 messages
-                    log_with_user_info("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)}", user_info)
+                    log_with_user_info("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)} using {broadcast_method}", user_info)
                 
                 # Small delay to avoid rate limits
                 await asyncio.sleep(BROADCAST_DELAY)
@@ -1071,9 +1070,6 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             except Exception as e:
                 failed_count += 1
                 logger.error(f"Failed to broadcast to {target_id}: {e}")
-                # Remove failed target from the list to avoid retries
-                if target_id in target_ids:
-                    target_ids.remove(target_id)
         
         # Final status update
         await status_msg.edit_text(
@@ -1082,11 +1078,11 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                 total_count=len(target_list),
                 target_type=target_name,
                 failed_count=failed_count
-            ),
+            ) + f"\n<i>Method used: {broadcast_method}</i>",
             parse_mode=ParseMode.HTML
         )
         
-        log_with_user_info("INFO", f"✅ Broadcast completed: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
+        log_with_user_info("INFO", f"✅ Broadcast completed using {broadcast_method}: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
         
     except Exception as e:
         log_with_user_info("ERROR", f"❌ Broadcast error: {e}", user_info)
