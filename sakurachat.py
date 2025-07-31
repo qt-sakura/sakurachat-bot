@@ -1033,15 +1033,29 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         
         broadcast_count = 0
         failed_count = 0
+        msg = update.message
+        
+        # Create a copy of target_list to safely modify during iteration
+        target_ids = target_list.copy()
         
         # Broadcast the current message to all targets
-        for i, target_id in enumerate(target_list, 1):
+        for i, target_id in enumerate(target_ids, 1):
             try:
-                await context.bot.copy_message(
-                    chat_id=target_id,
-                    from_chat_id=update.effective_chat.id,
-                    message_id=update.message.message_id
-                )
+                if msg.forward_from or msg.forward_from_chat:
+                    # If it's a forwarded message, use forward_message to preserve attribution
+                    await context.bot.forward_message(
+                        chat_id=target_id,
+                        from_chat_id=msg.chat.id,
+                        message_id=msg.message_id
+                    )
+                else:
+                    # Otherwise, use copy_message (better compatibility)
+                    await context.bot.copy_message(
+                        chat_id=target_id,
+                        from_chat_id=update.effective_chat.id,
+                        message_id=update.message.message_id
+                    )
+                
                 broadcast_count += 1
                 
                 if i % 10 == 0:  # Log progress every 10 messages
@@ -1053,6 +1067,9 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             except Exception as e:
                 failed_count += 1
                 logger.error(f"Failed to broadcast to {target_id}: {e}")
+                # Remove failed target from the list to avoid retries
+                if target_id in target_ids:
+                    target_ids.remove(target_id)
         
         # Final status update
         await status_msg.edit_text(
