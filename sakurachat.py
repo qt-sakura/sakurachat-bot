@@ -98,6 +98,18 @@ GROUP_LINK = "https://t.me/SoulMeetsHQ"  # Hardcoded group link
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
 
+# Emoji reactions for /start command
+EMOJI_REACT = ["🍓"]
+
+# Stickers for after /start command
+START_STICKERS = [
+    "CAACAgUAAxkBAAEPDAABaIs0SbQ_ywqz-IgOCTJleeXEUH8AAjAYAAKh8VlUhpeC66Ml6Fs2BA",
+    "CAACAgUAAxkBAAEPDAJoizRLBBFtaNZtl_dLdHcZxJ4uewACVBoAAsxzWVSg5ZSfV0OJmjYE",
+    "CAACAgUAAxkBAAEPDARoizROexOwWYE4cCNSRscFm7wX_wACaBYAAjPbWVRgiH1uZqag6TYE",
+    "CAACAgUAAxkBAAEPDAZoizRQwWRLUzL4b4QLzaqA5NohpQACgRUAAmNyWVQ_facWYQzCdDYE",
+    "CAACAgUAAxkBAAEPDAhoizRSmU8DvG1HyfY_QzE-_PsqcQAC-xoAApbcWFQaImZ4f1FNgzYE"
+]
+
 # Start Command Messages Dictionary
 START_MESSAGES = {
     "caption": """
@@ -701,13 +713,40 @@ def get_broadcast_text() -> str:
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command"""
+    """Handle /start command with emoji reaction and random sticker"""
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /start command received", user_info)
         
         track_user_and_chat(update, user_info)
         
+        # Step 1: React to the start message with random emoji
+        if EMOJI_REACT:
+            try:
+                random_emoji = random.choice(EMOJI_REACT)
+                await context.bot.set_message_reaction(
+                    chat_id=update.effective_chat.id,
+                    message_id=update.message.message_id,
+                    reaction=[{"type": "emoji", "emoji": random_emoji}]
+                )
+                log_with_user_info("DEBUG", f"🍓 Added emoji reaction: {random_emoji}", user_info)
+            except Exception as e:
+                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+        
+        # Step 2: Send random sticker (only in private chat)
+        if update.effective_chat.type == "private" and START_STICKERS:
+            await send_sticker_action(context, update.effective_chat.id, user_info)
+            
+            random_sticker = random.choice(START_STICKERS)
+            log_with_user_info("DEBUG", f"🎭 Sending start sticker: {random_sticker}", user_info)
+            
+            await context.bot.send_sticker(
+                chat_id=update.effective_chat.id,
+                sticker=random_sticker
+            )
+            log_with_user_info("INFO", "✅ Start sticker sent successfully", user_info)
+        
+        # Step 3: Send the welcome message with photo
         await send_photo_action(context, update.effective_chat.id, user_info)
         
         random_image = random.choice(SAKURA_IMAGES)
