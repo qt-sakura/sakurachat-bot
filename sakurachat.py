@@ -1041,7 +1041,11 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         # Broadcast the current message to all targets
         for i, target_id in enumerate(target_ids, 1):
             try:
-                if msg.forward_from or msg.forward_from_chat:
+                # Check if message has forward attributes and if they exist
+                is_forwarded = (hasattr(msg, 'forward_from') and msg.forward_from) or \
+                              (hasattr(msg, 'forward_from_chat') and msg.forward_from_chat)
+                
+                if is_forwarded:
                     # If it's a forwarded message, use forward_message to preserve attribution
                     await context.bot.forward_message(
                         chat_id=target_id,
