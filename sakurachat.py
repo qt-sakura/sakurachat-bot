@@ -1027,9 +1027,19 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
             return
         
-        # Check if the message is forwarded
+        # Check if the message is forwarded OR contains content that requires forwarding
         is_forwarded = update.message.forward_origin is not None
-        broadcast_method = "forward" if is_forwarded else "copy"
+        
+        # Special handling for quiz polls - they can only be forwarded, not copied
+        has_quiz_poll = (update.message.poll and 
+                        update.message.poll.type == "quiz")
+        
+        # Use forward if message is forwarded OR contains quiz poll
+        should_forward = is_forwarded or has_quiz_poll
+        broadcast_method = "forward" if should_forward else "copy"
+        
+        if has_quiz_poll and not is_forwarded:
+            log_with_user_info("INFO", f"📊 Quiz poll detected - using forward method", user_info)
         
         log_with_user_info("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
         
@@ -1044,8 +1054,8 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         # Broadcast the current message to all targets
         for i, target_id in enumerate(target_list, 1):
             try:
-                if is_forwarded:
-                    # Use forward_message for forwarded messages to preserve forwarding chain
+                if should_forward:
+                    # Use forward_message for forwarded messages or quiz polls
                     await context.bot.forward_message(
                         chat_id=target_id,
                         from_chat_id=update.effective_chat.id,
@@ -1089,6 +1099,12 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
         await update.message.reply_text(
             BROADCAST_MESSAGES["failed"].format(error=str(e))
         )
+
+
+# Optional: You can also create a separate function to check forwarded messages
+def is_message_forwarded(message) -> bool:
+    """Check if a message is forwarded"""
+    return message.forward_origin is not None
 
 
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
