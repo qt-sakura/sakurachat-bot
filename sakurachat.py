@@ -13,7 +13,8 @@ from telegram import (
     InlineKeyboardButton, 
     InlineKeyboardMarkup,
     BotCommand,
-    Message
+    Message,
+    ReactionTypeEmoji
 )
 from telegram.ext import (
     Application,
@@ -720,16 +721,40 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         track_user_and_chat(update, user_info)
         
-        # Step 1: React to the start message with random emoji
+        # Step 1: React to the start message with random emoji (FIXED VERSION)
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
-                await context.bot.set_message_reaction(
-                    chat_id=update.effective_chat.id,
-                    message_id=update.message.message_id,
-                    reaction=[{"type": "emoji", "emoji": random_emoji}]
-                )
-                log_with_user_info("DEBUG", f"🍓 Added emoji reaction: {random_emoji}", user_info)
+                
+                # Solution 1: Try the new API format first
+                try:
+                    reaction = [ReactionTypeEmoji(emoji=random_emoji)]
+                    await context.bot.set_message_reaction(
+                        chat_id=update.effective_chat.id,
+                        message_id=update.message.message_id,
+                        reaction=reaction
+                    )
+                    log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {random_emoji}", user_info)
+                
+                except ImportError:
+                    # Solution 2: Fallback to direct emoji string (older versions)
+                    try:
+                        await context.bot.set_message_reaction(
+                            chat_id=update.effective_chat.id,
+                            message_id=update.message.message_id,
+                            reaction=random_emoji
+                        )
+                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {random_emoji}", user_info)
+                    
+                    except Exception:
+                        # Solution 3: Try with list of strings
+                        await context.bot.set_message_reaction(
+                            chat_id=update.effective_chat.id,
+                            message_id=update.message.message_id,
+                            reaction=[random_emoji]
+                        )
+                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (list format): {random_emoji}", user_info)
+                
             except Exception as e:
                 log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
         
