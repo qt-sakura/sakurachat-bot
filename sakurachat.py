@@ -1,16 +1,16 @@
 # Ok
-import asyncio
-import logging
 import os
-import random
 import time
+import logging
+import random
+import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, Set, Optional
 
 from telegram import (
-    Update, 
-    InlineKeyboardButton, 
+    Update,
+    InlineKeyboardButton,
     InlineKeyboardMarkup,
     BotCommand,
     Message,
@@ -114,13 +114,7 @@ START_STICKERS = [
 # Start Command Messages Dictionary
 START_MESSAGES = {
     "caption": """
-✨ <b>Hi {user_mention}! I'm Sakura Haruno</b> ✨
-
-🌸 Your helpful friend who's always by your side  
-💭 You can ask me anything, I'll help you out  
-🫶 Simple talk, soft replies, and lots of love  
-
-<i>So, what do you want to talk about today? 💗</i>
+🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
 """,
     "button_texts": {
         "updates": "Updates",
