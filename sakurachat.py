@@ -997,7 +997,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 text=hi_response,
                 reply_markup=ForceReply(
                     selective=True,
-                    input_field_placeholder="Type here"
+                    input_field_placeholder="Cute text 💓"
                 )
             )
             log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
@@ -1229,7 +1229,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         response,
         reply_markup=ForceReply(
             selective=True,
-            input_field_placeholder="Type here"
+            input_field_placeholder="Cute text 💓"
         )
     )
     
