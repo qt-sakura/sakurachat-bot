@@ -139,13 +139,18 @@ SAKURA_IMAGES = [
 # MESSAGE DICTIONARIES
 # Start Command Messages Dictionary
 START_MESSAGES = {
-    "caption": """
+    "initial_caption": """
+🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
+""",
+    "info_caption": """
 🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
 """,
     "button_texts": {
-        "updates": "Updates",
-        "support": "Support", 
-        "add_to_group": "Add Me To Your Group"
+        "info": "📑 Info",
+        "hi": "👋 Hi",
+        "updates": "🗯️ Updates",
+        "support": "💞 Support", 
+        "add_to_group": "💁‍♀️ Add Me To Your Group"
     }
 }
 
