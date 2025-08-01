@@ -139,18 +139,13 @@ SAKURA_IMAGES = [
 # MESSAGE DICTIONARIES
 # Start Command Messages Dictionary
 START_MESSAGES = {
-    "initial_caption": """
-🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
-""",
-    "info_caption": """
+    "caption": """
 🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
 """,
     "button_texts": {
-        "info": "📑 Info",
-        "hi": "👋 Hi",
-        "updates": "🗯️ Updates",
-        "support": "💞 Support", 
-        "add_to_group": "💁‍♀️ Add Me To Your Group"
+        "updates": "Updates",
+        "support": "Support", 
+        "add_to_group": "Add Me To Your Group"
     }
 }
 
@@ -661,19 +656,8 @@ async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, 
 
 
 # KEYBOARD CREATION FUNCTIONS
-def create_initial_start_keyboard() -> InlineKeyboardMarkup:
-    """Create initial start keyboard with Info and Hi buttons"""
-    keyboard = [
-        [
-            InlineKeyboardButton(START_MESSAGES["button_texts"]["info"], callback_data="start_info"),
-            InlineKeyboardButton(START_MESSAGES["button_texts"]["hi"], callback_data="start_hi")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
 def create_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
-    """Create inline keyboard for start command info section"""
+    """Create inline keyboard for start command"""
     keyboard = [
         [
             InlineKeyboardButton(START_MESSAGES["button_texts"]["updates"], url=UPDATE_LINK),
@@ -687,14 +671,9 @@ def create_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_start_initial_caption(user_mention: str) -> str:
-    """Get initial caption text for start command with user mention"""
-    return START_MESSAGES["initial_caption"].format(user_mention=user_mention)
-
-
-def get_start_info_caption(user_mention: str) -> str:
-    """Get info caption text for start command with user mention"""
-    return START_MESSAGES["info_caption"].format(user_mention=user_mention)
+def get_start_caption(user_mention: str) -> str:
+    """Get caption text for start command with user mention"""
+    return START_MESSAGES["caption"].format(user_mention=user_mention)
 
 
 def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboardMarkup:
@@ -806,9 +785,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         random_image = random.choice(SAKURA_IMAGES)
         keyboard = create_start_keyboard(context.bot.username)
         user_mention = get_user_mention(update.effective_user)
-        
-        # FIXED: Use get_start_initial_caption instead of get_start_caption
-        caption = get_start_initial_caption(user_mention)
+        caption = get_start_caption(user_mention)
         
         log_with_user_info("DEBUG", f"📷 Sending start photo: {random_image[:50]}...", user_info)
         
