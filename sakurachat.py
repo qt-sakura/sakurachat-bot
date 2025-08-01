@@ -14,7 +14,8 @@ from telegram import (
     InlineKeyboardMarkup,
     BotCommand,
     Message,
-    ReactionTypeEmoji
+    ReactionTypeEmoji,
+    ForceReply
 )
 from telegram.ext import (
     Application,
@@ -955,7 +956,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user_info = extract_user_info(query.message)
         log_with_user_info("INFO", f"🌸 Start callback received: {query.data}", user_info)
         
-        await query.answer()
+        await query.answer("", show_alert=False)
         
         user_mention = get_user_mention(update.effective_user)
         
@@ -976,10 +977,14 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             user_name = update.effective_user.first_name or ""
             hi_response = await get_gemini_response("Hi", user_name, user_info)
             
-            # Send the AI response as a reply
+            # Send the AI response as a reply with ForceReply
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=hi_response
+                text=hi_response,
+                reply_markup=ForceReply(
+                    selective=True,
+                    input_field_placeholder="Type here"
+                )
             )
             log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
         
@@ -999,7 +1004,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         user_info = extract_user_info(query.message)
         log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
         
-        await query.answer()
+        await query.answer("", show_alert=False)
         
         callback_data = query.data
         user_id = int(callback_data.split('_')[2])
@@ -1040,7 +1045,7 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     user_info = extract_user_info(query.message)
     
-    await query.answer()
+    await query.answer("", show_alert=False)
     
     if query.from_user.id != OWNER_ID:
         log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
@@ -1195,8 +1200,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
     
-    # Send response
-    await update.message.reply_text(response)
+    # Send response with ForceReply for chatbot conversations
+    await update.message.reply_text(
+        response,
+        reply_markup=ForceReply(
+            selective=True,
+            input_field_placeholder="Type here"
+        )
+    )
     
     log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
