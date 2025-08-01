@@ -42,8 +42,8 @@ BROADCAST_DELAY = 0.03
 
 # Commands dictionary
 COMMANDS = [
-    BotCommand("start", "🌸 Meet Sakura"),
-    BotCommand("help", "💬 Short Guide")
+    BotCommand("start", "🌸 Wake Me Up"),
+    BotCommand("help", "💬 A Short Guide")
 ]
 
 # EMOJI REACTIONS AND STICKERS
@@ -138,23 +138,23 @@ SAKURA_IMAGES = [
 ]
 
 # MESSAGE DICTIONARIES
-# Start Command Messages Dictionary (Updated for two-step)
+# Start Command Messages Dictionary
 START_MESSAGES = {
     "initial_caption": """
-🌸 <b>Hi {user_mention}! I'm Sakura!</b>
+<b>Hi {user_mention}, I'm Sakura!</b> 🌸
 """,
     "info_caption": """
-🌸 <b>Hi {user_mention}! I'm Sakura!</b>
+<b>Hi {user_mention}, I'm Sakura!</b> 🌸
 """,
     "button_texts": {
-        "info": "📑 Info",
+        "info": "✏️ Info",
         "hi": "👋 Hello",
-        "updates": "🗯️ Updates",
+        "updates": "🗯️️ Updates",
         "support": "💞 Support", 
         "add_to_group": "🫂 Add Me To Your Group"
     },
     "callback_answers": {
-        "info": "📑 Here's more info about me!",
+        "info": "📑 Join our channel and group for help!",
         "hi": "👋 Hey there! Let's chat!"
     }
 }
