@@ -806,7 +806,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         random_image = random.choice(SAKURA_IMAGES)
         keyboard = create_start_keyboard(context.bot.username)
         user_mention = get_user_mention(update.effective_user)
-        caption = get_start_caption(user_mention)
+        
+        # FIXED: Use get_start_initial_caption instead of get_start_caption
+        caption = get_start_initial_caption(user_mention)
         
         log_with_user_info("DEBUG", f"📷 Sending start photo: {random_image[:50]}...", user_info)
         
