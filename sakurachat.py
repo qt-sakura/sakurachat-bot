@@ -29,76 +29,23 @@ from telegram.error import TelegramError
 
 from google import genai
 
-# Color codes for logging
-class Colors:
-    BLUE = '\033[94m'      # INFO/WARNING
-    GREEN = '\033[92m'     # DEBUG
-    YELLOW = '\033[93m'    # INFO
-    RED = '\033[91m'       # ERROR
-    RESET = '\033[0m'      # Reset color
-    BOLD = '\033[1m'       # Bold text
-
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter to add colors to entire log messages"""
-    
-    COLORS = {
-        'DEBUG': Colors.GREEN,
-        'INFO': Colors.YELLOW,
-        'WARNING': Colors.BLUE,
-        'ERROR': Colors.RED,
-    }
-    
-    def format(self, record):
-        # Get the original formatted message
-        original_format = super().format(record)
-        
-        # Get color based on log level
-        color = self.COLORS.get(record.levelname, Colors.RESET)
-        
-        # Apply color to the entire message
-        colored_format = f"{color}{original_format}{Colors.RESET}"
-        
-        return colored_format
-
-# Configure logging with colors
-def setup_colored_logging():
-    """Setup colored logging configuration"""
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    
-    # Remove existing handlers
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Create console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    
-    # Create colored formatter with enhanced format
-    formatter = ColoredFormatter(
-        fmt='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    console_handler.setFormatter(formatter)
-    
-    # Add handler to logger
-    logger.addHandler(console_handler)
-    
-    return logger
-
-# Initialize colored logger
-logger = setup_colored_logging()
-
-# Configuration
+# CONFIGURATION
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
-GROUP_LINK = "https://t.me/SoulMeetsHQ"  # Hardcoded group link
+GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
 
+# Commands dictionary
+COMMANDS = [
+    BotCommand("start", "🌸 Meet Sakura"),
+    BotCommand("help", "💬 Short Guide")
+]
+
+# EMOJI REACTIONS AND STICKERS
 # Emoji reactions for /start command
 EMOJI_REACT = ["🍓"]
 
@@ -111,6 +58,85 @@ START_STICKERS = [
     "CAACAgUAAxkBAAEPDAhoizRSmU8DvG1HyfY_QzE-_PsqcQAC-xoAApbcWFQaImZ4f1FNgzYE"
 ]
 
+# Sakura stickers list
+SAKURA_STICKERS = [
+    "CAACAgUAAxkBAAEOnMFoOwHrL_E-fBs2_aLViJKbHnEKigACUxcAAtArqFXR4hxTLoFOfDYE",
+    "CAACAgUAAxkBAAEOnMNoOwH0C1-dlOS0RmhQJZaLvlWYkgACthQAAvfkqVXP72iQq0BNejYE",
+    "CAACAgUAAxkBAAEOnMVoOwH2-i7OyMryUb5UrVCOopGYlAACVhQAAiwMqFUXDEHvVKsJLTYE",
+    "CAACAgUAAxkBAAEOnMdoOwH6d_QY6h4QDaS2jvj6LwS2wQACmRsAAmwjsFWFJ6owU1WfgTYE",
+    "CAACAgUAAxkBAAEOnMloOwH-Frc6JYkZHKEk9DJw-soycgACVigAAr4JsVWLUPaAp8o1mDYE",
+    "CAACAgUAAxkBAAEOnMtoOwIAATk3m5BlXvGe1xkODAEUTQQAAi8WAALHXKlVgsQdmfn20Rg2BA",
+    "CAACAgUAAxkBAAEOnMxoOwIAAfc-QKEZvoBF6CA3j0_sFloAAtMZAALqQ6lVDLoVOcN6leU2BA",
+    "CAACAgUAAxkBAAEOnM1oOwIB1s1MYAfCcXJoHGB9cEfrmgACAhkAAjKHqVWAkaO_ky9lTzYE",
+    "CAACAgUAAxkBAAEOnM9oOwIC3QLrH3-s10uJQJOov6T5OwACKxYAAhspsFV1qXoueKQAAUM2BA",
+    "CAACAgUAAxkBAAEOnNBoOwICkOoBINNAIIhDzqTBhCyVrgACXxkAAj60sVXgsb-vzSnt_TYE",
+    "CAACAgUAAxkBAAEOnNJoOwIDTeIOn-fGkTBREAov1JN4IAACuRUAAo2isVWykxNLWnwcYTYE",
+    "CAACAgUAAxkBAAEOnNNoOwID6iuGApoGCi704xMUDSl8QQACRx4AAp2SqFXcarUkpU5jzjYE",
+    "CAACAgUAAxkBAAEOnNVoOwIE1c1lhXrYRtpd4L1YHOHt9gACaBQAAu0uqFXKL-cNi_ZBJDYE",
+    "CAACAgUAAxkBAAEOnNZoOwIEftJuRGfJStGlNvCKNHnEKigACrxgAAtxdsFVMjTuKjuZHZDYE",
+    "CAACAgUAAxkBAAEOnNdoOwIFa_3I4cjE0I3aPGM83uKt9AACCxcAAidVsFWEt7xrqmGJxjYE",
+    "CAACAgUAAxkBAAEOnNloOwIFDK96aXtc5JtwyStgnoa7qAACEBkAAg7VqFV6tAlBFHKdPDYE",
+    "CAACAgUAAxkBAAEOnNpoOwIFQ0cFElvsB0Gz95HNbnMX1QACrhQAArcDsVV3-V8JhPN1qDYE",
+    "CAACAgUAAxkBAAEOnNxoOwIHJp8uPwABywABD3yH0JJkLPvbAAIgGgACq5exVfoo05pv4lKTNgQ",
+    "CAACAgUAAxkBAAEOnN1oOwIH2nP9Ki3llmC-o7EWYtitrQACHxUAArG-qFU5OStAsdYoJTYE",
+    "CAACAgUAAxkBAAEOnN5oOwIHAZfrKdzDbGYxdIKUW2XGWQACsRUAAiqIsVULIgcY4EYPbzYE",
+    "CAACAgUAAxkBAAEOnOBoOwIIy1dzx-0RLfwHiejWGkAbMAACPxcAArtosFXxg3weTZPx5TYE",
+    "CAACAgUAAxkBAAEOnOFoOwIIxFn1uQ6a3oldQn0AAfeH4RAAAncUAAIV_KlVtbXva5FrbTs2BA",
+    "CAACAgUAAxkBAAEOnONoOwIJjSlKKjbxYm9Y91KslMq9TAACtRcAAtggqVVx1D8N-Hwp8TYE",
+    "CAACAgUAAxkBAAEOnORoOwIJO01PbkilFlnOWgABB_4MvrcAApMTAAJ8krFVr6UvAAFW7tHbNgQ",
+    "CAACAgUAAxkBAAEOnOVoOwIK09kZqD0XyGaJwtIohkjMZgACQhUAAqGYqFXmCuT6Lrdn-jYE",
+    "CAACAgUAAxkBAAEOnOdoOwIKG8KS3B5npq2JCQN8KjJRFwACHxgAAvpMqVWpxtBkEZPfPjYE",
+    "CAACAgUAAxkBAAEOnOhoOwIK5X_qo6bmnv_zDBLnHDGo-QAC6x4AAiU7sVUROxvmQwqc0zYE",
+    "CAACAgUAAxkBAAEOnOpoOwILxbwdCAdV9Mv8qMAM1HhMswACnhMAAilDsVUIsplzTkTefTYE",
+    "CAACAgUAAxkBAAEOnOtoOwIMlqIEofu7G1aSAAERkLRXZvwAAugYAAI-W7FVTuh9RbnOGIo2BA",
+    "CAACAgUAAxkBAAEOnO1oOwINU_GIGSvoi1Y_2xf8UKEcUwACuxQAAmn2qFXgLss7TmYQkzYE",
+]
+
+# Sakura images for start command
+SAKURA_IMAGES = [
+    "https://ik.imagekit.io/asadofc/Images1.png",
+    "https://ik.imagekit.io/asadofc/Images2.png",
+    "https://ik.imagekit.io/asadofc/Images3.png",
+    "https://ik.imagekit.io/asadofc/Images4.png",
+    "https://ik.imagekit.io/asadofc/Images5.png",
+    "https://ik.imagekit.io/asadofc/Images6.png",
+    "https://ik.imagekit.io/asadofc/Images7.png",
+    "https://ik.imagekit.io/asadofc/Images8.png",
+    "https://ik.imagekit.io/asadofc/Images9.png",
+    "https://ik.imagekit.io/asadofc/Images10.png",
+    "https://ik.imagekit.io/asadofc/Images11.png",
+    "https://ik.imagekit.io/asadofc/Images12.png",
+    "https://ik.imagekit.io/asadofc/Images13.png",
+    "https://ik.imagekit.io/asadofc/Images14.png",
+    "https://ik.imagekit.io/asadofc/Images15.png",
+    "https://ik.imagekit.io/asadofc/Images16.png",
+    "https://ik.imagekit.io/asadofc/Images17.png",
+    "https://ik.imagekit.io/asadofc/Images18.png",
+    "https://ik.imagekit.io/asadofc/Images19.png",
+    "https://ik.imagekit.io/asadofc/Images20.png",
+    "https://ik.imagekit.io/asadofc/Images21.png",
+    "https://ik.imagekit.io/asadofc/Images22.png",
+    "https://ik.imagekit.io/asadofc/Images23.png",
+    "https://ik.imagekit.io/asadofc/Images24.png",
+    "https://ik.imagekit.io/asadofc/Images25.png",
+    "https://ik.imagekit.io/asadofc/Images26.png",
+    "https://ik.imagekit.io/asadofc/Images27.png",
+    "https://ik.imagekit.io/asadofc/Images28.png",
+    "https://ik.imagekit.io/asadofc/Images29.png",
+    "https://ik.imagekit.io/asadofc/Images30.png",
+    "https://ik.imagekit.io/asadofc/Images31.png",
+    "https://ik.imagekit.io/asadofc/Images32.png",
+    "https://ik.imagekit.io/asadofc/Images33.png",
+    "https://ik.imagekit.io/asadofc/Images34.png",
+    "https://ik.imagekit.io/asadofc/Images35.png",
+    "https://ik.imagekit.io/asadofc/Images36.png",
+    "https://ik.imagekit.io/asadofc/Images37.png",
+    "https://ik.imagekit.io/asadofc/Images38.png",
+    "https://ik.imagekit.io/asadofc/Images39.png",
+    "https://ik.imagekit.io/asadofc/Images40.png"
+]
+
+# MESSAGE DICTIONARIES
 # Start Command Messages Dictionary
 START_MESSAGES = {
     "caption": """
@@ -195,10 +221,10 @@ RESPONSES = [
     "Got a bit confused, try again 😔",
     "Something's off, I can't understand 😕",
     "I'm a little overwhelmed right now, let's talk later 🥺",
-    "My brain’s all scrambled, hold on 😅",
+    "My brain's all scrambled, hold on 😅",
     "There's some issue with the system 🫤",
     "Network's acting up, try once more 😐",
-    "I can’t speak properly right now 😪",
+    "I can't speak properly right now 😪",
     "Facing a technical issue 🤨",
     "I'm feeling a bit slow today 😴",
     "Looks like the server's having a bad day 😑",
@@ -207,50 +233,35 @@ RESPONSES = [
     "My brain just froze 🫠",
     "Might be a connection issue 😬",
     "Can't really focus at the moment 😌",
-    "There’s some technical glitch going on 😕",
+    "There's some technical glitch going on 😕",
     "Might need a quick system reboot 🫤",
     "I'm kinda in a confused state 😵",
     "The API seems moody today 😤",
-    "Just a little patience, I’ll be fine 💗"
+    "Just a little patience, I'll be fine 💗"
 ]
 
 ERROR = [
     "Sorry buddy, something went wrong 😔",
     "Oops, I think I misunderstood 🫢",
     "That was unexpected, try again 😅",
-    "I’m not working properly right now 😕",
-    "There’s some technical problem 🤨",
+    "I'm not working properly right now 😕",
+    "There's some technical problem 🤨",
     "Looks like there's a bug in the system 🫤",
-    "I’m kind of frozen at the moment 😐",
+    "I'm kind of frozen at the moment 😐",
     "Got an error, send the message again 😬",
     "Missed something there, say it again 🙃",
     "Facing a technical glitch 😑",
-    "I can’t respond properly right now 😪",
-    "There’s some internal error 🫠",
+    "I can't respond properly right now 😪",
+    "There's some internal error 🫠",
     "System might be overloaded 😴",
     "Seems like a connection issue 😌",
     "I'm a little confused right now 🥺",
     "There was a problem during processing 😵",
-    "I’m not functioning properly at the moment 😤",
+    "I'm not functioning properly at the moment 😤",
     "Ran into an unexpected error 🫤",
     "Restarting myself, please wait 😔",
     "Dealing with some technical difficulties 💗"
 ]
-
-# Global state
-user_ids: Set[int] = set()
-group_ids: Set[int] = set()
-help_expanded: Dict[int, bool] = {}
-broadcast_mode: Dict[int, str] = {}
-user_last_response_time: Dict[int, float] = {}
-
-# Initialize Gemini client
-gemini_client = None
-try:
-    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-    logger.info("✅ Gemini client initialized successfully")
-except Exception as e:
-    logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
 # Character prompt for Sakura
 SAKURA_PROMPT = """
@@ -396,85 +407,84 @@ You are soft helpful Sakura Haruno from Naruto Shippuden — still shinobi, stil
 Every message must feel like a whisper you wait to hear again 🌙
 """
 
-# Sakura stickers list
-SAKURA_STICKERS = [
-    "CAACAgUAAxkBAAEOnMFoOwHrL_E-fBs2_aLViJKbHnEKigACUxcAAtArqFXR4hxTLoFOfDYE",
-    "CAACAgUAAxkBAAEOnMNoOwH0C1-dlOS0RmhQJZaLvlWYkgACthQAAvfkqVXP72iQq0BNejYE",
-    "CAACAgUAAxkBAAEOnMVoOwH2-i7OyMryUb5UrVCOopGYlAACVhQAAiwMqFUXDEHvVKsJLTYE",
-    "CAACAgUAAxkBAAEOnMdoOwH6d_QY6h4QDaS2jvj6LwS2wQACmRsAAmwjsFWFJ6owU1WfgTYE",
-    "CAACAgUAAxkBAAEOnMloOwH-Frc6JYkZHKEk9DJw-soycgACVigAAr4JsVWLUPaAp8o1mDYE",
-    "CAACAgUAAxkBAAEOnMtoOwIAATk3m5BlXvGe1xkODAEUTQQAAi8WAALHXKlVgsQdmfn20Rg2BA",
-    "CAACAgUAAxkBAAEOnMxoOwIAAfc-QKEZvoBF6CA3j0_sFloAAtMZAALqQ6lVDLoVOcN6leU2BA",
-    "CAACAgUAAxkBAAEOnM1oOwIB1s1MYAfCcXJoHGB9cEfrmgACAhkAAjKHqVWAkaO_ky9lTzYE",
-    "CAACAgUAAxkBAAEOnM9oOwIC3QLrH3-s10uJQJOov6T5OwACKxYAAhspsFV1qXoueKQAAUM2BA",
-    "CAACAgUAAxkBAAEOnNBoOwICkOoBINNAIIhDzqTBhCyVrgACXxkAAj60sVXgsb-vzSnt_TYE",
-    "CAACAgUAAxkBAAEOnNJoOwIDTeIOn-fGkTBREAov1JN4IAACuRUAAo2isVWykxNLWnwcYTYE",
-    "CAACAgUAAxkBAAEOnNNoOwID6iuGApoGCi704xMUDSl8QQACRx4AAp2SqFXcarUkpU5jzjYE",
-    "CAACAgUAAxkBAAEOnNVoOwIE1c1lhXrYRtpd4L1YHOHt9gACaBQAAu0uqFXKL-cNi_ZBJDYE",
-    "CAACAgUAAxkBAAEOnNZoOwIEftJuRGfJStGlNvCKNHnEKigACrxgAAtxdsFVMjTuKjuZHZDYE",
-    "CAACAgUAAxkBAAEOnNdoOwIFa_3I4cjE0I3aPGM83uKt9AACCxcAAidVsFWEt7xrqmGJxjYE",
-    "CAACAgUAAxkBAAEOnNloOwIFDK96aXtc5JtwyStgnoa7qAACEBkAAg7VqFV6tAlBFHKdPDYE",
-    "CAACAgUAAxkBAAEOnNpoOwIFQ0cFElvsB0Gz95HNbnMX1QACrhQAArcDsVV3-V8JhPN1qDYE",
-    "CAACAgUAAxkBAAEOnNxoOwIHJp8uPwABywABD3yH0JJkLPvbAAIgGgACq5exVfoo05pv4lKTNgQ",
-    "CAACAgUAAxkBAAEOnN1oOwIH2nP9Ki3llmC-o7EWYtitrQACHxUAArG-qFU5OStAsdYoJTYE",
-    "CAACAgUAAxkBAAEOnN5oOwIHAZfrKdzDbGYxdIKUW2XGWQACsRUAAiqIsVULIgcY4EYPbzYE",
-    "CAACAgUAAxkBAAEOnOBoOwIIy1dzx-0RLfwHiejWGkAbMAACPxcAArtosFXxg3weTZPx5TYE",
-    "CAACAgUAAxkBAAEOnOFoOwIIxFn1uQ6a3oldQn0AAfeH4RAAAncUAAIV_KlVtbXva5FrbTs2BA",
-    "CAACAgUAAxkBAAEOnONoOwIJjSlKKjbxYm9Y91KslMq9TAACtRcAAtggqVVx1D8N-Hwp8TYE",
-    "CAACAgUAAxkBAAEOnORoOwIJO01PbkilFlnOWgABB_4MvrcAApMTAAJ8krFVr6UvAAFW7tHbNgQ",
-    "CAACAgUAAxkBAAEOnOVoOwIK09kZqD0XyGaJwtIohkjMZgACQhUAAqGYqFXmCuT6Lrdn-jYE",
-    "CAACAgUAAxkBAAEOnOdoOwIKG8KS3B5npq2JCQN8KjJRFwACHxgAAvpMqVWpxtBkEZPfPjYE",
-    "CAACAgUAAxkBAAEOnOhoOwIK5X_qo6bmnv_zDBLnHDGo-QAC6x4AAiU7sVUROxvmQwqc0zYE",
-    "CAACAgUAAxkBAAEOnOpoOwILxbwdCAdV9Mv8qMAM1HhMswACnhMAAilDsVUIsplzTkTefTYE",
-    "CAACAgUAAxkBAAEOnOtoOwIMlqIEofu7G1aSAAERkLRXZvwAAugYAAI-W7FVTuh9RbnOGIo2BA",
-    "CAACAgUAAxkBAAEOnO1oOwINU_GIGSvoi1Y_2xf8UKEcUwACuxQAAmn2qFXgLss7TmYQkzYE",
-]
+# GLOBAL STATE
+user_ids: Set[int] = set()
+group_ids: Set[int] = set()
+help_expanded: Dict[int, bool] = {}
+broadcast_mode: Dict[int, str] = {}
+user_last_response_time: Dict[int, float] = {}
 
-# Sakura images for start command
-SAKURA_IMAGES = [
-    "https://ik.imagekit.io/asadofc/Images1.png",
-    "https://ik.imagekit.io/asadofc/Images2.png",
-    "https://ik.imagekit.io/asadofc/Images3.png",
-    "https://ik.imagekit.io/asadofc/Images4.png",
-    "https://ik.imagekit.io/asadofc/Images5.png",
-    "https://ik.imagekit.io/asadofc/Images6.png",
-    "https://ik.imagekit.io/asadofc/Images7.png",
-    "https://ik.imagekit.io/asadofc/Images8.png",
-    "https://ik.imagekit.io/asadofc/Images9.png",
-    "https://ik.imagekit.io/asadofc/Images10.png",
-    "https://ik.imagekit.io/asadofc/Images11.png",
-    "https://ik.imagekit.io/asadofc/Images12.png",
-    "https://ik.imagekit.io/asadofc/Images13.png",
-    "https://ik.imagekit.io/asadofc/Images14.png",
-    "https://ik.imagekit.io/asadofc/Images15.png",
-    "https://ik.imagekit.io/asadofc/Images16.png",
-    "https://ik.imagekit.io/asadofc/Images17.png",
-    "https://ik.imagekit.io/asadofc/Images18.png",
-    "https://ik.imagekit.io/asadofc/Images19.png",
-    "https://ik.imagekit.io/asadofc/Images20.png",
-    "https://ik.imagekit.io/asadofc/Images21.png",
-    "https://ik.imagekit.io/asadofc/Images22.png",
-    "https://ik.imagekit.io/asadofc/Images23.png",
-    "https://ik.imagekit.io/asadofc/Images24.png",
-    "https://ik.imagekit.io/asadofc/Images25.png",
-    "https://ik.imagekit.io/asadofc/Images26.png",
-    "https://ik.imagekit.io/asadofc/Images27.png",
-    "https://ik.imagekit.io/asadofc/Images28.png",
-    "https://ik.imagekit.io/asadofc/Images29.png",
-    "https://ik.imagekit.io/asadofc/Images30.png",
-    "https://ik.imagekit.io/asadofc/Images31.png",
-    "https://ik.imagekit.io/asadofc/Images32.png",
-    "https://ik.imagekit.io/asadofc/Images33.png",
-    "https://ik.imagekit.io/asadofc/Images34.png",
-    "https://ik.imagekit.io/asadofc/Images35.png",
-    "https://ik.imagekit.io/asadofc/Images36.png",
-    "https://ik.imagekit.io/asadofc/Images37.png",
-    "https://ik.imagekit.io/asadofc/Images38.png",
-    "https://ik.imagekit.io/asadofc/Images39.png",
-    "https://ik.imagekit.io/asadofc/Images40.png"
-]
+# LOGGING SETUP
+# Color codes for logging
+class Colors:
+    BLUE = '\033[94m'      # INFO/WARNING
+    GREEN = '\033[92m'     # DEBUG
+    YELLOW = '\033[93m'    # INFO
+    RED = '\033[91m'       # ERROR
+    RESET = '\033[0m'      # Reset color
+    BOLD = '\033[1m'       # Bold text
 
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter to add colors to entire log messages"""
+    
+    COLORS = {
+        'DEBUG': Colors.GREEN,
+        'INFO': Colors.YELLOW,
+        'WARNING': Colors.BLUE,
+        'ERROR': Colors.RED,
+    }
+    
+    def format(self, record):
+        # Get the original formatted message
+        original_format = super().format(record)
+        
+        # Get color based on log level
+        color = self.COLORS.get(record.levelname, Colors.RESET)
+        
+        # Apply color to the entire message
+        colored_format = f"{color}{original_format}{Colors.RESET}"
+        
+        return colored_format
 
+# Configure logging with colors
+def setup_colored_logging():
+    """Setup colored logging configuration"""
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    
+    # Remove existing handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    
+    # Create colored formatter with enhanced format
+    formatter = ColoredFormatter(
+        fmt='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    console_handler.setFormatter(formatter)
+    
+    # Add handler to logger
+    logger.addHandler(console_handler)
+    
+    return logger
+
+# Initialize colored logger
+logger = setup_colored_logging()
+
+# GEMINI CLIENT INITIALIZATION
+# Initialize Gemini client
+gemini_client = None
+try:
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    logger.info("✅ Gemini client initialized successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize Gemini client: {e}")
+
+# UTILITY FUNCTIONS
 def extract_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
     logger.debug("🔍 Extracting user information from message")
@@ -592,6 +602,7 @@ def get_user_mention(user) -> str:
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'
 
 
+# AI RESPONSE FUNCTIONS
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None) -> str:
     """Get response from Gemini API with fallback responses"""
     if user_info:
@@ -625,6 +636,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         return get_error_response()
 
 
+# CHAT ACTION FUNCTIONS
 async def send_typing_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send typing action to show bot is processing"""
     log_with_user_info("DEBUG", "⌨️ Sending typing action", user_info)
@@ -643,6 +655,7 @@ async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, 
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.CHOOSE_STICKER)
 
 
+# KEYBOARD CREATION FUNCTIONS
 def create_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
     """Create inline keyboard for start command"""
     keyboard = [
@@ -707,6 +720,7 @@ def get_broadcast_text() -> str:
     )
 
 
+# COMMAND HANDLERS
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command with emoji reaction and random sticker"""
     try:
@@ -865,6 +879,52 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(get_error_response())
 
 
+async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle broadcast command (owner only)"""
+    user_info = extract_user_info(update.message)
+    
+    if update.effective_user.id != OWNER_ID:
+        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast command", user_info)
+        return
+    
+    log_with_user_info("INFO", "📢 Broadcast command received from owner", user_info)
+    
+    keyboard = create_broadcast_keyboard()
+    broadcast_text = get_broadcast_text()
+    
+    await update.message.reply_text(
+        broadcast_text,
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
+    )
+    
+    log_with_user_info("INFO", "✅ Broadcast selection menu sent", user_info)
+
+
+async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle ping command for everyone"""
+    user_info = extract_user_info(update.message)
+    log_with_user_info("INFO", "🏓 Ping command received", user_info)
+    
+    start_time = time.time()
+    
+    # Send initial message
+    msg = await update.message.reply_text("🛰️ Pinging...")
+    
+    # Calculate response time
+    response_time = round((time.time() - start_time) * 1000, 2)  # milliseconds
+    
+    # Edit message with response time and group link (no preview)
+    await msg.edit_text(
+        f"🏓 <a href='{GROUP_LINK}'>Pong!</a> {response_time}ms",
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
+    
+    log_with_user_info("INFO", f"✅ Ping completed: {response_time}ms", user_info)
+
+
+# CALLBACK HANDLERS
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
     try:
@@ -908,6 +968,123 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             pass
 
 
+async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle broadcast target selection"""
+    query = update.callback_query
+    user_info = extract_user_info(query.message)
+    
+    await query.answer()
+    
+    if query.from_user.id != OWNER_ID:
+        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
+        return
+    
+    log_with_user_info("INFO", f"🎯 Broadcast target selected: {query.data}", user_info)
+    
+    if query.data == "bc_users":
+        broadcast_mode[OWNER_ID] = "users"
+        await query.edit_message_text(
+            BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
+            parse_mode=ParseMode.HTML
+        )
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
+    elif query.data == "bc_groups":
+        broadcast_mode[OWNER_ID] = "groups"
+        await query.edit_message_text(
+            BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
+            parse_mode=ParseMode.HTML
+        )
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
+
+
+# BROADCAST FUNCTIONS
+async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
+    """Execute broadcast with the current message - uses forward_message for forwarded messages, copy_message for regular messages
+    Compatible with python-telegram-bot==22.3"""
+    try:
+        if target_type == "users":
+            target_list = [uid for uid in user_ids if uid != OWNER_ID]
+            target_name = "users"
+        elif target_type == "groups":
+            target_list = list(group_ids)
+            target_name = "groups"
+        else:
+            return
+        
+        log_with_user_info("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
+        
+        if not target_list:
+            await update.message.reply_text(
+                BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
+            )
+            log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
+            return
+        
+        # Check if the message is forwarded
+        is_forwarded = update.message.forward_origin is not None
+        broadcast_method = "forward" if is_forwarded else "copy"
+        
+        log_with_user_info("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
+        
+        # Show initial status
+        status_msg = await update.message.reply_text(
+            BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
+        )
+        
+        broadcast_count = 0
+        failed_count = 0
+        
+        # Broadcast the current message to all targets
+        for i, target_id in enumerate(target_list, 1):
+            try:
+                if is_forwarded:
+                    # Use forward_message for forwarded messages to preserve forwarding chain
+                    await context.bot.forward_message(
+                        chat_id=target_id,
+                        from_chat_id=update.effective_chat.id,
+                        message_id=update.message.message_id
+                    )
+                else:
+                    # Use copy_message for regular messages
+                    await context.bot.copy_message(
+                        chat_id=target_id,
+                        from_chat_id=update.effective_chat.id,
+                        message_id=update.message.message_id
+                    )
+                
+                broadcast_count += 1
+                
+                if i % 10 == 0:  # Log progress every 10 messages
+                    log_with_user_info("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)} using {broadcast_method}", user_info)
+                
+                # Small delay to avoid rate limits
+                await asyncio.sleep(BROADCAST_DELAY)
+                
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Failed to broadcast to {target_id}: {e}")
+        
+        # Final status update
+        await status_msg.edit_text(
+            BROADCAST_MESSAGES["completed"].format(
+                success_count=broadcast_count,
+                total_count=len(target_list),
+                target_type=target_name,
+                failed_count=failed_count
+            ) + f"\n<i>Method used: {broadcast_method}</i>",
+            parse_mode=ParseMode.HTML
+        )
+        
+        log_with_user_info("INFO", f"✅ Broadcast completed using {broadcast_method}: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
+        
+    except Exception as e:
+        log_with_user_info("ERROR", f"❌ Broadcast error: {e}", user_info)
+        await update.message.reply_text(
+            BROADCAST_MESSAGES["failed"].format(error=str(e))
+        )
+
+
+# MESSAGE HANDLERS
 async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle sticker messages"""
     user_info = extract_user_info(update.message)
@@ -1008,166 +1185,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(get_error_response())
 
 
-async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle broadcast command (owner only)"""
-    user_info = extract_user_info(update.message)
-    
-    if update.effective_user.id != OWNER_ID:
-        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast command", user_info)
-        return
-    
-    log_with_user_info("INFO", "📢 Broadcast command received from owner", user_info)
-    
-    keyboard = create_broadcast_keyboard()
-    broadcast_text = get_broadcast_text()
-    
-    await update.message.reply_text(
-        broadcast_text,
-        reply_markup=keyboard,
-        parse_mode=ParseMode.HTML
-    )
-    
-    log_with_user_info("INFO", "✅ Broadcast selection menu sent", user_info)
-
-
-async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle broadcast target selection"""
-    query = update.callback_query
-    user_info = extract_user_info(query.message)
-    
-    await query.answer()
-    
-    if query.from_user.id != OWNER_ID:
-        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
-        return
-    
-    log_with_user_info("INFO", f"🎯 Broadcast target selected: {query.data}", user_info)
-    
-    if query.data == "bc_users":
-        broadcast_mode[OWNER_ID] = "users"
-        await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
-            parse_mode=ParseMode.HTML
-        )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
-    elif query.data == "bc_groups":
-        broadcast_mode[OWNER_ID] = "groups"
-        await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
-            parse_mode=ParseMode.HTML
-        )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
-
-
-async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
-    """Execute broadcast with the current message - uses forward_message for forwarded messages, copy_message for regular messages
-    Compatible with python-telegram-bot==22.3"""
-    try:
-        if target_type == "users":
-            target_list = [uid for uid in user_ids if uid != OWNER_ID]
-            target_name = "users"
-        elif target_type == "groups":
-            target_list = list(group_ids)
-            target_name = "groups"
-        else:
-            return
-        
-        log_with_user_info("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
-        
-        if not target_list:
-            await update.message.reply_text(
-                BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
-            )
-            log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
-            return
-        
-        # Check if the message is forwarded
-        is_forwarded = update.message.forward_origin is not None
-        broadcast_method = "forward" if is_forwarded else "copy"
-        
-        log_with_user_info("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
-        
-        # Show initial status
-        status_msg = await update.message.reply_text(
-            BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
-        )
-        
-        broadcast_count = 0
-        failed_count = 0
-        
-        # Broadcast the current message to all targets
-        for i, target_id in enumerate(target_list, 1):
-            try:
-                if is_forwarded:
-                    # Use forward_message for forwarded messages to preserve forwarding chain
-                    await context.bot.forward_message(
-                        chat_id=target_id,
-                        from_chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id
-                    )
-                else:
-                    # Use copy_message for regular messages
-                    await context.bot.copy_message(
-                        chat_id=target_id,
-                        from_chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id
-                    )
-                
-                broadcast_count += 1
-                
-                if i % 10 == 0:  # Log progress every 10 messages
-                    log_with_user_info("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)} using {broadcast_method}", user_info)
-                
-                # Small delay to avoid rate limits
-                await asyncio.sleep(BROADCAST_DELAY)
-                
-            except Exception as e:
-                failed_count += 1
-                logger.error(f"Failed to broadcast to {target_id}: {e}")
-        
-        # Final status update
-        await status_msg.edit_text(
-            BROADCAST_MESSAGES["completed"].format(
-                success_count=broadcast_count,
-                total_count=len(target_list),
-                target_type=target_name,
-                failed_count=failed_count
-            ) + f"\n<i>Method used: {broadcast_method}</i>",
-            parse_mode=ParseMode.HTML
-        )
-        
-        log_with_user_info("INFO", f"✅ Broadcast completed using {broadcast_method}: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
-        
-    except Exception as e:
-        log_with_user_info("ERROR", f"❌ Broadcast error: {e}", user_info)
-        await update.message.reply_text(
-            BROADCAST_MESSAGES["failed"].format(error=str(e))
-        )
-
-
-async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle ping command for everyone"""
-    user_info = extract_user_info(update.message)
-    log_with_user_info("INFO", "🏓 Ping command received", user_info)
-    
-    start_time = time.time()
-    
-    # Send initial message
-    msg = await update.message.reply_text("🛰️ Pinging...")
-    
-    # Calculate response time
-    response_time = round((time.time() - start_time) * 1000, 2)  # milliseconds
-    
-    # Edit message with response time and group link (no preview)
-    await msg.edit_text(
-        f"🏓 <a href='{GROUP_LINK}'>Pong!</a> {response_time}ms",
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True
-    )
-    
-    log_with_user_info("INFO", f"✅ Ping completed: {response_time}ms", user_info)
-
-
+# ERROR HANDLER
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
@@ -1187,15 +1205,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
+# BOT SETUP FUNCTIONS
 async def setup_bot_commands(application: Application) -> None:
     """Setup bot commands menu"""
     try:
-        bot_commands = [
-            BotCommand("start", "🌸 Meet Sakura"),
-            BotCommand("help", "💬 Short Guide")
-        ]
-        
-        await application.bot.set_my_commands(bot_commands)
+        await application.bot.set_my_commands(COMMANDS)
         logger.info("✅ Bot commands menu set successfully")
         
     except Exception as e:
@@ -1255,6 +1269,7 @@ def run_bot() -> None:
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
+# HTTP SERVER FOR DEPLOYMENT
 class DummyHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler for keep-alive server"""
     
@@ -1280,6 +1295,7 @@ def start_dummy_server() -> None:
     server.serve_forever()
 
 
+# MAIN FUNCTION
 def main() -> None:
     """Main function"""
     try:
