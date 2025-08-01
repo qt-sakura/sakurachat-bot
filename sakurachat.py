@@ -141,26 +141,28 @@ SAKURA_IMAGES = [
 # Start Command Messages Dictionary (Updated for two-step)
 START_MESSAGES = {
     "initial_caption": """
-🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
-
-Choose an option below:
+🌸 <b>Hi {user_mention}! I'm Sakura!</b>
 """,
     "info_caption": """
-🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
+🌸 <b>Hi {user_mention}! I'm Sakura!</b>
 """,
     "button_texts": {
-        "info": "ℹ️ Info",
-        "hi": "👋 Hi",
-        "updates": "Updates",
-        "support": "Support", 
-        "add_to_group": "Add Me To Your Group"
+        "info": "📑 Info",
+        "hi": "👋 Hello",
+        "updates": "🗯️ Updates",
+        "support": "💞 Support", 
+        "add_to_group": "🫂 Add Me To Your Group"
+    },
+    "callback_answers": {
+        "info": "📑 Here's more info about me!",
+        "hi": "👋 Hey there! Let's chat!"
     }
 }
 
 # Help Command Messages Dictionary
 HELP_MESSAGES = {
     "minimal": """
-🌸 <b>Sakura Bot Guide for {user_mention}</b> 🌸
+🌸 <b>Short Guide for {user_mention}</b>
 
 ✨ I'm your helpful friend  
 💭 You can ask me anything  
@@ -169,7 +171,7 @@ HELP_MESSAGES = {
 <i>Tap the button below to expand the guide</i> ⬇️
 """,
     "expanded": """
-🌸 <b>Sakura Bot Guide for {user_mention}</b> 🌸
+🌸 <b>Short Guide for {user_mention}</b> 🌸
 
 🗣️ Talk in Hindi, English, or Bangla  
 💭 Ask simple questions  
@@ -182,6 +184,10 @@ HELP_MESSAGES = {
     "button_texts": {
         "expand": "📖 Expand Guide",
         "minimize": "📚 Minimize Guide"
+    },
+    "callback_answers": {
+        "expand": "📖 Guide expanded! Check all features",
+        "minimize": "📚 Guide minimized for quick view"
     }
 }
 
@@ -221,6 +227,10 @@ It will be automatically broadcasted to all groups.
     "button_texts": {
         "users": "👥 Users ({count})",
         "groups": "📢 Groups ({count})"
+    },
+    "callback_answers": {
+        "users": "👥 Broadcasting to users selected!",
+        "groups": "📢 Broadcasting to groups selected!"
     }
 }
 
@@ -956,11 +966,12 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user_info = extract_user_info(query.message)
         log_with_user_info("INFO", f"🌸 Start callback received: {query.data}", user_info)
         
-        await query.answer("", show_alert=False)
-        
         user_mention = get_user_mention(update.effective_user)
         
         if query.data == "start_info":
+            # Answer callback with proper message
+            await query.answer(START_MESSAGES["callback_answers"]["info"], show_alert=False)
+            
             # Show info with original start buttons
             keyboard = create_info_start_keyboard(context.bot.username)
             caption = get_info_start_caption(user_mention)
@@ -973,6 +984,9 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             log_with_user_info("INFO", "✅ Start info buttons shown", user_info)
             
         elif query.data == "start_hi":
+            # Answer callback with proper message
+            await query.answer(START_MESSAGES["callback_answers"]["hi"], show_alert=False)
+            
             # Send a hi message from Sakura
             user_name = update.effective_user.first_name or ""
             hi_response = await get_gemini_response("Hi", user_name, user_info)
@@ -1004,8 +1018,6 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         user_info = extract_user_info(query.message)
         log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
         
-        await query.answer("", show_alert=False)
-        
         callback_data = query.data
         user_id = int(callback_data.split('_')[2])
         
@@ -1016,6 +1028,12 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         is_expanded = help_expanded.get(user_id, False)
         help_expanded[user_id] = not is_expanded
+        
+        # Answer callback with appropriate message
+        if not is_expanded:
+            await query.answer(HELP_MESSAGES["callback_answers"]["expand"], show_alert=False)
+        else:
+            await query.answer(HELP_MESSAGES["callback_answers"]["minimize"], show_alert=False)
         
         keyboard = create_help_keyboard(user_id, not is_expanded)
         user_mention = get_user_mention(update.effective_user)
@@ -1045,22 +1063,28 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     user_info = extract_user_info(query.message)
     
-    await query.answer("", show_alert=False)
-    
     if query.from_user.id != OWNER_ID:
         log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
+        await query.answer("You're not authorized to use this 🚫", show_alert=True)
         return
     
     log_with_user_info("INFO", f"🎯 Broadcast target selected: {query.data}", user_info)
     
     if query.data == "bc_users":
+        # Answer callback with proper message
+        await query.answer(BROADCAST_MESSAGES["callback_answers"]["users"], show_alert=False)
+        
         broadcast_mode[OWNER_ID] = "users"
         await query.edit_message_text(
             BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
             parse_mode=ParseMode.HTML
         )
         log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
+        
     elif query.data == "bc_groups":
+        # Answer callback with proper message
+        await query.answer(BROADCAST_MESSAGES["callback_answers"]["groups"], show_alert=False)
+        
         broadcast_mode[OWNER_ID] = "groups"
         await query.edit_message_text(
             BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
