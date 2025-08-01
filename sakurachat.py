@@ -137,12 +137,19 @@ SAKURA_IMAGES = [
 ]
 
 # MESSAGE DICTIONARIES
-# Start Command Messages Dictionary
+# Start Command Messages Dictionary (Updated for two-step)
 START_MESSAGES = {
-    "caption": """
+    "initial_caption": """
+🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
+
+Choose an option below:
+""",
+    "info_caption": """
 🌸 <b>Hi {user_mention}! I'm Sakura!</b> 🌸
 """,
     "button_texts": {
+        "info": "ℹ️ Info",
+        "hi": "👋 Hi",
         "updates": "Updates",
         "support": "Support", 
         "add_to_group": "Add Me To Your Group"
@@ -656,8 +663,19 @@ async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, 
 
 
 # KEYBOARD CREATION FUNCTIONS
-def create_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
-    """Create inline keyboard for start command"""
+def create_initial_start_keyboard() -> InlineKeyboardMarkup:
+    """Create initial start keyboard with Info and Hi buttons"""
+    keyboard = [
+        [
+            InlineKeyboardButton(START_MESSAGES["button_texts"]["info"], callback_data="start_info"),
+            InlineKeyboardButton(START_MESSAGES["button_texts"]["hi"], callback_data="start_hi")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_info_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
+    """Create inline keyboard for start info (original start buttons)"""
     keyboard = [
         [
             InlineKeyboardButton(START_MESSAGES["button_texts"]["updates"], url=UPDATE_LINK),
@@ -671,9 +689,14 @@ def create_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_start_caption(user_mention: str) -> str:
-    """Get caption text for start command with user mention"""
-    return START_MESSAGES["caption"].format(user_mention=user_mention)
+def get_initial_start_caption(user_mention: str) -> str:
+    """Get initial caption text for start command with user mention"""
+    return START_MESSAGES["initial_caption"].format(user_mention=user_mention)
+
+
+def get_info_start_caption(user_mention: str) -> str:
+    """Get info caption text for start command with user mention"""
+    return START_MESSAGES["info_caption"].format(user_mention=user_mention)
 
 
 def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboardMarkup:
@@ -722,19 +745,19 @@ def get_broadcast_text() -> str:
 
 # COMMAND HANDLERS
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command with emoji reaction and random sticker"""
+    """Handle /start command with two-step inline buttons"""
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /start command received", user_info)
         
         track_user_and_chat(update, user_info)
         
-        # Step 1: React to the start message with random emoji (FIXED VERSION)
+        # Step 1: React to the start message with random emoji
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 
-                # Solution 1: Try the new API format first
+                # Try the new API format first
                 try:
                     reaction = [ReactionTypeEmoji(emoji=random_emoji)]
                     await context.bot.set_message_reaction(
@@ -745,7 +768,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {random_emoji}", user_info)
                 
                 except ImportError:
-                    # Solution 2: Fallback to direct emoji string (older versions)
+                    # Fallback to direct emoji string (older versions)
                     try:
                         await context.bot.set_message_reaction(
                             chat_id=update.effective_chat.id,
@@ -755,7 +778,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                         log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {random_emoji}", user_info)
                     
                     except Exception:
-                        # Solution 3: Try with list of strings
+                        # Try with list of strings
                         await context.bot.set_message_reaction(
                             chat_id=update.effective_chat.id,
                             message_id=update.message.message_id,
@@ -779,15 +802,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             )
             log_with_user_info("INFO", "✅ Start sticker sent successfully", user_info)
         
-        # Step 3: Send the welcome message with photo
+        # Step 3: Send the initial welcome message with photo and two-step buttons
         await send_photo_action(context, update.effective_chat.id, user_info)
         
         random_image = random.choice(SAKURA_IMAGES)
-        keyboard = create_start_keyboard(context.bot.username)
+        keyboard = create_initial_start_keyboard()
         user_mention = get_user_mention(update.effective_user)
-        caption = get_start_caption(user_mention)
+        caption = get_initial_start_caption(user_mention)
         
-        log_with_user_info("DEBUG", f"📷 Sending start photo: {random_image[:50]}...", user_info)
+        log_with_user_info("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
         
         await context.bot.send_photo(
             chat_id=update.effective_chat.id,
@@ -925,6 +948,50 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 # CALLBACK HANDLERS
+async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle start command inline button callbacks"""
+    try:
+        query = update.callback_query
+        user_info = extract_user_info(query.message)
+        log_with_user_info("INFO", f"🌸 Start callback received: {query.data}", user_info)
+        
+        await query.answer()
+        
+        user_mention = get_user_mention(update.effective_user)
+        
+        if query.data == "start_info":
+            # Show info with original start buttons
+            keyboard = create_info_start_keyboard(context.bot.username)
+            caption = get_info_start_caption(user_mention)
+            
+            await query.edit_message_caption(
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+            log_with_user_info("INFO", "✅ Start info buttons shown", user_info)
+            
+        elif query.data == "start_hi":
+            # Send a hi message from Sakura
+            user_name = update.effective_user.first_name or ""
+            hi_response = await get_gemini_response("Hi", user_name, user_info)
+            
+            # Send the AI response as a reply
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=hi_response
+            )
+            log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
+        
+    except Exception as e:
+        user_info = extract_user_info(query.message) if query.message else {}
+        log_with_user_info("ERROR", f"❌ Error in start callback: {e}", user_info)
+        try:
+            await query.answer("Something went wrong 😔", show_alert=True)
+        except:
+            pass
+
+
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
     try:
@@ -1227,6 +1294,7 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("ping", ping_command))
     
     # Callback query handlers
+    application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))
     application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_expand_"))
     application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_"))
     
