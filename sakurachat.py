@@ -142,15 +142,13 @@ SAKURA_IMAGES = [
 START_MESSAGES = {
     "initial_caption": """
 <b>Hi {user_mention}, I'm Sakura!</b> 🌸
-💖 So happy to have you here!
-<blockquote>What’s on your mind, sweet soul? 💝</blockquote>
 """,
     "info_caption": """
 🌸 <b>Welcome {user_mention}, I'm Sakura!</b>
 
-Join our channel for updates and special moments. Be part of our group where we chat, laugh, and connect like a little family! You can also add me to your own group anytime. 💓
+Join our channel for updates! Be part of our group or add me to yours. 💓
 
-<blockquote>💞 Let’s make beautiful memories together"</blockquote>
+<blockquote>💞 Let's make memories together</blockquote>
 """,
     "button_texts": {
         "info": "📒 Info",
