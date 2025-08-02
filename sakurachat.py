@@ -965,32 +965,36 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         query = update.callback_query
         user_info = extract_user_info(query.message)
         log_with_user_info("INFO", f"🌸 Start callback received: {query.data}", user_info)
-        
+
         user_mention = get_user_mention(update.effective_user)
-        
+
         if query.data == "start_info":
             # Answer callback with proper message
             await query.answer(START_MESSAGES["callback_answers"]["info"], show_alert=False)
-            
+
             # Show info with original start buttons
             keyboard = create_info_start_keyboard(context.bot.username)
             caption = get_info_start_caption(user_mention)
-            
+
             await query.edit_message_caption(
                 caption=caption,
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard
             )
             log_with_user_info("INFO", "✅ Start info buttons shown", user_info)
-            
+
         elif query.data == "start_hi":
             # Answer callback with proper message
             await query.answer(START_MESSAGES["callback_answers"]["hi"], show_alert=False)
-            
+
+            # Send typing indicator before processing
+            await send_typing_action(context, update.effective_chat.id, user_info)
+            log_with_user_info("INFO", "⌨️ Typing indicator sent for hello", user_info)
+
             # Send a hi message from Sakura
             user_name = update.effective_user.first_name or ""
-            hi_response = await get_gemini_response("Hi", user_name, user_info)
-            
+            hi_response = await get_gemini_response("Hi sakura", user_name, user_info)
+
             # Send the AI response as a reply with ForceReply
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
@@ -1001,7 +1005,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
             )
             log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(query.message) if query.message else {}
         log_with_user_info("ERROR", f"❌ Error in start callback: {e}", user_info)
