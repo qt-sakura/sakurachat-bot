@@ -42,8 +42,8 @@ BROADCAST_DELAY = 0.03
 
 # Commands dictionary
 COMMANDS = [
-    BotCommand("start", "🌸 Wake Me Up"),
-    BotCommand("help", "💬 A Short Guide")
+    BotCommand("start", "🌸 Wake me up"),
+    BotCommand("help", "💬 A short guide")
 ]
 
 # EMOJI REACTIONS AND STICKERS
@@ -142,20 +142,26 @@ SAKURA_IMAGES = [
 START_MESSAGES = {
     "initial_caption": """
 <b>Hi {user_mention}, I'm Sakura!</b> 🌸
+💖 So happy to have you here!
+<blockquote>What’s on your mind, sweet soul? 💝</blockquote>
 """,
     "info_caption": """
-<b>Hi {user_mention}, I'm Sakura!</b> 🌸
+🌸 <b>Welcome {user_mention}, I'm Sakura!</b>
+
+Join our channel for updates and special moments. Be part of our group where we chat, laugh, and connect like a little family! You can also add me to your own group anytime. 💓
+
+<blockquote>💞 Let’s make beautiful memories together"</blockquote>
 """,
     "button_texts": {
-        "info": "✏️ Info",
+        "info": "📒 Info",
         "hi": "👋 Hello",
         "updates": "🗯️️ Updates",
-        "support": "💞 Support", 
+        "support": "💕 Support", 
         "add_to_group": "🫂 Add Me To Your Group"
     },
     "callback_answers": {
-        "info": "📑 Join our channel and group for help!",
-        "hi": "👋 Hey there! Let's chat!"
+        "info": "📒 Join our channel and group for more!",
+        "hi": "👋 Hey there, Let's chat! What's on your mind?"
     }
 }
 
