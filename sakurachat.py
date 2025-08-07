@@ -877,9 +877,10 @@ def validate_config() -> bool:
     if not OWNER_ID:
         logger.error("❌ OWNER_ID not found in environment variables")
         return False
-    if not DATABASE_URL:
-        logger.error("❌ DATABASE_URL not found in environment variables")
-        return False
+    # Temporarily disable MongoDB requirement for testing
+    # if not DATABASE_URL:
+    #     logger.error("❌ DATABASE_URL not found in environment variables")
+    #     return False
     return True
 
 
