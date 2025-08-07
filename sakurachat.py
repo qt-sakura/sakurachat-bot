@@ -1,4 +1,3 @@
-# Ok
 import os
 import time
 import logging
@@ -6,7 +5,8 @@ import random
 import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Dict, Set, Optional
+from typing import Dict, Set, Optional, List
+from datetime import datetime
 
 from telegram import (
     Update,
@@ -29,6 +29,8 @@ from telegram.constants import ParseMode, ChatAction
 from telegram.error import TelegramError
 
 from google import genai
+from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 
 # CONFIGURATION
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -39,6 +41,13 @@ UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
+
+# MongoDB Configuration
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+DATABASE_NAME = "sakura_bot"
+USERS_COLLECTION = "users"
+GROUPS_COLLECTION = "groups"
+STATS_COLLECTION = "stats"
 
 # Commands dictionary
 COMMANDS = [
@@ -238,6 +247,21 @@ It will be automatically broadcasted to all groups.
     }
 }
 
+# Stats Command Messages Dictionary
+STATS_MESSAGES = {
+    "stats_text": """
+📊 <b>Bot Statistics</b>
+
+👥 <b>Total Users:</b> {users_count}
+📢 <b>Total Groups:</b> {groups_count}
+💬 <b>Total Messages:</b> {messages_count}
+📈 <b>Active Today:</b> {active_today}
+
+🕐 <b>Updated:</b> {timestamp}
+""",
+    "error": "❌ Error fetching stats: Database unavailable"
+}
+
 # Fallback responses for when API is unavailable or errors occur
 RESPONSES = [
     "Got a bit confused, try again 😔",
@@ -430,11 +454,16 @@ Every message must feel like a whisper you wait to hear again 🌙
 """
 
 # GLOBAL STATE
-user_ids: Set[int] = set()
-group_ids: Set[int] = set()
 help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_last_response_time: Dict[int, float] = {}
+
+# MongoDB client and database
+mongo_client: Optional[AsyncIOMotorClient] = None
+database = None
+users_collection = None
+groups_collection = None
+stats_collection = None
 
 # LOGGING SETUP
 # Color codes for logging
@@ -506,6 +535,222 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
+# MONGODB FUNCTIONS
+async def init_mongodb():
+    """Initialize MongoDB connection"""
+    global mongo_client, database, users_collection, groups_collection, stats_collection
+    
+    try:
+        mongo_client = AsyncIOMotorClient(DATABASE_URL, serverSelectionTimeoutMS=5000)
+        
+        # Test the connection
+        await mongo_client.admin.command('ping')
+        
+        # Initialize database and collections
+        database = mongo_client[DATABASE_NAME]
+        users_collection = database[USERS_COLLECTION]
+        groups_collection = database[GROUPS_COLLECTION]
+        stats_collection = database[STATS_COLLECTION]
+        
+        # Create indexes for better performance
+        await users_collection.create_index("user_id", unique=True)
+        await groups_collection.create_index("group_id", unique=True)
+        
+        # Initialize stats if not exists
+        await initialize_stats()
+        
+        logger.info("✅ MongoDB connected successfully")
+        return True
+        
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        logger.error(f"❌ MongoDB connection failed: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"❌ MongoDB initialization error: {e}")
+        return False
+
+
+async def initialize_stats():
+    """Initialize stats collection if not exists"""
+    try:
+        existing_stats = await stats_collection.find_one({"_id": "global"})
+        if not existing_stats:
+            initial_stats = {
+                "_id": "global",
+                "total_messages": 0,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            await stats_collection.insert_one(initial_stats)
+            logger.info("📊 Stats collection initialized")
+    except Exception as e:
+        logger.error(f"❌ Error initializing stats: {e}")
+
+
+async def save_user_to_db(user_info: Dict[str, any]):
+    """Save or update user information in database"""
+    if not users_collection:
+        return False
+    
+    try:
+        user_data = {
+            "user_id": user_info["user_id"],
+            "username": user_info["username"],
+            "full_name": user_info["full_name"],
+            "first_seen": datetime.utcnow(),
+            "last_seen": datetime.utcnow(),
+            "message_count": 1
+        }
+        
+        # Use upsert to update if exists, insert if new
+        await users_collection.update_one(
+            {"user_id": user_info["user_id"]},
+            {
+                "$set": {
+                    "username": user_info["username"],
+                    "full_name": user_info["full_name"],
+                    "last_seen": datetime.utcnow()
+                },
+                "$setOnInsert": {
+                    "first_seen": datetime.utcnow(),
+                    "message_count": 0
+                },
+                "$inc": {"message_count": 1}
+            },
+            upsert=True
+        )
+        
+        logger.debug(f"💾 User saved/updated: {user_info['user_id']}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving user to DB: {e}")
+        return False
+
+
+async def save_group_to_db(user_info: Dict[str, any]):
+    """Save or update group information in database"""
+    if not groups_collection:
+        return False
+    
+    try:
+        group_data = {
+            "group_id": user_info["chat_id"],
+            "title": user_info["chat_title"],
+            "username": user_info["chat_username"],
+            "type": user_info["chat_type"],
+            "first_added": datetime.utcnow(),
+            "last_active": datetime.utcnow(),
+            "message_count": 1
+        }
+        
+        # Use upsert to update if exists, insert if new
+        await groups_collection.update_one(
+            {"group_id": user_info["chat_id"]},
+            {
+                "$set": {
+                    "title": user_info["chat_title"],
+                    "username": user_info["chat_username"],
+                    "last_active": datetime.utcnow()
+                },
+                "$setOnInsert": {
+                    "first_added": datetime.utcnow(),
+                    "message_count": 0
+                },
+                "$inc": {"message_count": 1}
+            },
+            upsert=True
+        )
+        
+        logger.debug(f"💾 Group saved/updated: {user_info['chat_id']}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving group to DB: {e}")
+        return False
+
+
+async def increment_message_count():
+    """Increment global message count"""
+    if not stats_collection:
+        return False
+    
+    try:
+        await stats_collection.update_one(
+            {"_id": "global"},
+            {
+                "$inc": {"total_messages": 1},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error updating message count: {e}")
+        return False
+
+
+async def get_user_ids_from_db() -> List[int]:
+    """Get all user IDs from database"""
+    if not users_collection:
+        return []
+    
+    try:
+        cursor = users_collection.find({}, {"user_id": 1})
+        user_ids = [doc["user_id"] async for doc in cursor]
+        logger.debug(f"📥 Retrieved {len(user_ids)} user IDs from DB")
+        return user_ids
+    except Exception as e:
+        logger.error(f"❌ Error getting user IDs: {e}")
+        return []
+
+
+async def get_group_ids_from_db() -> List[int]:
+    """Get all group IDs from database"""
+    if not groups_collection:
+        return []
+    
+    try:
+        cursor = groups_collection.find({}, {"group_id": 1})
+        group_ids = [doc["group_id"] async for doc in cursor]
+        logger.debug(f"📥 Retrieved {len(group_ids)} group IDs from DB")
+        return group_ids
+    except Exception as e:
+        logger.error(f"❌ Error getting group IDs: {e}")
+        return []
+
+
+async def get_bot_stats():
+    """Get comprehensive bot statistics"""
+    if not database:
+        return None
+    
+    try:
+        # Get counts
+        users_count = await users_collection.count_documents({})
+        groups_count = await groups_collection.count_documents({})
+        
+        # Get total messages from stats
+        stats_doc = await stats_collection.find_one({"_id": "global"})
+        messages_count = stats_doc.get("total_messages", 0) if stats_doc else 0
+        
+        # Get active users today
+        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        active_today = await users_collection.count_documents({
+            "last_seen": {"$gte": today}
+        })
+        
+        return {
+            "users_count": users_count,
+            "groups_count": groups_count,
+            "messages_count": messages_count,
+            "active_today": active_today,
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        }
+    except Exception as e:
+        logger.error(f"❌ Error getting bot stats: {e}")
+        return None
+
+
 # UTILITY FUNCTIONS
 def extract_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
@@ -572,6 +817,9 @@ def validate_config() -> bool:
     if not OWNER_ID:
         logger.error("❌ OWNER_ID not found in environment variables")
         return False
+    if not DATABASE_URL:
+        logger.error("❌ DATABASE_URL not found in environment variables")
+        return False
     return True
 
 
@@ -603,19 +851,22 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
     return False
 
 
-def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
-    """Track user and chat IDs for broadcasting"""
-    user_id = user_info["user_id"]
-    chat_id = user_info["chat_id"]
+async def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
+    """Track user and chat IDs in database for broadcasting"""
     chat_type = user_info["chat_type"]
     
-    if chat_type == "private":
-        user_ids.add(user_id)
-        log_with_user_info("INFO", f"👤 User tracked for broadcasting", user_info)
-    elif chat_type in ['group', 'supergroup']:
-        group_ids.add(chat_id)
-        user_ids.add(user_id)
-        log_with_user_info("INFO", f"📢 Group and user tracked for broadcasting", user_info)
+    # Always save user to database
+    await save_user_to_db(user_info)
+    
+    # If it's a group, also save the group
+    if chat_type in ['group', 'supergroup']:
+        await save_group_to_db(user_info)
+        log_with_user_info("INFO", f"📢 Group and user tracked in database", user_info)
+    else:
+        log_with_user_info("INFO", f"👤 User tracked in database", user_info)
+    
+    # Increment message count
+    await increment_message_count()
 
 
 def get_user_mention(user) -> str:
@@ -733,16 +984,19 @@ def get_help_text(user_mention: str, expanded: bool = False) -> str:
         return HELP_MESSAGES["minimal"].format(user_mention=user_mention)
 
 
-def create_broadcast_keyboard() -> InlineKeyboardMarkup:
-    """Create broadcast target selection keyboard"""
+async def create_broadcast_keyboard() -> InlineKeyboardMarkup:
+    """Create broadcast target selection keyboard with real counts from database"""
+    users_count = len(await get_user_ids_from_db())
+    groups_count = len(await get_group_ids_from_db())
+    
     keyboard = [
         [
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["users"].format(count=len(user_ids)), 
+                BROADCAST_MESSAGES["button_texts"]["users"].format(count=users_count), 
                 callback_data="bc_users"
             ),
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=len(group_ids)), 
+                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=groups_count), 
                 callback_data="bc_groups"
             )
         ]
@@ -750,11 +1004,14 @@ def create_broadcast_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_broadcast_text() -> str:
-    """Get broadcast command text"""
+async def get_broadcast_text() -> str:
+    """Get broadcast command text with real counts from database"""
+    users_count = len(await get_user_ids_from_db())
+    groups_count = len(await get_group_ids_from_db())
+    
     return BROADCAST_MESSAGES["select_target"].format(
-        users_count=len(user_ids),
-        groups_count=len(group_ids)
+        users_count=users_count,
+        groups_count=groups_count
     )
 
 
@@ -765,7 +1022,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /start command received", user_info)
         
-        track_user_and_chat(update, user_info)
+        await track_user_and_chat(update, user_info)
         
         # Step 1: React to the start message with random emoji
         if EMOJI_REACT:
@@ -849,7 +1106,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "ℹ️ /help command received", user_info)
         
-        track_user_and_chat(update, user_info)
+        await track_user_and_chat(update, user_info)
         
         # Step 1: React to the help message with random emoji (if enabled)
         if EMOJI_REACT:
@@ -927,8 +1184,8 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     log_with_user_info("INFO", "📢 Broadcast command received from owner", user_info)
     
-    keyboard = create_broadcast_keyboard()
-    broadcast_text = get_broadcast_text()
+    keyboard = await create_broadcast_keyboard()
+    broadcast_text = await get_broadcast_text()
     
     await update.message.reply_text(
         broadcast_text,
@@ -939,10 +1196,35 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     log_with_user_info("INFO", "✅ Broadcast selection menu sent", user_info)
 
 
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle stats command"""
+    user_info = extract_user_info(update.message)
+    log_with_user_info("INFO", "📊 Stats command received", user_info)
+    
+    await track_user_and_chat(update, user_info)
+    
+    # Get bot statistics from database
+    stats = await get_bot_stats()
+    
+    if stats:
+        stats_text = STATS_MESSAGES["stats_text"].format(**stats)
+    else:
+        stats_text = STATS_MESSAGES["error"]
+    
+    await update.message.reply_text(
+        stats_text,
+        parse_mode=ParseMode.HTML
+    )
+    
+    log_with_user_info("INFO", "✅ Stats command completed", user_info)
+
+
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle ping command for everyone"""
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "🏓 Ping command received", user_info)
+    
+    await track_user_and_chat(update, user_info)
     
     start_time = time.time()
     
@@ -1082,46 +1364,50 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Answer callback with proper message
         await query.answer(BROADCAST_MESSAGES["callback_answers"]["users"], show_alert=False)
         
+        users_count = len(await get_user_ids_from_db())
         broadcast_mode[OWNER_ID] = "users"
         await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
+            BROADCAST_MESSAGES["ready_users"].format(count=users_count),
             parse_mode=ParseMode.HTML
         )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {users_count} users", user_info)
         
     elif query.data == "bc_groups":
         # Answer callback with proper message
         await query.answer(BROADCAST_MESSAGES["callback_answers"]["groups"], show_alert=False)
         
+        groups_count = len(await get_group_ids_from_db())
         broadcast_mode[OWNER_ID] = "groups"
         await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
+            BROADCAST_MESSAGES["ready_groups"].format(count=groups_count),
             parse_mode=ParseMode.HTML
         )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {groups_count} groups", user_info)
 
 
 # BROADCAST FUNCTIONS
 async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
-    """Execute broadcast with the current message - uses forward_message for forwarded messages, copy_message for regular messages
+    """Execute broadcast with the current message from database - uses forward_message for forwarded messages, copy_message for regular messages
     Compatible with python-telegram-bot==22.3"""
     try:
         if target_type == "users":
-            target_list = [uid for uid in user_ids if uid != OWNER_ID]
+            target_list = await get_user_ids_from_db()
+            # Remove owner from broadcast list
+            target_list = [uid for uid in target_list if uid != OWNER_ID]
             target_name = "users"
         elif target_type == "groups":
-            target_list = list(group_ids)
+            target_list = await get_group_ids_from_db()
             target_name = "groups"
         else:
             return
         
-        log_with_user_info("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
+        log_with_user_info("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name} from database", user_info)
         
         if not target_list:
             await update.message.reply_text(
                 BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
             )
-            log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
+            log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast in database", user_info)
             return
         
         # Check if the message is forwarded
@@ -1253,8 +1539,8 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         log_with_user_info("DEBUG", f"📨 Processing message in {chat_type}", user_info)
         
-        # Track user and group IDs for broadcasting
-        track_user_and_chat(update, user_info)
+        # Track user and group IDs in database for broadcasting
+        await track_user_and_chat(update, user_info)
         
         # Check if owner is in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
@@ -1334,6 +1620,7 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("broadcast", broadcast_command))
+    application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("ping", ping_command))
     
     # Callback query handlers
@@ -1359,7 +1646,7 @@ def run_bot() -> None:
     if not validate_config():
         return
     
-    logger.info("🚀 Initializing Sakura Bot...")
+    logger.info("🚀 Initializing Sakura Bot with MongoDB...")
     
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
@@ -1367,8 +1654,16 @@ def run_bot() -> None:
     # Setup handlers
     setup_handlers(application)
     
-    # Setup bot commands using post_init
+    # Setup bot commands and initialize MongoDB using post_init
     async def post_init(app):
+        # Initialize MongoDB connection
+        mongo_success = await init_mongodb()
+        if mongo_success:
+            logger.info("✅ MongoDB connection established")
+        else:
+            logger.warning("⚠️ MongoDB connection failed - bot will work with limited functionality")
+        
+        # Setup bot commands
         await setup_bot_commands(app)
         logger.info("🌸 Sakura Bot initialization completed!")
         
