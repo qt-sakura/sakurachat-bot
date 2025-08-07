@@ -42,12 +42,8 @@ GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
 
-# MongoDB Configuration
+# MongoDB Configuration - Simple connection string
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-
-# Alternative connection string for testing (if the original fails)
-ALTERNATIVE_DATABASE_URL = os.getenv("ALT_DATABASE_URL", "mongodb+srv://asad:fuckrupa@databaseforbot.rm3mccj.mongodb.net/sakura_bot?retryWrites=true&w=majority&tls=true&tlsAllowInvalidCertificates=true")
-
 DATABASE_NAME = "sakura_bot"
 USERS_COLLECTION = "users"
 GROUPS_COLLECTION = "groups"
@@ -541,129 +537,38 @@ except Exception as e:
 
 # MONGODB FUNCTIONS
 async def init_mongodb():
-    """Initialize MongoDB connection with multiple methods and SSL configurations"""
+    """Initialize MongoDB connection with simple SSL fix"""
     global mongo_client, database, users_collection, groups_collection, stats_collection
     
-    # List of connection strings to try
-    connection_strings = [
-        DATABASE_URL,
-        ALTERNATIVE_DATABASE_URL,
-        # Simplified connection string without SSL params
-        "mongodb+srv://asad:fuckrupa@databaseforbot.rm3mccj.mongodb.net/sakura_bot",
-    ]
-    
-    # Different SSL/TLS configurations to try
-    ssl_configs = [
-        # Method 1: TLS with invalid cert allowance
-        {'tls': True, 'tlsAllowInvalidCertificates': True, 'tlsInsecure': True},
-        # Method 2: Basic TLS
-        {'tls': True},
-        # Method 3: Legacy SSL
-        {'ssl': True, 'ssl_cert_reqs': 'CERT_NONE'},
-        # Method 4: No SSL/TLS
-        {},
-    ]
-    
-    connection_options = {
-        'serverSelectionTimeoutMS': 8000,
-        'connectTimeoutMS': 8000,
-        'socketTimeoutMS': 8000,
-        'maxPoolSize': 5,
-        'retryWrites': True,
-        'w': 'majority',
-        'maxIdleTimeMS': 30000,
-    }
-    
-    attempt = 1
-    for conn_string in connection_strings:
-        for ssl_config in ssl_configs:
-            try:
-                logger.info(f"🔄 MongoDB connection attempt {attempt}: {ssl_config}")
-                
-                # Merge all configurations
-                final_options = {**connection_options, **ssl_config}
-                
-                # Create client
-                mongo_client = AsyncIOMotorClient(conn_string, **final_options)
-                
-                # Test connection with ping
-                await asyncio.wait_for(
-                    mongo_client.admin.command('ping'), 
-                    timeout=6.0
-                )
-                
-                # Initialize database and collections
-                database = mongo_client[DATABASE_NAME]
-                users_collection = database[USERS_COLLECTION]
-                groups_collection = database[GROUPS_COLLECTION]
-                stats_collection = database[STATS_COLLECTION]
-                
-                # Create indexes (with timeout)
-                await asyncio.wait_for(
-                    users_collection.create_index("user_id", unique=True),
-                    timeout=5.0
-                )
-                await asyncio.wait_for(
-                    groups_collection.create_index("group_id", unique=True),
-                    timeout=5.0
-                )
-                
-                # Initialize stats
-                await initialize_stats()
-                
-                logger.info(f"✅ MongoDB connected successfully on attempt {attempt}")
-                return True
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Attempt {attempt} failed: {str(e)[:120]}...")
-                if mongo_client:
-                    mongo_client.close()
-                    mongo_client = None
-                
-                attempt += 1
-                
-                # Add delay between attempts
-                await asyncio.sleep(1)
-    
-    logger.error("❌ All MongoDB connection attempts failed")
-    
-    # Try one last fallback with pymongo (synchronous) - sometimes works better
     try:
-        logger.info("🔄 Trying fallback connection method...")
-        from pymongo import MongoClient
-        
-        sync_client = MongoClient(
-            DATABASE_URL,
-            serverSelectionTimeoutMS=10000,
-            tls=True,
-            tlsAllowInvalidCertificates=True
-        )
-        
-        # Test sync connection
-        sync_client.admin.command('ping')
-        sync_client.close()
-        
-        # If sync worked, try async again with same config
+        # Simple connection with proper SSL settings for MongoDB Atlas
         mongo_client = AsyncIOMotorClient(
             DATABASE_URL,
-            serverSelectionTimeoutMS=10000,
-            tls=True,
-            tlsAllowInvalidCertificates=True
+            tlsAllowInvalidCertificates=True,
+            serverSelectionTimeoutMS=10000
         )
         
+        # Test the connection
         await mongo_client.admin.command('ping')
         
-        # Initialize collections
+        # Initialize database and collections
         database = mongo_client[DATABASE_NAME]
         users_collection = database[USERS_COLLECTION]
         groups_collection = database[GROUPS_COLLECTION]
         stats_collection = database[STATS_COLLECTION]
         
-        logger.info("✅ MongoDB connected via fallback method")
+        # Create indexes for better performance
+        await users_collection.create_index("user_id", unique=True)
+        await groups_collection.create_index("group_id", unique=True)
+        
+        # Initialize stats if not exists
+        await initialize_stats()
+        
+        logger.info("✅ MongoDB connected successfully")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Fallback connection also failed: {e}")
+        logger.error(f"❌ MongoDB connection failed: {e}")
         return False
 
 
