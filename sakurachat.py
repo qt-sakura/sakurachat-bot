@@ -44,6 +44,10 @@ BROADCAST_DELAY = 0.03
 
 # MongoDB Configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+# Alternative connection string for testing (if the original fails)
+ALTERNATIVE_DATABASE_URL = os.getenv("ALT_DATABASE_URL", "mongodb+srv://asad:fuckrupa@databaseforbot.rm3mccj.mongodb.net/sakura_bot?retryWrites=true&w=majority&tls=true&tlsAllowInvalidCertificates=true")
+
 DATABASE_NAME = "sakura_bot"
 USERS_COLLECTION = "users"
 GROUPS_COLLECTION = "groups"
@@ -537,36 +541,129 @@ except Exception as e:
 
 # MONGODB FUNCTIONS
 async def init_mongodb():
-    """Initialize MongoDB connection"""
+    """Initialize MongoDB connection with multiple methods and SSL configurations"""
     global mongo_client, database, users_collection, groups_collection, stats_collection
     
+    # List of connection strings to try
+    connection_strings = [
+        DATABASE_URL,
+        ALTERNATIVE_DATABASE_URL,
+        # Simplified connection string without SSL params
+        "mongodb+srv://asad:fuckrupa@databaseforbot.rm3mccj.mongodb.net/sakura_bot",
+    ]
+    
+    # Different SSL/TLS configurations to try
+    ssl_configs = [
+        # Method 1: TLS with invalid cert allowance
+        {'tls': True, 'tlsAllowInvalidCertificates': True, 'tlsInsecure': True},
+        # Method 2: Basic TLS
+        {'tls': True},
+        # Method 3: Legacy SSL
+        {'ssl': True, 'ssl_cert_reqs': 'CERT_NONE'},
+        # Method 4: No SSL/TLS
+        {},
+    ]
+    
+    connection_options = {
+        'serverSelectionTimeoutMS': 8000,
+        'connectTimeoutMS': 8000,
+        'socketTimeoutMS': 8000,
+        'maxPoolSize': 5,
+        'retryWrites': True,
+        'w': 'majority',
+        'maxIdleTimeMS': 30000,
+    }
+    
+    attempt = 1
+    for conn_string in connection_strings:
+        for ssl_config in ssl_configs:
+            try:
+                logger.info(f"🔄 MongoDB connection attempt {attempt}: {ssl_config}")
+                
+                # Merge all configurations
+                final_options = {**connection_options, **ssl_config}
+                
+                # Create client
+                mongo_client = AsyncIOMotorClient(conn_string, **final_options)
+                
+                # Test connection with ping
+                await asyncio.wait_for(
+                    mongo_client.admin.command('ping'), 
+                    timeout=6.0
+                )
+                
+                # Initialize database and collections
+                database = mongo_client[DATABASE_NAME]
+                users_collection = database[USERS_COLLECTION]
+                groups_collection = database[GROUPS_COLLECTION]
+                stats_collection = database[STATS_COLLECTION]
+                
+                # Create indexes (with timeout)
+                await asyncio.wait_for(
+                    users_collection.create_index("user_id", unique=True),
+                    timeout=5.0
+                )
+                await asyncio.wait_for(
+                    groups_collection.create_index("group_id", unique=True),
+                    timeout=5.0
+                )
+                
+                # Initialize stats
+                await initialize_stats()
+                
+                logger.info(f"✅ MongoDB connected successfully on attempt {attempt}")
+                return True
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Attempt {attempt} failed: {str(e)[:120]}...")
+                if mongo_client:
+                    mongo_client.close()
+                    mongo_client = None
+                
+                attempt += 1
+                
+                # Add delay between attempts
+                await asyncio.sleep(1)
+    
+    logger.error("❌ All MongoDB connection attempts failed")
+    
+    # Try one last fallback with pymongo (synchronous) - sometimes works better
     try:
-        mongo_client = AsyncIOMotorClient(DATABASE_URL, serverSelectionTimeoutMS=5000)
+        logger.info("🔄 Trying fallback connection method...")
+        from pymongo import MongoClient
         
-        # Test the connection
+        sync_client = MongoClient(
+            DATABASE_URL,
+            serverSelectionTimeoutMS=10000,
+            tls=True,
+            tlsAllowInvalidCertificates=True
+        )
+        
+        # Test sync connection
+        sync_client.admin.command('ping')
+        sync_client.close()
+        
+        # If sync worked, try async again with same config
+        mongo_client = AsyncIOMotorClient(
+            DATABASE_URL,
+            serverSelectionTimeoutMS=10000,
+            tls=True,
+            tlsAllowInvalidCertificates=True
+        )
+        
         await mongo_client.admin.command('ping')
         
-        # Initialize database and collections
+        # Initialize collections
         database = mongo_client[DATABASE_NAME]
         users_collection = database[USERS_COLLECTION]
         groups_collection = database[GROUPS_COLLECTION]
         stats_collection = database[STATS_COLLECTION]
         
-        # Create indexes for better performance
-        await users_collection.create_index("user_id", unique=True)
-        await groups_collection.create_index("group_id", unique=True)
-        
-        # Initialize stats if not exists
-        await initialize_stats()
-        
-        logger.info("✅ MongoDB connected successfully")
+        logger.info("✅ MongoDB connected via fallback method")
         return True
         
-    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-        logger.error(f"❌ MongoDB connection failed: {e}")
-        return False
     except Exception as e:
-        logger.error(f"❌ MongoDB initialization error: {e}")
+        logger.error(f"❌ Fallback connection also failed: {e}")
         return False
 
 
@@ -588,8 +685,8 @@ async def initialize_stats():
 
 
 async def save_user_to_db(user_info: Dict[str, any]):
-    """Save or update user information in database"""
-    if not users_collection:
+    """Save or update user information in database with error handling"""
+    if not users_collection or not mongo_client:
         return False
     
     try:
@@ -603,34 +700,40 @@ async def save_user_to_db(user_info: Dict[str, any]):
         }
         
         # Use upsert to update if exists, insert if new
-        await users_collection.update_one(
-            {"user_id": user_info["user_id"]},
-            {
-                "$set": {
-                    "username": user_info["username"],
-                    "full_name": user_info["full_name"],
-                    "last_seen": datetime.utcnow()
+        result = await asyncio.wait_for(
+            users_collection.update_one(
+                {"user_id": user_info["user_id"]},
+                {
+                    "$set": {
+                        "username": user_info["username"],
+                        "full_name": user_info["full_name"],
+                        "last_seen": datetime.utcnow()
+                    },
+                    "$setOnInsert": {
+                        "first_seen": datetime.utcnow(),
+                        "message_count": 0
+                    },
+                    "$inc": {"message_count": 1}
                 },
-                "$setOnInsert": {
-                    "first_seen": datetime.utcnow(),
-                    "message_count": 0
-                },
-                "$inc": {"message_count": 1}
-            },
-            upsert=True
+                upsert=True
+            ),
+            timeout=5.0
         )
         
         logger.debug(f"💾 User saved/updated: {user_info['user_id']}")
         return True
         
+    except asyncio.TimeoutError:
+        logger.warning(f"⏰ Timeout saving user {user_info['user_id']} to DB")
+        return False
     except Exception as e:
         logger.error(f"❌ Error saving user to DB: {e}")
         return False
 
 
 async def save_group_to_db(user_info: Dict[str, any]):
-    """Save or update group information in database"""
-    if not groups_collection:
+    """Save or update group information in database with error handling"""
+    if not groups_collection or not mongo_client:
         return False
     
     try:
@@ -645,99 +748,132 @@ async def save_group_to_db(user_info: Dict[str, any]):
         }
         
         # Use upsert to update if exists, insert if new
-        await groups_collection.update_one(
-            {"group_id": user_info["chat_id"]},
-            {
-                "$set": {
-                    "title": user_info["chat_title"],
-                    "username": user_info["chat_username"],
-                    "last_active": datetime.utcnow()
+        result = await asyncio.wait_for(
+            groups_collection.update_one(
+                {"group_id": user_info["chat_id"]},
+                {
+                    "$set": {
+                        "title": user_info["chat_title"],
+                        "username": user_info["chat_username"],
+                        "last_active": datetime.utcnow()
+                    },
+                    "$setOnInsert": {
+                        "first_added": datetime.utcnow(),
+                        "message_count": 0
+                    },
+                    "$inc": {"message_count": 1}
                 },
-                "$setOnInsert": {
-                    "first_added": datetime.utcnow(),
-                    "message_count": 0
-                },
-                "$inc": {"message_count": 1}
-            },
-            upsert=True
+                upsert=True
+            ),
+            timeout=5.0
         )
         
         logger.debug(f"💾 Group saved/updated: {user_info['chat_id']}")
         return True
         
+    except asyncio.TimeoutError:
+        logger.warning(f"⏰ Timeout saving group {user_info['chat_id']} to DB")
+        return False
     except Exception as e:
         logger.error(f"❌ Error saving group to DB: {e}")
         return False
 
 
 async def increment_message_count():
-    """Increment global message count"""
-    if not stats_collection:
+    """Increment global message count with error handling"""
+    if not stats_collection or not mongo_client:
         return False
     
     try:
-        await stats_collection.update_one(
-            {"_id": "global"},
-            {
-                "$inc": {"total_messages": 1},
-                "$set": {"updated_at": datetime.utcnow()}
-            }
+        result = await asyncio.wait_for(
+            stats_collection.update_one(
+                {"_id": "global"},
+                {
+                    "$inc": {"total_messages": 1},
+                    "$set": {"updated_at": datetime.utcnow()}
+                }
+            ),
+            timeout=3.0
         )
         return True
+    except asyncio.TimeoutError:
+        logger.warning("⏰ Timeout updating message count")
+        return False
     except Exception as e:
         logger.error(f"❌ Error updating message count: {e}")
         return False
 
 
 async def get_user_ids_from_db() -> List[int]:
-    """Get all user IDs from database"""
-    if not users_collection:
+    """Get all user IDs from database with error handling"""
+    if not users_collection or not mongo_client:
+        logger.warning("📥 MongoDB not available, returning empty user list")
         return []
     
     try:
         cursor = users_collection.find({}, {"user_id": 1})
-        user_ids = [doc["user_id"] async for doc in cursor]
+        user_ids = await asyncio.wait_for(
+            asyncio.gather(*[doc["user_id"] async for doc in cursor]),
+            timeout=10.0
+        )
         logger.debug(f"📥 Retrieved {len(user_ids)} user IDs from DB")
         return user_ids
+    except asyncio.TimeoutError:
+        logger.warning("⏰ Timeout getting user IDs from DB")
+        return []
     except Exception as e:
         logger.error(f"❌ Error getting user IDs: {e}")
         return []
 
 
 async def get_group_ids_from_db() -> List[int]:
-    """Get all group IDs from database"""
-    if not groups_collection:
+    """Get all group IDs from database with error handling"""
+    if not groups_collection or not mongo_client:
+        logger.warning("📥 MongoDB not available, returning empty group list")
         return []
     
     try:
         cursor = groups_collection.find({}, {"group_id": 1})
-        group_ids = [doc["group_id"] async for doc in cursor]
+        group_ids = await asyncio.wait_for(
+            asyncio.gather(*[doc["group_id"] async for doc in cursor]),
+            timeout=10.0
+        )
         logger.debug(f"📥 Retrieved {len(group_ids)} group IDs from DB")
         return group_ids
+    except asyncio.TimeoutError:
+        logger.warning("⏰ Timeout getting group IDs from DB")
+        return []
     except Exception as e:
         logger.error(f"❌ Error getting group IDs: {e}")
         return []
 
 
 async def get_bot_stats():
-    """Get comprehensive bot statistics"""
-    if not database:
+    """Get comprehensive bot statistics with error handling"""
+    if not database or not mongo_client:
         return None
     
     try:
-        # Get counts
-        users_count = await users_collection.count_documents({})
-        groups_count = await groups_collection.count_documents({})
+        # Get counts with timeout
+        users_count = await asyncio.wait_for(
+            users_collection.count_documents({}), timeout=5.0
+        )
+        groups_count = await asyncio.wait_for(
+            groups_collection.count_documents({}), timeout=5.0
+        )
         
         # Get total messages from stats
-        stats_doc = await stats_collection.find_one({"_id": "global"})
+        stats_doc = await asyncio.wait_for(
+            stats_collection.find_one({"_id": "global"}), timeout=5.0
+        )
         messages_count = stats_doc.get("total_messages", 0) if stats_doc else 0
         
         # Get active users today
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        active_today = await users_collection.count_documents({
-            "last_seen": {"$gte": today}
-        })
+        active_today = await asyncio.wait_for(
+            users_collection.count_documents({"last_seen": {"$gte": today}}),
+            timeout=5.0
+        )
         
         return {
             "users_count": users_count,
@@ -746,9 +882,28 @@ async def get_bot_stats():
             "active_today": active_today,
             "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
         }
+    except asyncio.TimeoutError:
+        logger.warning("⏰ Timeout getting bot stats")
+        return None
     except Exception as e:
         logger.error(f"❌ Error getting bot stats: {e}")
         return None
+
+
+async def test_db_connection():
+    """Test database connection and retry if needed"""
+    global mongo_client
+    
+    if not mongo_client:
+        return False
+    
+    try:
+        await asyncio.wait_for(mongo_client.admin.command('ping'), timeout=3.0)
+        return True
+    except:
+        logger.warning("🔄 Database connection lost, attempting to reconnect...")
+        success = await init_mongodb()
+        return success
 
 
 # UTILITY FUNCTIONS
