@@ -31,6 +31,9 @@ from telegram.error import TelegramError
 
 from google import genai
 import pymysql
+from pymysql.cursors import DictCursor
+import threading
+import queue
 
 # CONFIGURATION
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -437,42 +440,98 @@ help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_last_response_time: Dict[int, float] = {}
 
-# DATABASE CONNECTION AND FUNCTIONS
-def parse_database_url(url: str) -> dict:
-    """Parse database URL into connection parameters"""
-    parsed = urlparse(url)
-    return {
-        'host': parsed.hostname,
-        'port': parsed.port,
-        'user': parsed.username,
-        'password': parsed.password,
-        'database': parsed.path[1:] if parsed.path else 'defaultdb',  # Remove leading '/'
-        'charset': 'utf8mb4',
-        'connect_timeout': 10,
-        'read_timeout': 10,
-        'write_timeout': 10,
-        'cursorclass': pymysql.cursors.DictCursor
-    }
-
-
-def get_database_connection():
-    """Get database connection using DATABASE_URL"""
-    if not DATABASE_URL:
-        logger.error("❌ DATABASE_URL not found in environment variables")
-        return None
+# DATABASE CONNECTION POOL AND FUNCTIONS
+class DatabasePool:
+    """Simple database connection pool"""
+    def __init__(self, max_connections=5):
+        self.max_connections = max_connections
+        self.pool = queue.Queue(maxsize=max_connections)
+        self.db_config = None
+        self._initialize_pool()
     
-    try:
-        db_config = parse_database_url(DATABASE_URL)
-        connection = pymysql.connect(**db_config)
-        return connection
-    except Exception as e:
-        logger.error(f"❌ Failed to connect to database: {e}")
-        return None
+    def _initialize_pool(self):
+        """Initialize the connection pool"""
+        if not DATABASE_URL:
+            logger.error("❌ DATABASE_URL not found")
+            return
+        
+        self.db_config = self.parse_database_url(DATABASE_URL)
+        
+        # Pre-create connections
+        for _ in range(self.max_connections):
+            try:
+                connection = pymysql.connect(**self.db_config)
+                self.pool.put(connection, block=False)
+            except Exception as e:
+                logger.error(f"❌ Failed to create pool connection: {e}")
+                break
+        
+        logger.info(f"✅ Database pool initialized with {self.pool.qsize()} connections")
+    
+    def parse_database_url(self, url: str) -> dict:
+        """Parse database URL into connection parameters"""
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        return {
+            'host': parsed.hostname,
+            'port': parsed.port,
+            'user': parsed.username,
+            'password': parsed.password,
+            'database': parsed.path[1:] if parsed.path else 'defaultdb',
+            'charset': 'utf8mb4',
+            'connect_timeout': 5,  # Reduced timeout
+            'read_timeout': 5,
+            'write_timeout': 5,
+            'cursorclass': DictCursor,
+            'autocommit': True  # Auto-commit for faster operations
+        }
+    
+    def get_connection(self):
+        """Get a connection from the pool"""
+        try:
+            # Try to get from pool (non-blocking)
+            connection = self.pool.get(block=False)
+            
+            # Test if connection is alive
+            if connection.open:
+                return connection
+            else:
+                # Connection is dead, create a new one
+                return pymysql.connect(**self.db_config)
+                
+        except queue.Empty:
+            # Pool is empty, create new connection
+            return pymysql.connect(**self.db_config)
+        except Exception as e:
+            logger.error(f"❌ Failed to get database connection: {e}")
+            return None
+    
+    def return_connection(self, connection):
+        """Return a connection to the pool"""
+        try:
+            if connection and connection.open:
+                # Only return if pool isn't full
+                self.pool.put(connection, block=False)
+        except queue.Full:
+            # Pool is full, close the connection
+            try:
+                connection.close()
+            except:
+                pass
+        except Exception:
+            # Connection is bad, close it
+            try:
+                connection.close()
+            except:
+                pass
+
+# Initialize global database pool
+db_pool = DatabasePool()
 
 
 def initialize_database():
     """Initialize database tables"""
-    connection = get_database_connection()
+    connection = db_pool.get_connection()
     if not connection:
         logger.error("❌ Cannot initialize database - no connection")
         return False
@@ -498,7 +557,6 @@ def initialize_database():
             )
         """)
         
-        connection.commit()
         logger.info("✅ Database tables initialized successfully")
         return True
         
@@ -506,54 +564,60 @@ def initialize_database():
         logger.error(f"❌ Error initializing database: {e}")
         return False
     finally:
-        connection.close()
+        db_pool.return_connection(connection)
 
 
-def add_user_to_database(user_id: int):
-    """Add user to database"""
-    connection = get_database_connection()
-    if not connection:
-        return
+def add_user_to_database_async(user_id: int):
+    """Add user to database asynchronously"""
+    def _add_user():
+        connection = db_pool.get_connection()
+        if not connection:
+            return
+        
+        try:
+            cursor = connection.cursor()
+            cursor.execute("""
+                INSERT INTO bot_users (user_id) 
+                VALUES (%s) 
+                ON DUPLICATE KEY UPDATE last_seen = CURRENT_TIMESTAMP
+            """, (user_id,))
+            logger.debug(f"📝 User {user_id} added/updated in database")
+        except Exception as e:
+            logger.error(f"❌ Error adding user to database: {e}")
+        finally:
+            db_pool.return_connection(connection)
     
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO bot_users (user_id) 
-            VALUES (%s) 
-            ON DUPLICATE KEY UPDATE last_seen = CURRENT_TIMESTAMP
-        """, (user_id,))
-        connection.commit()
-        logger.debug(f"📝 User {user_id} added/updated in database")
-    except Exception as e:
-        logger.error(f"❌ Error adding user to database: {e}")
-    finally:
-        connection.close()
+    # Run in background thread to not block
+    threading.Thread(target=_add_user, daemon=True).start()
 
 
-def add_group_to_database(group_id: int):
-    """Add group to database"""
-    connection = get_database_connection()
-    if not connection:
-        return
+def add_group_to_database_async(group_id: int):
+    """Add group to database asynchronously"""
+    def _add_group():
+        connection = db_pool.get_connection()
+        if not connection:
+            return
+        
+        try:
+            cursor = connection.cursor()
+            cursor.execute("""
+                INSERT INTO bot_groups (group_id) 
+                VALUES (%s) 
+                ON DUPLICATE KEY UPDATE last_seen = CURRENT_TIMESTAMP
+            """, (group_id,))
+            logger.debug(f"📝 Group {group_id} added/updated in database")
+        except Exception as e:
+            logger.error(f"❌ Error adding group to database: {e}")
+        finally:
+            db_pool.return_connection(connection)
     
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO bot_groups (group_id) 
-            VALUES (%s) 
-            ON DUPLICATE KEY UPDATE last_seen = CURRENT_TIMESTAMP
-        """, (group_id,))
-        connection.commit()
-        logger.debug(f"📝 Group {group_id} added/updated in database")
-    except Exception as e:
-        logger.error(f"❌ Error adding group to database: {e}")
-    finally:
-        connection.close()
+    # Run in background thread to not block
+    threading.Thread(target=_add_group, daemon=True).start()
 
 
 def get_all_user_ids() -> Set[int]:
     """Get all user IDs from database"""
-    connection = get_database_connection()
+    connection = db_pool.get_connection()
     if not connection:
         return set()
     
@@ -568,12 +632,12 @@ def get_all_user_ids() -> Set[int]:
         logger.error(f"❌ Error retrieving users from database: {e}")
         return set()
     finally:
-        connection.close()
+        db_pool.return_connection(connection)
 
 
 def get_all_group_ids() -> Set[int]:
     """Get all group IDs from database"""
-    connection = get_database_connection()
+    connection = db_pool.get_connection()
     if not connection:
         return set()
     
@@ -588,7 +652,7 @@ def get_all_group_ids() -> Set[int]:
         logger.error(f"❌ Error retrieving groups from database: {e}")
         return set()
     finally:
-        connection.close()
+        db_pool.return_connection(connection)
 
 
 # LOGGING SETUP
@@ -762,18 +826,18 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
 
 
 def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
-    """Track user and chat IDs for broadcasting using database"""
+    """Track user and chat IDs for broadcasting using database (async)"""
     user_id = user_info["user_id"]
     chat_id = user_info["chat_id"]
     chat_type = user_info["chat_type"]
     
     if chat_type == "private":
-        add_user_to_database(user_id)
-        log_with_user_info("INFO", f"👤 User tracked for broadcasting", user_info)
+        add_user_to_database_async(user_id)
+        log_with_user_info("INFO", f"👤 User tracked for broadcasting (async)", user_info)
     elif chat_type in ['group', 'supergroup']:
-        add_group_to_database(chat_id)
-        add_user_to_database(user_id)
-        log_with_user_info("INFO", f"📢 Group and user tracked for broadcasting", user_info)
+        add_group_to_database_async(chat_id)
+        add_user_to_database_async(user_id)
+        log_with_user_info("INFO", f"📢 Group and user tracked for broadcasting (async)", user_info)
 
 
 def get_user_mention(user) -> str:
