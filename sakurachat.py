@@ -1559,55 +1559,46 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
-async def run_bot() -> None:
+def run_bot() -> None:
     """Run the bot with database initialization"""
     if not validate_config():
         return
     
     logger.info("🚀 Initializing Sakura Bot...")
     
-    # Initialize database first
-    db_success = await init_database()
-    if not db_success:
-        logger.error("❌ Database initialization failed. Bot cannot start.")
-        return
-    
-    # Create application
-    application = Application.builder().token(BOT_TOKEN).build()
-    
-    # Setup handlers
-    setup_handlers(application)
-    
-    # Setup bot commands using post_init
-    async def post_init(app):
-        await setup_bot_commands(app)
-        logger.info("🌸 Sakura Bot initialization completed!")
+    async def initialize_and_run():
+        # Initialize database first
+        db_success = await init_database()
+        if not db_success:
+            logger.error("❌ Database initialization failed. Bot cannot start.")
+            return
         
-    # Setup shutdown handler
-    async def post_shutdown(app):
-        await close_database()
-        logger.info("🌸 Sakura Bot shutdown completed!")
+        # Create application
+        application = Application.builder().token(BOT_TOKEN).build()
         
-    application.post_init = post_init
-    application.post_shutdown = post_shutdown
-    
-    logger.info("🌸 Sakura Bot is starting...")
-    
-    try:
+        # Setup handlers
+        setup_handlers(application)
+        
+        # Setup bot commands using post_init
+        async def post_init(app):
+            await setup_bot_commands(app)
+            logger.info("🌸 Sakura Bot initialization completed!")
+            
+        # Setup shutdown handler
+        async def post_shutdown(app):
+            await close_database()
+            logger.info("🌸 Sakura Bot shutdown completed!")
+            
+        application.post_init = post_init
+        application.post_shutdown = post_shutdown
+        
+        logger.info("🌸 Sakura Bot is starting...")
+        
         # Run the bot with polling
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-        
-        # Keep the bot running
-        await application.updater.idle()
-        
-    except Exception as e:
-        logger.error(f"❌ Error running bot: {e}")
-    finally:
-        # Cleanup
-        await application.stop()
-        await application.shutdown()
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    
+    # Run the async initialization
+    asyncio.run(initialize_and_run())
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -1645,8 +1636,8 @@ def main() -> None:
         # Start dummy server in background thread
         threading.Thread(target=start_dummy_server, daemon=True).start()
         
-        # Run the bot with async event loop
-        asyncio.run(run_bot())
+        # Run the bot
+        run_bot()
         
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
