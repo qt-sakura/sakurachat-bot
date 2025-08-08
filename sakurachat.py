@@ -1,4 +1,3 @@
-# Ok
 import os
 import time
 import logging
@@ -7,7 +6,7 @@ import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, Set, Optional
-from urllib.parse import urlparse
+import asyncpg
 
 from telegram import (
     Update,
@@ -30,7 +29,6 @@ from telegram.constants import ParseMode, ChatAction
 from telegram.error import TelegramError
 
 from google import genai
-import pymysql
 
 # CONFIGURATION
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -38,10 +36,12 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
-DATABASE_URL = os.getenv("DATABASE_URL", "")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
+
+# Database configuration
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 # Commands dictionary
 COMMANDS = [
@@ -433,163 +433,14 @@ Every message must feel like a whisper you wait to hear again 🌙
 """
 
 # GLOBAL STATE
+user_ids: Set[int] = set()
+group_ids: Set[int] = set()
 help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_last_response_time: Dict[int, float] = {}
 
-# DATABASE CONNECTION AND FUNCTIONS
-def parse_database_url(url: str) -> dict:
-    """Parse database URL into connection parameters"""
-    parsed = urlparse(url)
-    return {
-        'host': parsed.hostname,
-        'port': parsed.port,
-        'user': parsed.username,
-        'password': parsed.password,
-        'database': parsed.path[1:] if parsed.path else 'defaultdb',  # Remove leading '/'
-        'charset': 'utf8mb4',
-        'connect_timeout': 10,
-        'read_timeout': 10,
-        'write_timeout': 10,
-        'cursorclass': pymysql.cursors.DictCursor
-    }
-
-
-def get_database_connection():
-    """Get database connection using DATABASE_URL"""
-    if not DATABASE_URL:
-        logger.error("❌ DATABASE_URL not found in environment variables")
-        return None
-    
-    try:
-        db_config = parse_database_url(DATABASE_URL)
-        connection = pymysql.connect(**db_config)
-        return connection
-    except Exception as e:
-        logger.error(f"❌ Failed to connect to database: {e}")
-        return None
-
-
-def initialize_database():
-    """Initialize database tables"""
-    connection = get_database_connection()
-    if not connection:
-        logger.error("❌ Cannot initialize database - no connection")
-        return False
-    
-    try:
-        cursor = connection.cursor()
-        
-        # Create users table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS bot_users (
-                user_id BIGINT PRIMARY KEY,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # Create groups table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS bot_groups (
-                group_id BIGINT PRIMARY KEY,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        """)
-        
-        connection.commit()
-        logger.info("✅ Database tables initialized successfully")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Error initializing database: {e}")
-        return False
-    finally:
-        connection.close()
-
-
-def add_user_to_database(user_id: int):
-    """Add user to database"""
-    connection = get_database_connection()
-    if not connection:
-        return
-    
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO bot_users (user_id) 
-            VALUES (%s) 
-            ON DUPLICATE KEY UPDATE last_seen = CURRENT_TIMESTAMP
-        """, (user_id,))
-        connection.commit()
-        logger.debug(f"📝 User {user_id} added/updated in database")
-    except Exception as e:
-        logger.error(f"❌ Error adding user to database: {e}")
-    finally:
-        connection.close()
-
-
-def add_group_to_database(group_id: int):
-    """Add group to database"""
-    connection = get_database_connection()
-    if not connection:
-        return
-    
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO bot_groups (group_id) 
-            VALUES (%s) 
-            ON DUPLICATE KEY UPDATE last_seen = CURRENT_TIMESTAMP
-        """, (group_id,))
-        connection.commit()
-        logger.debug(f"📝 Group {group_id} added/updated in database")
-    except Exception as e:
-        logger.error(f"❌ Error adding group to database: {e}")
-    finally:
-        connection.close()
-
-
-def get_all_user_ids() -> Set[int]:
-    """Get all user IDs from database"""
-    connection = get_database_connection()
-    if not connection:
-        return set()
-    
-    try:
-        cursor = connection.cursor()
-        cursor.execute("SELECT user_id FROM bot_users")
-        results = cursor.fetchall()
-        user_ids = {row['user_id'] for row in results}
-        logger.debug(f"📊 Retrieved {len(user_ids)} users from database")
-        return user_ids
-    except Exception as e:
-        logger.error(f"❌ Error retrieving users from database: {e}")
-        return set()
-    finally:
-        connection.close()
-
-
-def get_all_group_ids() -> Set[int]:
-    """Get all group IDs from database"""
-    connection = get_database_connection()
-    if not connection:
-        return set()
-    
-    try:
-        cursor = connection.cursor()
-        cursor.execute("SELECT group_id FROM bot_groups")
-        results = cursor.fetchall()
-        group_ids = {row['group_id'] for row in results}
-        logger.debug(f"📊 Retrieved {len(group_ids)} groups from database")
-        return group_ids
-    except Exception as e:
-        logger.error(f"❌ Error retrieving groups from database: {e}")
-        return set()
-    finally:
-        connection.close()
-
+# DATABASE CONNECTION POOL
+db_pool = None
 
 # LOGGING SETUP
 # Color codes for logging
@@ -661,6 +512,162 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
+# DATABASE FUNCTIONS
+async def init_database():
+    """Initialize database connection and create tables"""
+    global db_pool
+    
+    if not DATABASE_URL:
+        logger.error("❌ DATABASE_URL not found in environment variables")
+        return False
+    
+    try:
+        # Create connection pool
+        db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+        logger.info("✅ Database connection pool created successfully")
+        
+        # Create tables if they don't exist
+        async with db_pool.acquire() as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id BIGINT PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS groups (
+                    group_id BIGINT PRIMARY KEY,
+                    title TEXT,
+                    username TEXT,
+                    type TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Create indexes for better performance
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_groups_created_at ON groups(created_at)")
+            
+        logger.info("✅ Database tables created/verified successfully")
+        
+        # Load existing users and groups into memory
+        await load_data_from_database()
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+        return False
+
+async def load_data_from_database():
+    """Load user IDs and group IDs from database into memory"""
+    global user_ids, group_ids
+    
+    if not db_pool:
+        logger.warning("⚠️ Database pool not available for loading data")
+        return
+    
+    try:
+        async with db_pool.acquire() as conn:
+            # Load user IDs
+            user_rows = await conn.fetch("SELECT user_id FROM users")
+            user_ids = {row['user_id'] for row in user_rows}
+            
+            # Load group IDs
+            group_rows = await conn.fetch("SELECT group_id FROM groups")
+            group_ids = {row['group_id'] for row in group_rows}
+            
+        logger.info(f"✅ Loaded {len(user_ids)} users and {len(group_ids)} groups from database")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to load data from database: {e}")
+
+async def save_user_to_database(user_id: int, username: str = None, first_name: str = None, last_name: str = None):
+    """Save or update user in database"""
+    if not db_pool:
+        return
+    
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO users (user_id, username, first_name, last_name, updated_at)
+                VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id) 
+                DO UPDATE SET 
+                    username = EXCLUDED.username,
+                    first_name = EXCLUDED.first_name,
+                    last_name = EXCLUDED.last_name,
+                    updated_at = CURRENT_TIMESTAMP
+            """, user_id, username, first_name, last_name)
+            
+        logger.debug(f"💾 User {user_id} saved to database")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to save user {user_id} to database: {e}")
+
+async def save_group_to_database(group_id: int, title: str = None, username: str = None, chat_type: str = None):
+    """Save or update group in database"""
+    if not db_pool:
+        return
+    
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO groups (group_id, title, username, type, updated_at)
+                VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                ON CONFLICT (group_id) 
+                DO UPDATE SET 
+                    title = EXCLUDED.title,
+                    username = EXCLUDED.username,
+                    type = EXCLUDED.type,
+                    updated_at = CURRENT_TIMESTAMP
+            """, group_id, title, username, chat_type)
+            
+        logger.debug(f"💾 Group {group_id} saved to database")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to save group {group_id} to database: {e}")
+
+async def get_users_from_database():
+    """Get all user IDs from database"""
+    if not db_pool:
+        return []
+    
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch("SELECT user_id FROM users")
+            return [row['user_id'] for row in rows]
+    except Exception as e:
+        logger.error(f"❌ Failed to get users from database: {e}")
+        return []
+
+async def get_groups_from_database():
+    """Get all group IDs from database"""
+    if not db_pool:
+        return []
+    
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch("SELECT group_id FROM groups")
+            return [row['group_id'] for row in rows]
+    except Exception as e:
+        logger.error(f"❌ Failed to get groups from database: {e}")
+        return []
+
+async def close_database():
+    """Close database connection pool"""
+    global db_pool
+    
+    if db_pool:
+        await db_pool.close()
+        logger.info("✅ Database connection pool closed")
+
 # UTILITY FUNCTIONS
 def extract_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
@@ -671,6 +678,8 @@ def extract_user_info(msg: Message) -> Dict[str, any]:
         "user_id": u.id,
         "username": u.username,
         "full_name": u.full_name,
+        "first_name": u.first_name,
+        "last_name": u.last_name,
         "chat_id": c.id,
         "chat_type": c.type,
         "chat_title": c.title or c.first_name or "",
@@ -761,18 +770,45 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
     return False
 
 
-def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
-    """Track user and chat IDs for broadcasting using database"""
+async def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
+    """Track user and chat IDs for broadcasting (both in memory and database)"""
     user_id = user_info["user_id"]
     chat_id = user_info["chat_id"]
     chat_type = user_info["chat_type"]
     
     if chat_type == "private":
-        add_user_to_database(user_id)
+        # Add to memory
+        user_ids.add(user_id)
+        
+        # Save to database
+        await save_user_to_database(
+            user_id, 
+            user_info.get("username"), 
+            user_info.get("first_name"), 
+            user_info.get("last_name")
+        )
+        
         log_with_user_info("INFO", f"👤 User tracked for broadcasting", user_info)
+        
     elif chat_type in ['group', 'supergroup']:
-        add_group_to_database(chat_id)
-        add_user_to_database(user_id)
+        # Add to memory
+        group_ids.add(chat_id)
+        user_ids.add(user_id)
+        
+        # Save to database
+        await save_group_to_database(
+            chat_id, 
+            user_info.get("chat_title"), 
+            user_info.get("username"), 
+            chat_type
+        )
+        await save_user_to_database(
+            user_id, 
+            user_info.get("username"), 
+            user_info.get("first_name"), 
+            user_info.get("last_name")
+        )
+        
         log_with_user_info("INFO", f"📢 Group and user tracked for broadcasting", user_info)
 
 
@@ -893,17 +929,14 @@ def get_help_text(user_mention: str, expanded: bool = False) -> str:
 
 def create_broadcast_keyboard() -> InlineKeyboardMarkup:
     """Create broadcast target selection keyboard"""
-    user_count = len(get_all_user_ids())
-    group_count = len(get_all_group_ids())
-    
     keyboard = [
         [
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["users"].format(count=user_count), 
+                BROADCAST_MESSAGES["button_texts"]["users"].format(count=len(user_ids)), 
                 callback_data="bc_users"
             ),
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=group_count), 
+                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=len(group_ids)), 
                 callback_data="bc_groups"
             )
         ]
@@ -913,12 +946,9 @@ def create_broadcast_keyboard() -> InlineKeyboardMarkup:
 
 def get_broadcast_text() -> str:
     """Get broadcast command text"""
-    user_count = len(get_all_user_ids())
-    group_count = len(get_all_group_ids())
-    
     return BROADCAST_MESSAGES["select_target"].format(
-        users_count=user_count,
-        groups_count=group_count
+        users_count=len(user_ids),
+        groups_count=len(group_ids)
     )
 
 
@@ -929,7 +959,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /start command received", user_info)
         
-        track_user_and_chat(update, user_info)
+        await track_user_and_chat(update, user_info)
         
         # Step 1: React to the start message with random emoji
         if EMOJI_REACT:
@@ -1013,7 +1043,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "ℹ️ /help command received", user_info)
         
-        track_user_and_chat(update, user_info)
+        await track_user_and_chat(update, user_info)
         
         # Step 1: React to the help message with random emoji (if enabled)
         if EMOJI_REACT:
@@ -1090,6 +1120,14 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
     
     log_with_user_info("INFO", "📢 Broadcast command received from owner", user_info)
+    
+    # Refresh counts from database
+    db_users = await get_users_from_database()
+    db_groups = await get_groups_from_database()
+    
+    # Sync memory with database
+    user_ids.update(db_users)
+    group_ids.update(db_groups)
     
     keyboard = create_broadcast_keyboard()
     broadcast_text = get_broadcast_text()
@@ -1246,25 +1284,23 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # Answer callback with proper message
         await query.answer(BROADCAST_MESSAGES["callback_answers"]["users"], show_alert=False)
         
-        user_count = len(get_all_user_ids())
         broadcast_mode[OWNER_ID] = "users"
         await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_users"].format(count=user_count),
+            BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
             parse_mode=ParseMode.HTML
         )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {user_count} users", user_info)
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
         
     elif query.data == "bc_groups":
         # Answer callback with proper message
         await query.answer(BROADCAST_MESSAGES["callback_answers"]["groups"], show_alert=False)
         
-        group_count = len(get_all_group_ids())
         broadcast_mode[OWNER_ID] = "groups"
         await query.edit_message_text(
-            BROADCAST_MESSAGES["ready_groups"].format(count=group_count),
+            BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
             parse_mode=ParseMode.HTML
         )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {group_count} groups", user_info)
+        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
 
 
 # BROADCAST FUNCTIONS
@@ -1273,11 +1309,13 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
     Compatible with python-telegram-bot==22.3"""
     try:
         if target_type == "users":
-            all_user_ids = get_all_user_ids()
-            target_list = [uid for uid in all_user_ids if uid != OWNER_ID]
+            # Get fresh data from database
+            target_list = await get_users_from_database()
+            target_list = [uid for uid in target_list if uid != OWNER_ID]
             target_name = "users"
         elif target_type == "groups":
-            target_list = list(get_all_group_ids())
+            # Get fresh data from database
+            target_list = await get_groups_from_database()
             target_name = "groups"
         else:
             return
@@ -1421,7 +1459,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         log_with_user_info("DEBUG", f"📨 Processing message in {chat_type}", user_info)
         
         # Track user and group IDs for broadcasting
-        track_user_and_chat(update, user_info)
+        await track_user_and_chat(update, user_info)
         
         # Check if owner is in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
@@ -1521,16 +1559,17 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
-def run_bot() -> None:
-    """Run the bot"""
+async def run_bot() -> None:
+    """Run the bot with database initialization"""
     if not validate_config():
         return
     
     logger.info("🚀 Initializing Sakura Bot...")
     
-    # Initialize database
-    if not initialize_database():
-        logger.error("❌ Failed to initialize database, exiting...")
+    # Initialize database first
+    db_success = await init_database()
+    if not db_success:
+        logger.error("❌ Database initialization failed. Bot cannot start.")
         return
     
     # Create application
@@ -1544,12 +1583,31 @@ def run_bot() -> None:
         await setup_bot_commands(app)
         logger.info("🌸 Sakura Bot initialization completed!")
         
+    # Setup shutdown handler
+    async def post_shutdown(app):
+        await close_database()
+        logger.info("🌸 Sakura Bot shutdown completed!")
+        
     application.post_init = post_init
+    application.post_shutdown = post_shutdown
     
     logger.info("🌸 Sakura Bot is starting...")
     
-    # Run the bot with polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    try:
+        # Run the bot with polling
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+        
+        # Keep the bot running
+        await application.updater.idle()
+        
+    except Exception as e:
+        logger.error(f"❌ Error running bot: {e}")
+    finally:
+        # Cleanup
+        await application.stop()
+        await application.shutdown()
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -1587,8 +1645,8 @@ def main() -> None:
         # Start dummy server in background thread
         threading.Thread(target=start_dummy_server, daemon=True).start()
         
-        # Run the bot
-        run_bot()
+        # Run the bot with async event loop
+        asyncio.run(run_bot())
         
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
