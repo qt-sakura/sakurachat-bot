@@ -1560,45 +1560,40 @@ def setup_handlers(application: Application) -> None:
 
 
 def run_bot() -> None:
-    """Run the bot with database initialization"""
+    """Run the bot"""
     if not validate_config():
         return
     
     logger.info("🚀 Initializing Sakura Bot...")
     
-    async def initialize_and_run():
-        # Initialize database first
+    # Create application
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    # Setup handlers
+    setup_handlers(application)
+    
+    # Setup bot commands and database using post_init
+    async def post_init(app):
+        # Initialize database
         db_success = await init_database()
         if not db_success:
-            logger.error("❌ Database initialization failed. Bot cannot start.")
-            return
+            logger.error("❌ Database initialization failed. Bot will continue without persistence.")
         
-        # Create application
-        application = Application.builder().token(BOT_TOKEN).build()
+        await setup_bot_commands(app)
+        logger.info("🌸 Sakura Bot initialization completed!")
         
-        # Setup handlers
-        setup_handlers(application)
+    # Setup shutdown handler
+    async def post_shutdown(app):
+        await close_database()
+        logger.info("🌸 Sakura Bot shutdown completed!")
         
-        # Setup bot commands using post_init
-        async def post_init(app):
-            await setup_bot_commands(app)
-            logger.info("🌸 Sakura Bot initialization completed!")
-            
-        # Setup shutdown handler
-        async def post_shutdown(app):
-            await close_database()
-            logger.info("🌸 Sakura Bot shutdown completed!")
-            
-        application.post_init = post_init
-        application.post_shutdown = post_shutdown
-        
-        logger.info("🌸 Sakura Bot is starting...")
-        
-        # Run the bot with polling
-        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    application.post_init = post_init
+    application.post_shutdown = post_shutdown
     
-    # Run the async initialization
-    asyncio.run(initialize_and_run())
+    logger.info("🌸 Sakura Bot is starting...")
+    
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 # HTTP SERVER FOR DEPLOYMENT
