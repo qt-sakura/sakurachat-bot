@@ -1,5 +1,6 @@
 requests
 google-genai
 python-telegram-bot==22.3
-PyMySQL==1.1.1
-cryptography==45.0.5
+#PyMySQL==1.1.1
+#cryptography==45.0.5
+asyncpg==0.30.0
