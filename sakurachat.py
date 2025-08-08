@@ -522,8 +522,14 @@ async def init_database():
         return False
     
     try:
-        # Create connection pool
-        db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
+        # Create connection pool with optimized settings
+        db_pool = await asyncpg.create_pool(
+            DATABASE_URL, 
+            min_size=2, 
+            max_size=5,
+            command_timeout=3,
+            server_settings={'application_name': 'sakura_bot'}
+        )
         logger.info("✅ Database connection pool created successfully")
         
         # Create tables if they don't exist
@@ -588,56 +594,64 @@ async def load_data_from_database():
     except Exception as e:
         logger.error(f"❌ Failed to load data from database: {e}")
 
-async def save_user_to_database(user_id: int, username: str = None, first_name: str = None, last_name: str = None):
-    """Save or update user in database"""
+def save_user_to_database_async(user_id: int, username: str = None, first_name: str = None, last_name: str = None):
+    """Save user to database asynchronously (fire and forget)"""
     if not db_pool:
         return
     
-    try:
-        async with db_pool.acquire() as conn:
-            await conn.execute("""
-                INSERT INTO users (user_id, username, first_name, last_name, updated_at)
-                VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-                ON CONFLICT (user_id) 
-                DO UPDATE SET 
-                    username = EXCLUDED.username,
-                    first_name = EXCLUDED.first_name,
-                    last_name = EXCLUDED.last_name,
-                    updated_at = CURRENT_TIMESTAMP
-            """, user_id, username, first_name, last_name)
+    async def save_user():
+        try:
+            async with db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO users (user_id, username, first_name, last_name, updated_at)
+                    VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                    ON CONFLICT (user_id) 
+                    DO UPDATE SET 
+                        username = EXCLUDED.username,
+                        first_name = EXCLUDED.first_name,
+                        last_name = EXCLUDED.last_name,
+                        updated_at = CURRENT_TIMESTAMP
+                """, user_id, username, first_name, last_name)
+                
+            logger.debug(f"💾 User {user_id} saved to database")
             
-        logger.debug(f"💾 User {user_id} saved to database")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to save user {user_id} to database: {e}")
+        except Exception as e:
+            logger.error(f"❌ Failed to save user {user_id} to database: {e}")
+    
+    # Schedule the save operation without waiting
+    asyncio.create_task(save_user())
 
-async def save_group_to_database(group_id: int, title: str = None, username: str = None, chat_type: str = None):
-    """Save or update group in database"""
+def save_group_to_database_async(group_id: int, title: str = None, username: str = None, chat_type: str = None):
+    """Save group to database asynchronously (fire and forget)"""
     if not db_pool:
         return
     
-    try:
-        async with db_pool.acquire() as conn:
-            await conn.execute("""
-                INSERT INTO groups (group_id, title, username, type, updated_at)
-                VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-                ON CONFLICT (group_id) 
-                DO UPDATE SET 
-                    title = EXCLUDED.title,
-                    username = EXCLUDED.username,
-                    type = EXCLUDED.type,
-                    updated_at = CURRENT_TIMESTAMP
-            """, group_id, title, username, chat_type)
+    async def save_group():
+        try:
+            async with db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO groups (group_id, title, username, type, updated_at)
+                    VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                    ON CONFLICT (group_id) 
+                    DO UPDATE SET 
+                        title = EXCLUDED.title,
+                        username = EXCLUDED.username,
+                        type = EXCLUDED.type,
+                        updated_at = CURRENT_TIMESTAMP
+                """, group_id, title, username, chat_type)
+                
+            logger.debug(f"💾 Group {group_id} saved to database")
             
-        logger.debug(f"💾 Group {group_id} saved to database")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to save group {group_id} to database: {e}")
+        except Exception as e:
+            logger.error(f"❌ Failed to save group {group_id} to database: {e}")
+    
+    # Schedule the save operation without waiting
+    asyncio.create_task(save_group())
 
 async def get_users_from_database():
     """Get all user IDs from database"""
     if not db_pool:
-        return []
+        return list(user_ids)  # Fallback to memory
     
     try:
         async with db_pool.acquire() as conn:
@@ -645,12 +659,12 @@ async def get_users_from_database():
             return [row['user_id'] for row in rows]
     except Exception as e:
         logger.error(f"❌ Failed to get users from database: {e}")
-        return []
+        return list(user_ids)  # Fallback to memory
 
 async def get_groups_from_database():
     """Get all group IDs from database"""
     if not db_pool:
-        return []
+        return list(group_ids)  # Fallback to memory
     
     try:
         async with db_pool.acquire() as conn:
@@ -658,7 +672,7 @@ async def get_groups_from_database():
             return [row['group_id'] for row in rows]
     except Exception as e:
         logger.error(f"❌ Failed to get groups from database: {e}")
-        return []
+        return list(group_ids)  # Fallback to memory
 
 async def close_database():
     """Close database connection pool"""
@@ -770,18 +784,18 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
     return False
 
 
-async def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
-    """Track user and chat IDs for broadcasting (both in memory and database)"""
+def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
+    """Track user and chat IDs for broadcasting (fast memory + async database)"""
     user_id = user_info["user_id"]
     chat_id = user_info["chat_id"]
     chat_type = user_info["chat_type"]
     
     if chat_type == "private":
-        # Add to memory
+        # Add to memory immediately (fast)
         user_ids.add(user_id)
         
-        # Save to database
-        await save_user_to_database(
+        # Save to database asynchronously (non-blocking)
+        save_user_to_database_async(
             user_id, 
             user_info.get("username"), 
             user_info.get("first_name"), 
@@ -791,18 +805,18 @@ async def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None
         log_with_user_info("INFO", f"👤 User tracked for broadcasting", user_info)
         
     elif chat_type in ['group', 'supergroup']:
-        # Add to memory
+        # Add to memory immediately (fast)
         group_ids.add(chat_id)
         user_ids.add(user_id)
         
-        # Save to database
-        await save_group_to_database(
+        # Save to database asynchronously (non-blocking)
+        save_group_to_database_async(
             chat_id, 
             user_info.get("chat_title"), 
             user_info.get("username"), 
             chat_type
         )
-        await save_user_to_database(
+        save_user_to_database_async(
             user_id, 
             user_info.get("username"), 
             user_info.get("first_name"), 
@@ -959,7 +973,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /start command received", user_info)
         
-        await track_user_and_chat(update, user_info)
+        track_user_and_chat(update, user_info)
         
         # Step 1: React to the start message with random emoji
         if EMOJI_REACT:
@@ -1043,7 +1057,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "ℹ️ /help command received", user_info)
         
-        await track_user_and_chat(update, user_info)
+        track_user_and_chat(update, user_info)
         
         # Step 1: React to the help message with random emoji (if enabled)
         if EMOJI_REACT:
@@ -1459,7 +1473,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         log_with_user_info("DEBUG", f"📨 Processing message in {chat_type}", user_info)
         
         # Track user and group IDs for broadcasting
-        await track_user_and_chat(update, user_info)
+        track_user_and_chat(update, user_info)
         
         # Check if owner is in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
