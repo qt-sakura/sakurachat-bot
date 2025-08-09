@@ -30,6 +30,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # CONFIGURATION
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
@@ -37,9 +38,6 @@ UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
-
-# Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 # Commands dictionary
 COMMANDS = [
