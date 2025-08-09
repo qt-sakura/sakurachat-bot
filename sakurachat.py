@@ -1,13 +1,10 @@
 import os
 import time
-import logging
 import random
 import asyncio
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Dict, Set, Optional
+import logging
 import asyncpg
-
+import threading
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -25,10 +22,11 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
-from telegram.constants import ParseMode, ChatAction
-from telegram.error import TelegramError
-
 from google import genai
+from typing import Dict, Set, Optional
+from telegram.error import TelegramError
+from telegram.constants import ParseMode, ChatAction
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # CONFIGURATION
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
