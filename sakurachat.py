@@ -5,6 +5,7 @@ import asyncio
 import logging
 import asyncpg
 import threading
+import aiohttp
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -22,6 +23,7 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+from telethon import TelegramClient, events
 from google import genai
 from typing import Dict, Set, Optional
 from telegram.error import TelegramError
@@ -38,6 +40,23 @@ UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
+
+# TELETHON EFFECTS CONFIGURATION
+API_ID = int(os.getenv("API_ID", "0"))
+API_HASH = os.getenv("API_HASH", "")
+EFFECTS = ['5104841245755180586', '5046509860389126442', '5159385139981059251']  # Fire, Party, Hearts
+
+# Clean Telethon session
+if os.path.exists('sakura_effects.session'):
+    os.remove('sakura_effects.session')
+
+# Initialize Telethon client for effects
+effects_client = None
+try:
+    effects_client = TelegramClient('sakura_effects', API_ID, API_HASH)
+    logger.info("✅ Telethon effects client initialized")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize Telethon effects client: {e}")
 
 # Commands dictionary
 COMMANDS = [
@@ -499,6 +518,56 @@ def setup_colored_logging():
 # Initialize colored logger
 logger = setup_colored_logging()
 
+# TELETHON EFFECTS FUNCTIONS
+async def send_with_effect(chat_id: int, text: str) -> bool:
+    """Send message with random effect using Telethon"""
+    if not effects_client:
+        logger.warning("⚠️ Telethon effects client not available")
+        return False
+    
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {
+            'chat_id': chat_id, 
+            'text': text, 
+            'message_effect_id': random.choice(EFFECTS),
+            'parse_mode': 'HTML'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                result = await response.json()
+                if result.get('ok'):
+                    logger.info(f"✨ Effect message sent to {chat_id}")
+                    return True
+                else:
+                    logger.error(f"❌ Effect failed for {chat_id}: {result}")
+                    return False
+    except Exception as e:
+        logger.error(f"❌ Effect error for {chat_id}: {e}")
+        return False
+
+async def start_effects_client():
+    """Start Telethon effects client"""
+    global effects_client
+    if effects_client:
+        try:
+            await effects_client.start(bot_token=BOT_TOKEN)
+            logger.info("✅ Telethon effects client started successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to start Telethon effects client: {e}")
+            effects_client = None
+
+async def stop_effects_client():
+    """Stop Telethon effects client"""
+    global effects_client
+    if effects_client:
+        try:
+            await effects_client.disconnect()
+            logger.info("✅ Telethon effects client stopped")
+        except Exception as e:
+            logger.error(f"❌ Error stopping Telethon effects client: {e}")
+
 # GEMINI CLIENT INITIALIZATION
 # Initialize Gemini client
 gemini_client = None
@@ -749,6 +818,12 @@ def validate_config() -> bool:
     if not DATABASE_URL:
         logger.error("❌ DATABASE_URL not found in environment variables")
         return False
+    if not API_ID:
+        logger.error("❌ API_ID not found in environment variables")
+        return False
+    if not API_HASH:
+        logger.error("❌ API_HASH not found in environment variables")
+        return False
     return True
 
 
@@ -964,7 +1039,7 @@ def get_broadcast_text() -> str:
 
 # COMMAND HANDLERS
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command with two-step inline buttons"""
+    """Handle /start command with two-step inline buttons and effects in private chat"""
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /start command received", user_info)
@@ -1031,13 +1106,33 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         log_with_user_info("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
         
-        await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo=random_image,
-            caption=caption,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard
-        )
+        # Send with effects if in private chat
+        if update.effective_chat.type == "private":
+            # Send normal message first
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=random_image,
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+            
+            # Send effect message immediately after
+            effect_message = f"🌸 Welcome {update.effective_user.first_name}! Let's chat! 🌸"
+            effect_sent = await send_with_effect(update.effective_chat.id, effect_message)
+            if effect_sent:
+                log_with_user_info("INFO", "✨ Start command effect sent successfully", user_info)
+            else:
+                log_with_user_info("WARNING", "⚠️ Start command effect failed", user_info)
+        else:
+            # Group chat - no effects, just normal message
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=random_image,
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
         
         log_with_user_info("INFO", "✅ Start command completed successfully", user_info)
         
@@ -1048,7 +1143,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /help command with random image"""
+    """Handle /help command with random image and effects in private chat"""
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "ℹ️ /help command received", user_info)
@@ -1105,13 +1200,33 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         random_image = random.choice(SAKURA_IMAGES)
         log_with_user_info("DEBUG", f"📷 Sending help photo: {random_image[:50]}...", user_info)
         
-        await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo=random_image,
-            caption=help_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard
-        )
+        # Send with effects if in private chat
+        if update.effective_chat.type == "private":
+            # Send normal message first
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=random_image,
+                caption=help_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+            
+            # Send effect message immediately after
+            effect_message = f"💬 Here's your guide {update.effective_user.first_name}! Need any help? 💬"
+            effect_sent = await send_with_effect(update.effective_chat.id, effect_message)
+            if effect_sent:
+                log_with_user_info("INFO", "✨ Help command effect sent successfully", user_info)
+            else:
+                log_with_user_info("WARNING", "⚠️ Help command effect failed", user_info)
+        else:
+            # Group chat - no effects, just normal message
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=random_image,
+                caption=help_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
         
         log_with_user_info("INFO", "✅ Help command completed successfully", user_info)
         
@@ -1589,12 +1704,16 @@ def run_bot() -> None:
         if not db_success:
             logger.error("❌ Database initialization failed. Bot will continue without persistence.")
         
+        # Start Telethon effects client
+        await start_effects_client()
+        
         await setup_bot_commands(app)
         logger.info("🌸 Sakura Bot initialization completed!")
         
     # Setup shutdown handler
     async def post_shutdown(app):
         await close_database()
+        await stop_effects_client()
         logger.info("🌸 Sakura Bot shutdown completed!")
         
     application.post_init = post_init
