@@ -547,6 +547,39 @@ async def send_with_effect(chat_id: int, text: str) -> bool:
         logger.error(f"❌ Effect error for {chat_id}: {e}")
         return False
 
+async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
+    """Send photo message with random effect using direct API"""
+    if not effects_client:
+        logger.warning("⚠️ Telethon effects client not available")
+        return False
+    
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+        payload = {
+            'chat_id': chat_id,
+            'photo': photo_url,
+            'caption': caption,
+            'message_effect_id': random.choice(EFFECTS),
+            'parse_mode': 'HTML'
+        }
+        
+        # Add reply markup if provided
+        if reply_markup:
+            payload['reply_markup'] = reply_markup.to_json()
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                result = await response.json()
+                if result.get('ok'):
+                    logger.info(f"✨ Effect photo sent to {chat_id}")
+                    return True
+                else:
+                    logger.error(f"❌ Photo effect failed for {chat_id}: {result}")
+                    return False
+    except Exception as e:
+        logger.error(f"❌ Photo effect error for {chat_id}: {e}")
+        return False
+
 async def start_effects_client():
     """Start Telethon effects client"""
     global effects_client
@@ -1106,24 +1139,27 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         log_with_user_info("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
         
-        # Send with effects if in private chat
+        # Send with effects if in private chat, normal otherwise
         if update.effective_chat.type == "private":
-            # Send normal message first
-            await context.bot.send_photo(
-                chat_id=update.effective_chat.id,
-                photo=random_image,
-                caption=caption,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard
+            # Use Telethon effects for the main start message
+            effect_sent = await send_with_effect_photo(
+                update.effective_chat.id, 
+                random_image, 
+                caption, 
+                keyboard
             )
-            
-            # Send effect message immediately after
-            effect_message = f"🌸 Welcome {update.effective_user.first_name}! Let's chat! 🌸"
-            effect_sent = await send_with_effect(update.effective_chat.id, effect_message)
             if effect_sent:
-                log_with_user_info("INFO", "✨ Start command effect sent successfully", user_info)
+                log_with_user_info("INFO", "✨ Start command with effects sent successfully", user_info)
             else:
-                log_with_user_info("WARNING", "⚠️ Start command effect failed", user_info)
+                # Fallback to normal PTB message if effects fail
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=random_image,
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+                log_with_user_info("WARNING", "⚠️ Start command sent without effects (fallback)", user_info)
         else:
             # Group chat - no effects, just normal message
             await context.bot.send_photo(
@@ -1200,24 +1236,27 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         random_image = random.choice(SAKURA_IMAGES)
         log_with_user_info("DEBUG", f"📷 Sending help photo: {random_image[:50]}...", user_info)
         
-        # Send with effects if in private chat
+        # Send with effects if in private chat, normal otherwise
         if update.effective_chat.type == "private":
-            # Send normal message first
-            await context.bot.send_photo(
-                chat_id=update.effective_chat.id,
-                photo=random_image,
-                caption=help_text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard
+            # Use Telethon effects for the main help message
+            effect_sent = await send_with_effect_photo(
+                update.effective_chat.id,
+                random_image,
+                help_text,
+                keyboard
             )
-            
-            # Send effect message immediately after
-            effect_message = f"💬 Here's your guide {update.effective_user.first_name}! Need any help? 💬"
-            effect_sent = await send_with_effect(update.effective_chat.id, effect_message)
             if effect_sent:
-                log_with_user_info("INFO", "✨ Help command effect sent successfully", user_info)
+                log_with_user_info("INFO", "✨ Help command with effects sent successfully", user_info)
             else:
-                log_with_user_info("WARNING", "⚠️ Help command effect failed", user_info)
+                # Fallback to normal PTB message if effects fail
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=random_image,
+                    caption=help_text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+                log_with_user_info("WARNING", "⚠️ Help command sent without effects (fallback)", user_info)
         else:
             # Group chat - no effects, just normal message
             await context.bot.send_photo(
