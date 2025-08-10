@@ -574,7 +574,7 @@ except Exception as e:
     logger.error(f"❌ Failed to initialize Telethon effects client: {e}")
 
 # TELETHON EFFECTS FUNCTIONS
-async def send_with_effect(chat_id: int, text: str) -> bool:
+async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
     """Send message with random effect using Telethon"""
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
@@ -588,6 +588,14 @@ async def send_with_effect(chat_id: int, text: str) -> bool:
             'message_effect_id': random.choice(EFFECTS),
             'parse_mode': 'HTML'
         }
+        
+        # Add reply markup if provided (for ForceReply)
+        if reply_markup:
+            payload['reply_markup'] = reply_markup.to_json()
+        else:
+            # Default ForceReply for Gemini responses
+            force_reply = ForceReply(selective=True, input_field_placeholder="Cute text 💓")
+            payload['reply_markup'] = force_reply.to_json()
         
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
@@ -1484,15 +1492,34 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             user_name = update.effective_user.first_name or ""
             hi_response = await get_gemini_response("Hi sakura", user_name, user_info)
 
-            # Send the AI response as a reply with ForceReply
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=hi_response,
-                reply_markup=ForceReply(
-                    selective=True,
-                    input_field_placeholder="Cute text 💓"
+            # Send with effects if in private chat
+            if update.effective_chat.type == "private":
+                # Try sending with effects first
+                effect_sent = await send_with_effect(update.effective_chat.id, hi_response)
+                if effect_sent:
+                    log_with_user_info("INFO", "✨ Start Hi response with effects sent successfully", user_info)
+                else:
+                    # Fallback to normal PTB message if effects fail
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=hi_response,
+                        reply_markup=ForceReply(
+                            selective=True,
+                            input_field_placeholder="Cute text 💓"
+                        )
+                    )
+                    log_with_user_info("WARNING", "⚠️ Start Hi response sent without effects (fallback)", user_info)
+            else:
+                # Group chat - no effects, just normal message
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=hi_response,
+                    reply_markup=ForceReply(
+                        selective=True,
+                        input_field_placeholder="Cute text 💓"
+                    )
                 )
-            )
+            
             log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
 
     except Exception as e:
@@ -1705,7 +1732,7 @@ async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle text and media messages with AI response"""
+    """Handle text and media messages with AI response and effects in private chat"""
     user_info = extract_user_info(update.message)
     user_message = update.message.text or update.message.caption or "Media message"
     
@@ -1720,14 +1747,31 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
     
-    # Send response with ForceReply for chatbot conversations
-    await update.message.reply_text(
-        response,
-        reply_markup=ForceReply(
-            selective=True,
-            input_field_placeholder="Cute text 💓"
+    # Send with effects if in private chat
+    if update.effective_chat.type == "private":
+        # Try sending with effects first
+        effect_sent = await send_with_effect(update.effective_chat.id, response)
+        if effect_sent:
+            log_with_user_info("INFO", "✨ Gemini response with effects sent successfully", user_info)
+        else:
+            # Fallback to normal PTB message if effects fail
+            await update.message.reply_text(
+                response,
+                reply_markup=ForceReply(
+                    selective=True,
+                    input_field_placeholder="Cute text 💓"
+                )
+            )
+            log_with_user_info("WARNING", "⚠️ Gemini response sent without effects (fallback)", user_info)
+    else:
+        # Group chat - no effects, just normal message
+        await update.message.reply_text(
+            response,
+            reply_markup=ForceReply(
+                selective=True,
+                input_field_placeholder="Cute text 💓"
+            )
         )
-    )
     
     log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
