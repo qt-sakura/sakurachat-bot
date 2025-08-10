@@ -50,6 +50,9 @@ EFFECTS = ['5104841245755180586', '5046509860389126442', '5159385139981059251'] 
 if os.path.exists('sakura_effects.session'):
     os.remove('sakura_effects.session')
 
+# Initialize colored logger first
+logger = setup_colored_logging()
+
 # Initialize Telethon client for effects
 effects_client = None
 try:
