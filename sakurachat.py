@@ -547,7 +547,64 @@ async def send_with_effect(chat_id: int, text: str) -> bool:
         logger.error(f"❌ Effect error for {chat_id}: {e}")
         return False
 
-async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
+async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> bool:
+    """Send animated emoji reaction using direct API call"""
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
+        payload = {
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'reaction': [{'type': 'emoji', 'emoji': emoji}],
+            'is_big': True  # This makes the reaction animated/big
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                result = await response.json()
+                if result.get('ok'):
+                    logger.info(f"🎭 Animated reaction {emoji} sent to {chat_id}")
+                    return True
+                else:
+                    logger.error(f"❌ Animated reaction failed for {chat_id}: {result}")
+                    return False
+    except Exception as e:
+        logger.error(f"❌ Animated reaction error for {chat_id}: {e}")
+        return False
+
+async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any]):
+    """Fallback PTB reaction without animation"""
+    try:
+        # Try the new API format first
+        try:
+            reaction = [ReactionTypeEmoji(emoji=emoji)]
+            await context.bot.set_message_reaction(
+                chat_id=update.effective_chat.id,
+                message_id=update.message.message_id,
+                reaction=reaction
+            )
+            log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {emoji}", user_info)
+        
+        except ImportError:
+            # Fallback to direct emoji string (older versions)
+            try:
+                await context.bot.set_message_reaction(
+                    chat_id=update.effective_chat.id,
+                    message_id=update.message.message_id,
+                    reaction=emoji
+                )
+                log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {emoji}", user_info)
+            
+            except Exception:
+                # Try with list of strings
+                await context.bot.set_message_reaction(
+                    chat_id=update.effective_chat.id,
+                    message_id=update.message.message_id,
+                    reaction=[emoji]
+                )
+                log_with_user_info("DEBUG", f"🍓 Added emoji reaction (list format): {emoji}", user_info)
+    
+    except Exception as e:
+        log_with_user_info("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
     """Send photo message with random effect using direct API"""
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
@@ -1079,39 +1136,26 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         track_user_and_chat(update, user_info)
         
-        # Step 1: React to the start message with random emoji
+        # Step 1: React to the start message with random emoji and animation
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 
-                # Try the new API format first
-                try:
-                    reaction = [ReactionTypeEmoji(emoji=random_emoji)]
-                    await context.bot.set_message_reaction(
-                        chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id,
-                        reaction=reaction
+                # Use Telethon for animated emoji reactions
+                if effects_client and update.effective_chat.type == "private":
+                    reaction_sent = await send_animated_reaction(
+                        update.effective_chat.id,
+                        update.message.message_id,
+                        random_emoji
                     )
-                    log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {random_emoji}", user_info)
-                
-                except ImportError:
-                    # Fallback to direct emoji string (older versions)
-                    try:
-                        await context.bot.set_message_reaction(
-                            chat_id=update.effective_chat.id,
-                            message_id=update.message.message_id,
-                            reaction=random_emoji
-                        )
-                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {random_emoji}", user_info)
-                    
-                    except Exception:
-                        # Try with list of strings
-                        await context.bot.set_message_reaction(
-                            chat_id=update.effective_chat.id,
-                            message_id=update.message.message_id,
-                            reaction=[random_emoji]
-                        )
-                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (list format): {random_emoji}", user_info)
+                    if reaction_sent:
+                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                    else:
+                        # Fallback to PTB reaction without animation
+                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                else:
+                    # Group chat or no Telethon - use PTB reaction
+                    await add_ptb_reaction(context, update, random_emoji, user_info)
                 
             except Exception as e:
                 log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
@@ -1186,39 +1230,26 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
         track_user_and_chat(update, user_info)
         
-        # Step 1: React to the help message with random emoji (if enabled)
+        # Step 1: React to the help message with random emoji and animation
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 
-                # Try the new API format first
-                try:
-                    reaction = [ReactionTypeEmoji(emoji=random_emoji)]
-                    await context.bot.set_message_reaction(
-                        chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id,
-                        reaction=reaction
+                # Use Telethon for animated emoji reactions
+                if effects_client and update.effective_chat.type == "private":
+                    reaction_sent = await send_animated_reaction(
+                        update.effective_chat.id,
+                        update.message.message_id,
+                        random_emoji
                     )
-                    log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {random_emoji}", user_info)
-                
-                except ImportError:
-                    # Fallback to direct emoji string (older versions)
-                    try:
-                        await context.bot.set_message_reaction(
-                            chat_id=update.effective_chat.id,
-                            message_id=update.message.message_id,
-                            reaction=random_emoji
-                        )
-                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {random_emoji}", user_info)
-                    
-                    except Exception:
-                        # Try with list of strings
-                        await context.bot.set_message_reaction(
-                            chat_id=update.effective_chat.id,
-                            message_id=update.message.message_id,
-                            reaction=[random_emoji]
-                        )
-                        log_with_user_info("DEBUG", f"🍓 Added emoji reaction (list format): {random_emoji}", user_info)
+                    if reaction_sent:
+                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                    else:
+                        # Fallback to PTB reaction without animation
+                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                else:
+                    # Group chat or no Telethon - use PTB reaction
+                    await add_ptb_reaction(context, update, random_emoji, user_info)
                 
             except Exception as e:
                 log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
