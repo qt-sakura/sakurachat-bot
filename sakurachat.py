@@ -46,6 +46,64 @@ API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 EFFECTS = ['5104841245755180586', '5046509860389126442', '5159385139981059251']  # Fire, Party, Hearts
 
+# LOGGING SETUP
+# Color codes for logging
+class Colors:
+    BLUE = '\033[94m'      # INFO/WARNING
+    GREEN = '\033[92m'     # DEBUG
+    YELLOW = '\033[93m'    # INFO
+    RED = '\033[91m'       # ERROR
+    RESET = '\033[0m'      # Reset color
+    BOLD = '\033[1m'       # Bold text
+
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter to add colors to entire log messages"""
+    
+    COLORS = {
+        'DEBUG': Colors.GREEN,
+        'INFO': Colors.YELLOW,
+        'WARNING': Colors.BLUE,
+        'ERROR': Colors.RED,
+    }
+    
+    def format(self, record):
+        # Get the original formatted message
+        original_format = super().format(record)
+        
+        # Get color based on log level
+        color = self.COLORS.get(record.levelname, Colors.RESET)
+        
+        # Apply color to the entire message
+        colored_format = f"{color}{original_format}{Colors.RESET}"
+        
+        return colored_format
+
+# Configure logging with colors
+def setup_colored_logging():
+    """Setup colored logging configuration"""
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    
+    # Remove existing handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    
+    # Create colored formatter with enhanced format
+    formatter = ColoredFormatter(
+        fmt='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    console_handler.setFormatter(formatter)
+    
+    # Add handler to logger
+    logger.addHandler(console_handler)
+    
+    return logger
+
 # Clean Telethon session
 if os.path.exists('sakura_effects.session'):
     os.remove('sakura_effects.session')
@@ -459,67 +517,6 @@ user_last_response_time: Dict[int, float] = {}
 
 # DATABASE CONNECTION POOL
 db_pool = None
-
-# LOGGING SETUP
-# Color codes for logging
-class Colors:
-    BLUE = '\033[94m'      # INFO/WARNING
-    GREEN = '\033[92m'     # DEBUG
-    YELLOW = '\033[93m'    # INFO
-    RED = '\033[91m'       # ERROR
-    RESET = '\033[0m'      # Reset color
-    BOLD = '\033[1m'       # Bold text
-
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter to add colors to entire log messages"""
-    
-    COLORS = {
-        'DEBUG': Colors.GREEN,
-        'INFO': Colors.YELLOW,
-        'WARNING': Colors.BLUE,
-        'ERROR': Colors.RED,
-    }
-    
-    def format(self, record):
-        # Get the original formatted message
-        original_format = super().format(record)
-        
-        # Get color based on log level
-        color = self.COLORS.get(record.levelname, Colors.RESET)
-        
-        # Apply color to the entire message
-        colored_format = f"{color}{original_format}{Colors.RESET}"
-        
-        return colored_format
-
-# Configure logging with colors
-def setup_colored_logging():
-    """Setup colored logging configuration"""
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    
-    # Remove existing handlers
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Create console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    
-    # Create colored formatter with enhanced format
-    formatter = ColoredFormatter(
-        fmt='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    console_handler.setFormatter(formatter)
-    
-    # Add handler to logger
-    logger.addHandler(console_handler)
-    
-    return logger
-
-# Initialize colored logger
-logger = setup_colored_logging()
 
 # TELETHON EFFECTS FUNCTIONS
 async def send_with_effect(chat_id: int, text: str) -> bool:
