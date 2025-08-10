@@ -605,6 +605,39 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
     
     except Exception as e:
         log_with_user_info("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
+
+async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
+    """Send photo message with random effect using direct API"""
+    if not effects_client:
+        logger.warning("⚠️ Telethon effects client not available")
+        return False
+    
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+        payload = {
+            'chat_id': chat_id,
+            'photo': photo_url,
+            'caption': caption,
+            'message_effect_id': random.choice(EFFECTS),
+            'parse_mode': 'HTML'
+        }
+        
+        # Add reply markup if provided
+        if reply_markup:
+            payload['reply_markup'] = reply_markup.to_json()
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                result = await response.json()
+                if result.get('ok'):
+                    logger.info(f"✨ Effect photo sent to {chat_id}")
+                    return True
+                else:
+                    logger.error(f"❌ Photo effect failed for {chat_id}: {result}")
+                    return False
+    except Exception as e:
+        logger.error(f"❌ Photo effect error for {chat_id}: {e}")
+        return False
     """Send photo message with random effect using direct API"""
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
