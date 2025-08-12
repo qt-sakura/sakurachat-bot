@@ -497,6 +497,10 @@ help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_last_response_time: Dict[int, float] = {}
 
+# CONVERSATION MEMORY SYSTEM
+conversation_history: Dict[int, list] = {}
+MAX_CONVERSATION_LENGTH = 10  # Keep last 10 messages per user
+
 # DATABASE CONNECTION POOL
 db_pool = None
 
@@ -1089,9 +1093,48 @@ def get_user_mention(user) -> str:
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'
 
 
+# CONVERSATION MEMORY FUNCTIONS
+def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
+    """Add message to user's conversation history"""
+    global conversation_history
+    
+    if user_id not in conversation_history:
+        conversation_history[user_id] = []
+    
+    # Add message with role (user or assistant)
+    role = "user" if is_user else "assistant"
+    conversation_history[user_id].append({"role": role, "content": message})
+    
+    # Keep only last MAX_CONVERSATION_LENGTH messages
+    if len(conversation_history[user_id]) > MAX_CONVERSATION_LENGTH:
+        conversation_history[user_id] = conversation_history[user_id][-MAX_CONVERSATION_LENGTH:]
+
+
+def get_conversation_context(user_id: int) -> str:
+    """Get formatted conversation context for the user"""
+    if user_id not in conversation_history or not conversation_history[user_id]:
+        return ""
+    
+    context_lines = []
+    for message in conversation_history[user_id]:
+        if message["role"] == "user":
+            context_lines.append(f"User: {message['content']}")
+        else:
+            context_lines.append(f"Sakura: {message['content']}")
+    
+    return "\n".join(context_lines)
+
+
+def clear_conversation_history(user_id: int):
+    """Clear conversation history for a user"""
+    global conversation_history
+    if user_id in conversation_history:
+        del conversation_history[user_id]
+
+
 # AI RESPONSE FUNCTIONS
-async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None) -> str:
-    """Get response from Gemini API with fallback responses"""
+async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+    """Get response from Gemini API with conversation context"""
     if user_info:
         log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
     
@@ -1101,7 +1144,15 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         return get_fallback_response()
     
     try:
-        prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}\nUser message: {user_message}\n\nSakura's response:"
+        # Get conversation context if user_id provided
+        context = ""
+        if user_id:
+            context = get_conversation_context(user_id)
+            if context:
+                context = f"\n\nPrevious conversation:\n{context}\n"
+        
+        # Build prompt with context
+        prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
         
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
@@ -1109,6 +1160,11 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         )
         
         ai_response = response.text.strip() if response.text else get_fallback_response()
+        
+        # Add messages to conversation history
+        if user_id:
+            add_to_conversation_history(user_id, user_message, is_user=True)
+            add_to_conversation_history(user_id, ai_response, is_user=False)
         
         if user_info:
             log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
@@ -1455,6 +1511,7 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     log_with_user_info("INFO", f"✅ Ping completed: {response_time}ms", user_info)
 
 
+
 # CALLBACK HANDLERS
 async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle start command inline button callbacks"""
@@ -1490,7 +1547,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
             # Send a hi message from Sakura
             user_name = update.effective_user.first_name or ""
-            hi_response = await get_gemini_response("Hi sakura", user_name, user_info)
+            hi_response = await get_gemini_response("Hi sakura", user_name, user_info, update.effective_user.id)
 
             # Send with effects if in private chat
             if update.effective_chat.type == "private":
@@ -1743,7 +1800,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_name = update.effective_user.first_name or ""
     
     # Get response from Gemini
-    response = await get_gemini_response(user_message, user_name, user_info)
+    response = await get_gemini_response(user_message, user_name, user_info, update.effective_user.id)
     
     log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
     
