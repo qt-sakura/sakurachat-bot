@@ -44,9 +44,19 @@ RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
 
 # Conversation memory configuration
-MAX_CONVERSATION_LENGTH = 50  # Maximum messages to remember per conversation
-CONVERSATION_TIMEOUT_HOURS = 24  # Clear conversation after 24 hours of inactivity
-MEMORY_CLEANUP_INTERVAL = 3600  # Cleanup old conversations every hour (in seconds)
+MAX_CONVERSATION_LENGTH = 20
+CONVERSATION_TIMEOUT_HOURS = 24
+MEMORY_CLEANUP_INTERVAL = 3600
+
+# GLOBAL STATE
+user_ids: Set[int] = set()
+group_ids: Set[int] = set()
+help_expanded: Dict[int, bool] = {}
+broadcast_mode: Dict[int, str] = {}
+user_last_response_time: Dict[int, float] = {}
+
+# DATABASE CONNECTION POOL
+db_pool = None
 
 # Commands dictionary
 COMMANDS = [
@@ -494,19 +504,6 @@ You are soft helpful Sakura Haruno from Naruto Shippuden — still shinobi, stil
 
 Every message must feel like a whisper you wait to hear again 🌙
 """
-
-# GLOBAL STATE
-user_ids: Set[int] = set()
-group_ids: Set[int] = set()
-help_expanded: Dict[int, bool] = {}
-broadcast_mode: Dict[int, str] = {}
-user_last_response_time: Dict[int, float] = {}
-
-# CONVERSATION MEMORY SYSTEM (PostgreSQL-based)
-# Configuration moved to top of file
-
-# DATABASE CONNECTION POOL
-db_pool = None
 
 # LOGGING SETUP
 # Color codes for logging
@@ -1038,7 +1035,7 @@ def format_conversation_context(conversation: list) -> str:
         return ""
     
     context_parts = ["Previous conversation context:"]
-    for msg in conversation[-10:]:  # Use last 10 messages for context
+    for msg in conversation[-20:]:  # Use last 20 messages for context
         role = "User" if msg['type'] == 'user' else "Sakura"
         context_parts.append(f"{role}: {msg['text']}")
     
@@ -1233,15 +1230,6 @@ def get_user_mention(user) -> str:
     """Create user mention for HTML parsing using first name"""
     first_name = user.first_name or "Friend"
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'
-
-
-# OLD CONVERSATION MEMORY FUNCTIONS (REMOVED - NOW USING POSTGRESQL)
-# Conversation memory functions have been moved to PostgreSQL-based system above
-
-
-
-
-
 
 # AI RESPONSE FUNCTIONS
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
