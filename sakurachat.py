@@ -42,20 +42,15 @@ UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
-
-# Conversation memory configuration
 MAX_CONVERSATION_LENGTH = 20
-CONVERSATION_TIMEOUT_HOURS = 24
-MEMORY_CLEANUP_INTERVAL = 3600
 
-# GLOBAL STATE
+# GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
 group_ids: Set[int] = set()
 help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_last_response_time: Dict[int, float] = {}
-
-# DATABASE CONNECTION POOL
+conversation_history: Dict[int, list] = {} 
 db_pool = None
 
 # Commands dictionary
@@ -812,31 +807,14 @@ async def init_database():
                 )
             """)
             
-            # Create conversation history table (remove foreign key constraint for compatibility)
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS conversation_history (
-                    id SERIAL PRIMARY KEY,
-                    user_id BIGINT NOT NULL,
-                    message_text TEXT NOT NULL,
-                    message_type VARCHAR(10) NOT NULL CHECK (message_type IN ('user', 'bot')),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
             # Create indexes for better performance
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_groups_created_at ON groups(created_at)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_conversation_user_id ON conversation_history(user_id)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_conversation_created_at ON conversation_history(created_at DESC)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_conversation_user_time ON conversation_history(user_id, created_at DESC)")
             
         logger.info("✅ Database tables created/verified successfully")
         
         # Load existing users and groups into memory
         await load_data_from_database()
-        
-        # Start conversation cleanup task
-        asyncio.create_task(conversation_cleanup_task())
         
         return True
         
@@ -920,127 +898,6 @@ def save_group_to_database_async(group_id: int, title: str = None, username: str
     
     # Schedule the save operation without waiting
     asyncio.create_task(save_group())
-
-# CONVERSATION MEMORY FUNCTIONS (PostgreSQL-based)
-async def add_conversation_message(user_id: int, message_text: str, message_type: str):
-    """Add a message to conversation history in database"""
-    if not db_pool:
-        logger.warning("⚠️ Database pool not available for conversation memory")
-        return
-    
-    try:
-        async with db_pool.acquire() as conn:
-            # Add new message
-            await conn.execute("""
-                INSERT INTO conversation_history (user_id, message_text, message_type, created_at)
-                VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-            """, user_id, message_text, message_type)
-            
-            # Keep only the latest MAX_CONVERSATION_LENGTH messages per user
-            await conn.execute("""
-                DELETE FROM conversation_history 
-                WHERE user_id = $1 AND id NOT IN (
-                    SELECT id FROM conversation_history 
-                    WHERE user_id = $1 
-                    ORDER BY created_at DESC 
-                    LIMIT $2
-                )
-            """, user_id, MAX_CONVERSATION_LENGTH)
-            
-        logger.debug(f"💬 Added {message_type} message to conversation for user {user_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to add conversation message for user {user_id}: {e}")
-
-async def get_conversation_history(user_id: int) -> list:
-    """Get conversation history for a user from database"""
-    if not db_pool:
-        logger.warning("⚠️ Database pool not available for conversation memory")
-        return []
-    
-    try:
-        async with db_pool.acquire() as conn:
-            # Get recent messages within timeout period
-            timeout_cutoff = f"NOW() - INTERVAL '{CONVERSATION_TIMEOUT_HOURS} hours'"
-            rows = await conn.fetch(f"""
-                SELECT message_text, message_type, created_at 
-                FROM conversation_history 
-                WHERE user_id = $1 AND created_at > {timeout_cutoff}
-                ORDER BY created_at ASC 
-                LIMIT $2
-            """, user_id, MAX_CONVERSATION_LENGTH)
-            
-            conversation = []
-            for row in rows:
-                conversation.append({
-                    'text': row['message_text'],
-                    'type': row['message_type'],
-                    'time': row['created_at']
-                })
-            
-        logger.debug(f"📖 Retrieved {len(conversation)} conversation messages for user {user_id}")
-        return conversation
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to get conversation history for user {user_id}: {e}")
-        return []
-
-async def clear_conversation_history(user_id: int):
-    """Clear all conversation history for a user"""
-    if not db_pool:
-        logger.warning("⚠️ Database pool not available for conversation memory")
-        return
-    
-    try:
-        async with db_pool.acquire() as conn:
-            await conn.execute("""
-                DELETE FROM conversation_history WHERE user_id = $1
-            """, user_id)
-            
-        logger.info(f"🗑️ Cleared conversation history for user {user_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to clear conversation history for user {user_id}: {e}")
-
-async def conversation_cleanup_task():
-    """Background task to cleanup old conversations every hour"""
-    while True:
-        try:
-            await asyncio.sleep(MEMORY_CLEANUP_INTERVAL)
-            
-            if not db_pool:
-                continue
-                
-            async with db_pool.acquire() as conn:
-                # Delete conversations older than timeout period
-                timeout_cutoff = f"NOW() - INTERVAL '{CONVERSATION_TIMEOUT_HOURS} hours'"
-                result = await conn.execute(f"""
-                    DELETE FROM conversation_history 
-                    WHERE created_at < {timeout_cutoff}
-                """)
-                
-                # Extract number of deleted rows from result
-                deleted_count = result.split()[-1] if result and result.split() else "0"
-                
-                if deleted_count != "0":
-                    logger.info(f"🧹 Cleaned up {deleted_count} old conversation messages")
-                    
-        except Exception as e:
-            logger.error(f"❌ Conversation cleanup task error: {e}")
-            await asyncio.sleep(60)  # Wait 1 minute before retrying
-
-def format_conversation_context(conversation: list) -> str:
-    """Format conversation history for AI context"""
-    if not conversation:
-        return ""
-    
-    context_parts = ["Previous conversation context:"]
-    for msg in conversation[-20:]:  # Use last 20 messages for context
-        role = "User" if msg['type'] == 'user' else "Sakura"
-        context_parts.append(f"{role}: {msg['text']}")
-    
-    context_parts.append("---")
-    return "\n".join(context_parts)
 
 async def get_users_from_database():
     """Get all user IDs from database"""
@@ -1231,6 +1088,46 @@ def get_user_mention(user) -> str:
     first_name = user.first_name or "Friend"
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'
 
+
+# CONVERSATION MEMORY FUNCTIONS
+def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
+    """Add message to user's conversation history"""
+    global conversation_history
+    
+    if user_id not in conversation_history:
+        conversation_history[user_id] = []
+    
+    # Add message with role (user or assistant)
+    role = "user" if is_user else "assistant"
+    conversation_history[user_id].append({"role": role, "content": message})
+    
+    # Keep only last MAX_CONVERSATION_LENGTH messages
+    if len(conversation_history[user_id]) > MAX_CONVERSATION_LENGTH:
+        conversation_history[user_id] = conversation_history[user_id][-MAX_CONVERSATION_LENGTH:]
+
+
+def get_conversation_context(user_id: int) -> str:
+    """Get formatted conversation context for the user"""
+    if user_id not in conversation_history or not conversation_history[user_id]:
+        return ""
+    
+    context_lines = []
+    for message in conversation_history[user_id]:
+        if message["role"] == "user":
+            context_lines.append(f"User: {message['content']}")
+        else:
+            context_lines.append(f"Sakura: {message['content']}")
+    
+    return "\n".join(context_lines)
+
+
+def clear_conversation_history(user_id: int):
+    """Clear conversation history for a user"""
+    global conversation_history
+    if user_id in conversation_history:
+        del conversation_history[user_id]
+
+
 # AI RESPONSE FUNCTIONS
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context"""
@@ -1243,12 +1140,12 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         return get_fallback_response()
     
     try:
-        # Get conversation context from PostgreSQL if user_id provided
+        # Get conversation context if user_id provided
         context = ""
         if user_id:
-            conversation = await get_conversation_history(user_id)
-            if conversation:
-                context = f"\n\n{format_conversation_context(conversation)}\n"
+            context = get_conversation_context(user_id)
+            if context:
+                context = f"\n\nPrevious conversation:\n{context}\n"
         
         # Build prompt with context
         prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
@@ -1260,10 +1157,10 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         
         ai_response = response.text.strip() if response.text else get_fallback_response()
         
-        # Add messages to PostgreSQL conversation history
+        # Add messages to conversation history
         if user_id:
-            await add_conversation_message(user_id, user_message, 'user')
-            await add_conversation_message(user_id, ai_response, 'bot')
+            add_to_conversation_history(user_id, user_message, is_user=True)
+            add_to_conversation_history(user_id, ai_response, is_user=False)
         
         if user_info:
             log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
