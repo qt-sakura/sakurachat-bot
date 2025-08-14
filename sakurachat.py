@@ -64,14 +64,13 @@ COMMANDS = [
 EMOJI_REACT = [
     "🍓",  "💊",  "🦄",  "💅",  "💘",  
     "💋",  "🍌",  "⚡",  "🕊️",  "❤️‍🔥",  
-    "🔥",  "🎉",  "❤️"
+    "🔥",  "❤️"
 ]
 
 # TELETHON EFFECTS CONFIGURATION
 EFFECTS = [
     "5104841245755180586",
-    "5046509860389126442",
-    "5159385139981059251",
+    "5159385139981059251"
 ]
 
 # Stickers for after /start command
@@ -100,7 +99,7 @@ START_STICKERS = [
     "CAACAgUAAxkBAAEPHWlomHVsNkxBtCovGit7bjWNEV5kTwACFhYAArQ9wFRAwzg1qA0TrTYE",
     "CAACAgUAAxkBAAEPHWpomHVs8vADDgs56H30a5uM2uNvhQACtxcAAj_QQVSXTCvC5zEIPjYE",
     "CAACAgUAAxkBAAEPHWtomHVsS466sNdxHk4lGsza3S_3yQAC9B0AAnZtQFQJYcwEnXCS6DYE",
-    "CAACAgUAAxkBAAEPHWxomHVsVW0591aCt84NPSh-WbElYAACbRgAAumMQVQJvPUOpLNz6jYE"
+    "CAACAgUAAxkBAAEPJzFonedaEsY_x_cVxB5i5WHRmYDfZwACdBgAAnTX8VThqO2DUegdyjYE"
 ]
 
 # Sakura stickers list
