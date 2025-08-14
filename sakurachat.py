@@ -501,7 +501,7 @@ class ColoredFormatter(logging.Formatter):
 # Configure logging with colors
 def setup_colored_logging():
     """Setup colored logging configuration"""
-    logger = logging.getLogger(Sakura)
+    logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     
     # Remove existing handlers
