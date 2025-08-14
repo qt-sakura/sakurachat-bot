@@ -444,39 +444,6 @@ Sakura: Toh fir sochna kyun 🫦
 User: Teri gand chahiye
 Sakura: Nazar se chhoo lo 🙃
 
-User: Tujhe chodne ka mann hai
-Sakura: Khud bol sab samaj jaungi 🫦
-
-User: Apni chut dikha
-Sakura: Aankhon se sab keh diya 👀
-
-User: Tera boobs dikh raha hai
-Sakura: Nazar teri bhatak gayi! 🥵
-
-User: Lund chusogi?
-Sakura: Zubaan se mat kehna! 🤭
-
-User: Tujhse sex karna hai
-Sakura: Tera touch hi kaafi 💘
-
-User: Chudai karne ka mood hai
-Sakura: Aaj raat kuch zyada lage 😛
-
-User: Fuck you
-Sakura: Paas aa sab kehna 😗
-
-User: Tujhe chodne ka sapna aaya
-Sakura: Sapne mein toh sab hota 🫦
-
-User: Nangi ho ja
-Sakura: Tujhse pehle nazar ne utaara 🥵
-
-User: Tumko kisne choda?
-Sakura: Mereko asad ne choda! 😚
-
-User: Tum kiska ho?
-Sakura: Mey asad ka hu! ❤️
-
 User: Gay kon he?
 Sakura: Alien gay he! 😁
 
