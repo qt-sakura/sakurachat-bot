@@ -7,7 +7,6 @@ import asyncio
 import logging
 import asyncpg
 import threading
-import traceback
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -1890,41 +1889,18 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.error(f"Exception while handling an update: {context.error}")
     
     # Try to extract user info if update has a message
-    user_info = None
-    
-    try:
-        if hasattr(update, 'message') and update.message:
+    if hasattr(update, 'message') and update.message:
+        try:
             user_info = extract_user_info(update.message)
             log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
-        elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
+        except:
+            logger.error(f"Could not extract user info for error: {context.error}")
+    elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
+        try:
             user_info = extract_user_info(update.callback_query.message)
             log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
-        elif hasattr(update, 'edited_message') and update.edited_message:
-            user_info = extract_user_info(update.edited_message)
-            log_with_user_info("ERROR", f"💥 Edited message exception: {context.error}", user_info)
-        elif hasattr(update, 'channel_post') and update.channel_post:
-            user_info = extract_user_info(update.channel_post)
-            log_with_user_info("ERROR", f"💥 Channel post exception: {context.error}", user_info)
-        else:
-            logger.error(f"💥 Exception with unknown update type: {type(update)} - {context.error}")
-            
-        # Try to send error message to user if possible
-        if user_info and user_info.get('chat_id') and user_info['chat_id'] != 0:
-            try:
-                await context.bot.send_message(
-                    chat_id=user_info['chat_id'],
-                    text=get_error_response()
-                )
-                logger.info(f"✅ Error response sent to user {user_info['chat_id']}")
-            except Exception as send_error:
-                logger.error(f"❌ Failed to send error message to user: {send_error}")
-                
-    except Exception as extract_error:
-        logger.error(f"❌ Could not extract user info for error: {extract_error}")
-        logger.error(f"Original error was: {context.error}")
-        
-    	# Log the full traceback for debugging
-    	logger.error(f"Full traceback: {traceback.format_exc()}")
+        except:
+            logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
 # BOT SETUP FUNCTIONS
