@@ -904,56 +904,20 @@ async def close_database():
 def extract_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
     logger.debug("🔍 Extracting user information from message")
-    
-    # Check if message is None
-    if not msg:
-        logger.warning("⚠️ Message is None, returning empty user info")
-        return {
-            "user_id": 0,
-            "username": None,
-            "full_name": "Unknown",
-            "first_name": "Unknown",
-            "last_name": None,
-            "chat_id": 0,
-            "chat_type": "unknown",
-            "chat_title": "Unknown",
-            "chat_username": "No Username",
-            "chat_link": "No Link",
-        }
-    
-    # Check if from_user is None (can happen with channel posts, etc.)
-    if not msg.from_user:
-        logger.warning("⚠️ Message has no from_user, using chat info only")
-        c = msg.chat
-        return {
-            "user_id": 0,
-            "username": None,
-            "full_name": "Unknown User",
-            "first_name": "Unknown",
-            "last_name": None,
-            "chat_id": c.id if c else 0,
-            "chat_type": c.type if c else "unknown",
-            "chat_title": c.title or c.first_name or "Unknown" if c else "Unknown",
-            "chat_username": f"@{c.username}" if c and c.username else "No Username",
-            "chat_link": f"https://t.me/{c.username}" if c and c.username else "No Link",
-        }
-    
     u = msg.from_user
     c = msg.chat
-    
     info = {
         "user_id": u.id,
         "username": u.username,
         "full_name": u.full_name,
         "first_name": u.first_name,
         "last_name": u.last_name,
-        "chat_id": c.id if c else 0,
-        "chat_type": c.type if c else "unknown",
-        "chat_title": c.title or c.first_name or "" if c else "",
-        "chat_username": f"@{c.username}" if c and c.username else "No Username",
-        "chat_link": f"https://t.me/{c.username}" if c and c.username else "No Link",
+        "chat_id": c.id,
+        "chat_type": c.type,
+        "chat_title": c.title or c.first_name or "",
+        "chat_username": f"@{c.username}" if c.username else "No Username",
+        "chat_link": f"https://t.me/{c.username}" if c.username else "No Link",
     }
-    
     logger.info(
         f"📑 User info extracted: {info['full_name']} (@{info['username']}) "
         f"[ID: {info['user_id']}] in {info['chat_title']} [{info['chat_id']}] {info['chat_link']}"
