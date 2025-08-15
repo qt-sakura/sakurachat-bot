@@ -743,8 +743,8 @@ async def init_database():
         # Create connection pool with optimized settings
         db_pool = await asyncpg.create_pool(
             DATABASE_URL, 
-            min_size=2, 
-            max_size=5,
+            min_size=5, 
+            max_size=20,
             command_timeout=3,
             server_settings={'application_name': 'sakura_bot'}
         )
