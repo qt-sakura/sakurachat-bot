@@ -7,6 +7,7 @@ import asyncio
 import logging
 import asyncpg
 import threading
+import traceback
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -904,20 +905,56 @@ async def close_database():
 def extract_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
     logger.debug("🔍 Extracting user information from message")
+    
+    # Check if message is None
+    if not msg:
+        logger.warning("⚠️ Message is None, returning empty user info")
+        return {
+            "user_id": 0,
+            "username": None,
+            "full_name": "Unknown",
+            "first_name": "Unknown",
+            "last_name": None,
+            "chat_id": 0,
+            "chat_type": "unknown",
+            "chat_title": "Unknown",
+            "chat_username": "No Username",
+            "chat_link": "No Link",
+        }
+    
+    # Check if from_user is None (can happen with channel posts, etc.)
+    if not msg.from_user:
+        logger.warning("⚠️ Message has no from_user, using chat info only")
+        c = msg.chat
+        return {
+            "user_id": 0,
+            "username": None,
+            "full_name": "Unknown User",
+            "first_name": "Unknown",
+            "last_name": None,
+            "chat_id": c.id if c else 0,
+            "chat_type": c.type if c else "unknown",
+            "chat_title": c.title or c.first_name or "Unknown" if c else "Unknown",
+            "chat_username": f"@{c.username}" if c and c.username else "No Username",
+            "chat_link": f"https://t.me/{c.username}" if c and c.username else "No Link",
+        }
+    
     u = msg.from_user
     c = msg.chat
+    
     info = {
         "user_id": u.id,
         "username": u.username,
         "full_name": u.full_name,
         "first_name": u.first_name,
         "last_name": u.last_name,
-        "chat_id": c.id,
-        "chat_type": c.type,
-        "chat_title": c.title or c.first_name or "",
-        "chat_username": f"@{c.username}" if c.username else "No Username",
-        "chat_link": f"https://t.me/{c.username}" if c.username else "No Link",
+        "chat_id": c.id if c else 0,
+        "chat_type": c.type if c else "unknown",
+        "chat_title": c.title or c.first_name or "" if c else "",
+        "chat_username": f"@{c.username}" if c and c.username else "No Username",
+        "chat_link": f"https://t.me/{c.username}" if c and c.username else "No Link",
     }
+    
     logger.info(
         f"📑 User info extracted: {info['full_name']} (@{info['username']}) "
         f"[ID: {info['user_id']}] in {info['chat_title']} [{info['chat_id']}] {info['chat_link']}"
@@ -1853,18 +1890,41 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.error(f"Exception while handling an update: {context.error}")
     
     # Try to extract user info if update has a message
-    if hasattr(update, 'message') and update.message:
-        try:
+    user_info = None
+    
+    try:
+        if hasattr(update, 'message') and update.message:
             user_info = extract_user_info(update.message)
             log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
-        except:
-            logger.error(f"Could not extract user info for error: {context.error}")
-    elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
-        try:
+        elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
             user_info = extract_user_info(update.callback_query.message)
             log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
-        except:
-            logger.error(f"Could not extract user info for callback error: {context.error}")
+        elif hasattr(update, 'edited_message') and update.edited_message:
+            user_info = extract_user_info(update.edited_message)
+            log_with_user_info("ERROR", f"💥 Edited message exception: {context.error}", user_info)
+        elif hasattr(update, 'channel_post') and update.channel_post:
+            user_info = extract_user_info(update.channel_post)
+            log_with_user_info("ERROR", f"💥 Channel post exception: {context.error}", user_info)
+        else:
+            logger.error(f"💥 Exception with unknown update type: {type(update)} - {context.error}")
+            
+        # Try to send error message to user if possible
+        if user_info and user_info.get('chat_id') and user_info['chat_id'] != 0:
+            try:
+                await context.bot.send_message(
+                    chat_id=user_info['chat_id'],
+                    text=get_error_response()
+                )
+                logger.info(f"✅ Error response sent to user {user_info['chat_id']}")
+            except Exception as send_error:
+                logger.error(f"❌ Failed to send error message to user: {send_error}")
+                
+    except Exception as extract_error:
+        logger.error(f"❌ Could not extract user info for error: {extract_error}")
+        logger.error(f"Original error was: {context.error}")
+        
+    	# Log the full traceback for debugging
+    	logger.error(f"Full traceback: {traceback.format_exc()}")
 
 
 # BOT SETUP FUNCTIONS
