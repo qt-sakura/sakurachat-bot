@@ -1,5 +1,6 @@
 import os
 import time
+import uvloop
 import aiohttp
 import random
 import asyncio
@@ -1976,6 +1977,16 @@ def start_dummy_server() -> None:
 def main() -> None:
     """Main function"""
     try:
+        # Install uvloop for better performance - ADD THESE 6 LINES
+        try:
+            uvloop.install()
+            logger.info("🚀 uvloop installed successfully")
+        except ImportError:
+            logger.warning("⚠️ uvloop not available")
+        except Exception as e:
+            logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
+        
         logger.info("🌸 Sakura Bot starting up...")
         
         # Start dummy server in background thread
