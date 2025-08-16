@@ -55,6 +55,7 @@ broadcast_mode: Dict[int, str] = {}
 user_last_response_time: Dict[int, float] = {}
 conversation_history: Dict[int, list] = {} 
 db_pool = None
+cleanup_task = None
 
 # Commands dictionary
 COMMANDS = [
@@ -504,7 +505,7 @@ class ColoredFormatter(logging.Formatter):
 # Configure logging with colors
 def setup_colored_logging():
     """Setup colored logging configuration"""
-    logger = logging.getLogger("SAKURA")
+    logger = logging.getLogger("SAKURA 🌸")
     logger.setLevel(logging.INFO)
     
     # Remove existing handlers
@@ -1094,6 +1095,8 @@ async def cleanup_old_conversations():
     """Clean up old conversation histories and response times periodically"""
     global conversation_history, user_last_response_time
     
+    logger.info("🧹 Conversation cleanup task started")
+    
     while True:
         try:
             current_time = time.time()
@@ -1120,11 +1123,19 @@ async def cleanup_old_conversations():
             
             logger.debug(f"📊 Active conversations: {len(conversation_history)}")
                 
+        except asyncio.CancelledError:
+            # Handle graceful shutdown
+            logger.info("🧹 Cleanup task cancelled - shutting down gracefully")
+            break
         except Exception as e:
             logger.error(f"❌ Error in conversation cleanup: {e}")
         
-        # Wait for next cleanup cycle
-        await asyncio.sleep(CHAT_CLEANUP)
+        # Wait for next cleanup cycle (with cancellation support)
+        try:
+            await asyncio.sleep(CHAT_CLEANUP)
+        except asyncio.CancelledError:
+            logger.info("🧹 Cleanup task sleep cancelled - shutting down")
+            break
  
 
 # AI RESPONSE FUNCTIONS
@@ -1953,6 +1964,8 @@ def run_bot() -> None:
     
     # Setup bot commands and database using post_init
     async def post_init(app):
+        global cleanup_task
+        
         # Initialize database
         db_success = await init_database()
         if not db_success:
@@ -1963,13 +1976,26 @@ def run_bot() -> None:
         
         await setup_bot_commands(app)
         
-        # Start conversation cleanup task
-        asyncio.create_task(cleanup_old_conversations())
+        # Start conversation cleanup task and store reference
+        cleanup_task = asyncio.create_task(cleanup_old_conversations())
         
         logger.info("🌸 Sakura Bot initialization completed!")
         
     # Setup shutdown handler
     async def post_shutdown(app):
+        global cleanup_task
+        
+        # Cancel cleanup task gracefully
+        if cleanup_task and not cleanup_task.done():
+            logger.info("🛑 Cancelling cleanup task...")
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                logger.info("✅ Cleanup task cancelled successfully")
+            except Exception as e:
+                logger.error(f"❌ Error cancelling cleanup task: {e}")
+        
         await close_database()
         await stop_effects_client()
         logger.info("🌸 Sakura Bot shutdown completed!")
