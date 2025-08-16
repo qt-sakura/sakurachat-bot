@@ -41,11 +41,11 @@ OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
-RATE_LIMIT_SECONDS = 1.0
+MESSAGE_LIMIT = 1.0
 BROADCAST_DELAY = 0.03
-MAX_CONVERSATION_LENGTH = 20
-CONVERSATION_CLEANUP_INTERVAL = 1800
-CONVERSATION_MAX_IDLE_TIME = 3600
+CHAT_LENGTH = 20
+CHAT_CLEANUP = 1800
+OLD_CHAT = 3600
 
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
@@ -986,7 +986,7 @@ def is_rate_limited(user_id: int) -> bool:
     """Check if user is rate limited"""
     current_time = time.time()
     last_response = user_last_response_time.get(user_id, 0)
-    return current_time - last_response < RATE_LIMIT_SECONDS
+    return current_time - last_response < MESSAGE_LIMIT
 
 
 def update_user_response_time(user_id: int) -> None:
@@ -1070,9 +1070,9 @@ def add_to_conversation_history(user_id: int, message: str, is_user: bool = True
     role = "user" if is_user else "assistant"
     conversation_history[user_id].append({"role": role, "content": message})
     
-    # Keep only last MAX_CONVERSATION_LENGTH messages
-    if len(conversation_history[user_id]) > MAX_CONVERSATION_LENGTH:
-        conversation_history[user_id] = conversation_history[user_id][-MAX_CONVERSATION_LENGTH:]
+    # Keep only last CHAT_LENGTH messages
+    if len(conversation_history[user_id]) > CHAT_LENGTH:
+        conversation_history[user_id] = conversation_history[user_id][-CHAT_LENGTH:]
 
 
 def get_conversation_context(user_id: int) -> str:
@@ -1103,7 +1103,7 @@ async def cleanup_old_conversations():
             expired_users = []
             for user_id in list(conversation_history.keys()):
                 last_response_time = user_last_response_time.get(user_id, 0)
-                if current_time - last_response_time > CONVERSATION_MAX_IDLE_TIME:
+                if current_time - last_response_time > OLD_CHAT:
                     expired_users.append(user_id)
             
             # Remove expired conversations
@@ -1124,7 +1124,7 @@ async def cleanup_old_conversations():
             logger.error(f"❌ Error in conversation cleanup: {e}")
         
         # Wait for next cleanup cycle
-        await asyncio.sleep(CONVERSATION_CLEANUP_INTERVAL)
+        await asyncio.sleep(CHAT_CLEANUP)
  
 
 # AI RESPONSE FUNCTIONS
