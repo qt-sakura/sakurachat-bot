@@ -44,6 +44,8 @@ GROUP_LINK = "https://t.me/SoulMeetsHQ"
 RATE_LIMIT_SECONDS = 1.0
 BROADCAST_DELAY = 0.03
 MAX_CONVERSATION_LENGTH = 20
+CONVERSATION_CLEANUP_INTERVAL = 1800
+CONVERSATION_MAX_IDLE_TIME = 3600
 
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
@@ -1088,12 +1090,42 @@ def get_conversation_context(user_id: int) -> str:
     return "\n".join(context_lines)
 
 
-def clear_conversation_history(user_id: int):
-    """Clear conversation history for a user"""
-    global conversation_history
-    if user_id in conversation_history:
-        del conversation_history[user_id]
-
+async def cleanup_old_conversations():
+    """Clean up old conversation histories and response times periodically"""
+    global conversation_history, user_last_response_time
+    
+    while True:
+        try:
+            current_time = time.time()
+            conversations_cleaned = 0
+            
+            # Find expired conversations
+            expired_users = []
+            for user_id in list(conversation_history.keys()):
+                last_response_time = user_last_response_time.get(user_id, 0)
+                if current_time - last_response_time > CONVERSATION_MAX_IDLE_TIME:
+                    expired_users.append(user_id)
+            
+            # Remove expired conversations
+            for user_id in expired_users:
+                if user_id in conversation_history:
+                    del conversation_history[user_id]
+                    conversations_cleaned += 1
+                if user_id in user_last_response_time:
+                    del user_last_response_time[user_id]
+            
+            # Log cleanup results
+            if conversations_cleaned > 0:
+                logger.info(f"🧹 Cleaned {conversations_cleaned} old conversations")
+            
+            logger.debug(f"📊 Active conversations: {len(conversation_history)}")
+                
+        except Exception as e:
+            logger.error(f"❌ Error in conversation cleanup: {e}")
+        
+        # Wait for next cleanup cycle
+        await asyncio.sleep(CONVERSATION_CLEANUP_INTERVAL)
+ 
 
 # AI RESPONSE FUNCTIONS
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
@@ -1930,6 +1962,10 @@ def run_bot() -> None:
         await start_effects_client()
         
         await setup_bot_commands(app)
+        
+        # Start conversation cleanup task
+        asyncio.create_task(cleanup_old_conversations())
+        
         logger.info("🌸 Sakura Bot initialization completed!")
         
     # Setup shutdown handler
