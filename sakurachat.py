@@ -14,13 +14,15 @@ from telegram import (
     BotCommand,
     Message,
     ReactionTypeEmoji,
-    ForceReply
+    ForceReply,
+    LabeledPrice
 )
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
+    PreCheckoutQueryHandler,
     ContextTypes,
     filters
 )
@@ -57,9 +59,64 @@ conversation_history: Dict[int, list] = {}
 db_pool = None
 cleanup_task = None
 
+# Star payment storage and constants
+payment_storage = {}
+
+INVOICE_DESCRIPTIONS = [
+    "Welcome to our flowers stall! 🌸✨",
+    "Take beautiful sakura flowers! 🌸💫",
+    "Pick your favorite cherry blossoms! 🌸🌟",
+    "Get fresh flowers from our stall! 🌸🦋"
+]
+
+THANK_YOU_MESSAGES = [
+    "🌸 Thanks for taking flowers from our stall! Come back anytime! 💕",
+    "✨ Thank you for visiting our flower stall! Your flowers are beautiful! 🌸",
+    "🌟 Thanks for choosing our sakura stall! Enjoy your flowers! 🌸❤️",
+    "🌸 Thank you for shopping at our flower stall! See you again! ✨",
+    "💫 Thanks for getting flowers from us! Have a lovely day! 🌸"
+]
+
+REFUND_MESSAGES = [
+    "🌸 Thanks for showing such kindness! We are returning your payment for your generosity! 💕",
+    "✨ Your kindness touched our hearts! We're refunding your payment as a gesture of appreciation! 🌸",
+    "🌟 Such a kind soul! We're returning your stars because your kindness means more to us! 🌸❤️",
+    "🌸 Your gentle spirit deserves this refund! Thank you for being so wonderfully kind! ✨",
+    "💫 We're touched by your kindness! Here's your refund as our way of saying thank you! 🌸"
+]
+
+PAYMENT_STICKERS = [
+    "CAACAgUAAxkBAAEPHVRomHVszeSnrB2qQBGNHy6BgyZAHwACvxkAAmpxyFT7N37qhVnGmzYE",
+    "CAACAgUAAxkBAAEPHVVomHVsuGrU-zEa0X8i1jn_HW7XawAC-BkAArnxwVRFqeVbp2Mn_TYE",
+    "CAACAgUAAxkBAAEPHVZomHVsuf3QWObxnD9mavVnmS4XPgACPhgAAqMryVT761H_MmILCjYE",
+    "CAACAgUAAxkBAAEPHVdomHVs87jwVjxQjM7k37cUAwnJXQACwxYAAs2CyFRnx4YgWFPZkjYE",
+    "CAACAgUAAxkBAAEPHVhomHVsnB4iVT8jr56ZtGPq98KQeQACfRgAAoQAAcBUyVgSjnENUUo2BA",
+    "CAACAgUAAxkBAAEPHVlomHVsRWNXE2vkgSYrBU9K-JB9UwACoxcAAi4MyFS0w-gqFTBWQjYE",
+    "CAACAgUAAxkBAAEPHVpomHVsfUZT06tR7jgqmHNJA-j5fAACpBgAAuhZyVSaY0y3w0zVLjYE",
+    "CAACAgUAAxkBAAEPHVtomHVsqjujca8HBOPQpEvJY-I0WQACZRQAAhX0wFS2YntXBMU6ATYE",
+    "CAACAgUAAxkBAAEPHVxomHVsw09_FKmfugTeaqTXrIOMNwACzhQAAlyLwFSL4-96tJu0STYE",
+    "CAACAgUAAxkBAAEPHV1omHVsP9aNtLlGJyErPF8yEvuuawAC6RcAAj7DwFSKnv319y6jnTYE",
+    "CAACAgUAAxkBAAEPHV5omHVsuz9c3bxncAXOQ6BDzhrTnwACKxwAAm4QwVRdrk0EgrotFjYE",
+    "CAACAgUAAxkBAAEPHV9omHVs3df-rmdlDbJFu-MREg5RrwAC5RYAAsCewVSvwTepiO6BlTYE",
+    "CAACAgUAAxkBAAEPHWBomHVshaztRlsJ2d3p6qV1TAolvgACChkAAjf9wFSqz_XgZVhTLTYE",
+    "CAACAgUAAxkBAAEPHWFomHVsrjl_UqIUYgs8NUKycyXbuQAChRgAApa6wFQoEbjt-4UEUDYE",
+    "CAACAgUAAxkBAAEPHWJomHVssUsAAU8BbI1lcPdQ2hJbbrwAAg4YAAI4lchULkVARTsFmjI2BA",
+    "CAACAgUAAxkBAAEPHWNomHVs0wFx3n8i8r6TefoJzP_3XAACqRYAAvKvyFQiY8XErd3KFDYE",
+    "CAACAgUAAxkBAAEPHWRomHVsXNHMWzXxpKxSrze5yM0kzAACRx4AAt7oyFS3n9YnyqQwCjYE",
+    "CAACAgUAAxkBAAEPHWVomHVsQxKxih6IfqUeZ7aQaCXBvAACyBgAAkHPwVT8uW_J5GUHQTYE",
+    "CAACAgUAAxkBAAEPHWZomHVsFSeBqaNqm5rWNu8LdszNcAACxhUAAuEtwVQi2t0gazmalDYE",
+    "CAACAgUAAxkBAAEPHWdomHVsFOXCOM_DZb1VuGPlXfkY2AAC4RgAAu2CwVSxJETZ5OhUGTYE",
+    "CAACAgUAAxkBAAEPHWhomHVsovXP8XqbvEjEB508DTW6VQAC2BcAAoJLwFRRhczsSdgAASg2BA",
+    "CAACAgUAAxkBAAEPHWlomHVsNkxBtCovGit7bjWNEV5kTwACFhYAArQ9wFRAwzg1qA0TrTYE",
+    "CAACAgUAAxkBAAEPHWpomHVs8vADDgs56H30a5uM2uNvhQACtxcAAj_QQVSXTCvC5zEIPjYE",
+    "CAACAgUAAxkBAAEPHWtomHVsS466sNdxHk4lGsza3S_3yQAC9B0AAnZtQFQJYcwEnXCS6DYE",
+    "CAACAgUAAxkBAAEPJzFonedaEsY_x_cVxB5i5WHRmYDfZwACdBgAAnTX8VThqO2DUegdyjYE"
+]
+
 # Commands dictionary
 COMMANDS = [
-    BotCommand("start", "🌸 Wake me up"),
+    BotCommand("start", "👋 Wake me up"),
+    BotCommand("get", "🌸 Get flowers"),
     BotCommand("help", "💬 A short guide")
 ]
 
@@ -1674,6 +1731,31 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode=ParseMode.HTML
         )
         log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
+    
+    elif query.data == "get_flowers_again":
+        # Handle "Get flowers again" button callback
+        log_with_user_info("INFO", "🌸 'Get flowers again' button clicked", user_info)
+        
+        # Answer the callback
+        await query.answer("🌸 Getting more flowers for you!", show_alert=False)
+        
+        # Send a new invoice with default amount
+        try:
+            await context.bot.send_invoice(
+                chat_id=query.message.chat.id,
+                title="Flowers 🌸",
+                description=random.choice(INVOICE_DESCRIPTIONS),
+                payload=f"sakura_star_{query.from_user.id}",
+                provider_token="",  # Empty for stars
+                currency="XTR",  # Telegram Stars currency
+                prices=[LabeledPrice(label='✨ Sakura Star', amount=50)]
+            )
+            
+            log_with_user_info("INFO", "✅ New invoice sent from 'Get flowers again' button", user_info)
+            
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ Error sending new invoice from button: {e}", user_info)
+            await query.message.reply_text("❌ Oops! Something went wrong. Try using /get command instead! 🔧")
 
 
 # BROADCAST FUNCTIONS
@@ -1910,6 +1992,121 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
+# STAR PAYMENT FUNCTIONS
+async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send an invoice for sakura flowers."""
+    try:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("INFO", "🌸 /get command received", user_info)
+        
+        # Track user for broadcasting
+        track_user_and_chat(update, user_info)
+        
+        # Default to 50 stars, but allow user to specify amount
+        amount = 50
+        if len(update.message.text.split()) > 1 and update.message.text.split()[1].isdigit():
+            amount = int(update.message.text.split()[1])
+            # Limit to reasonable amounts
+            if amount > 100000:
+                amount = 100000
+            elif amount < 1:
+                amount = 1
+        
+        invoice_message = await context.bot.send_invoice(
+            chat_id=update.message.chat.id,
+            title="Flowers 🌸",
+            description=random.choice(INVOICE_DESCRIPTIONS),
+            payload=f"sakura_star_{update.message.from_user.id}",
+            provider_token="",  # Empty for stars
+            currency="XTR",  # Telegram Stars currency
+            prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
+        )
+        
+        log_with_user_info("INFO", f"✅ Invoice sent for {amount} stars", user_info)
+        
+    except Exception as e:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("ERROR", f"❌ Error sending invoice: {e}", user_info)
+        await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
+
+
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Answer the PreCheckoutQuery."""
+    query = update.pre_checkout_query
+    
+    # Always approve the payment
+    await context.bot.answer_pre_checkout_query(
+        pre_checkout_query_id=query.id, 
+        ok=True
+    )
+    
+    logger.info(f"💳 Pre-checkout approved for user {query.from_user.id}")
+
+
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle successful payment - refund if 10 stars or less, otherwise process normally."""
+    payment = update.message.successful_payment
+    user_id = update.message.from_user.id
+    amount = payment.total_amount
+    user_info = extract_user_info(update.message)
+    
+    log_with_user_info("INFO", f"💰 Payment received for {amount} stars", user_info)
+    
+    # Check if amount is 10 stars or less
+    if amount <= 10:
+        log_with_user_info("INFO", f"🔄 Refunding payment of {amount} stars (kindness gesture)", user_info)
+        
+        # Wait 4 seconds after payment
+        await asyncio.sleep(4)
+        
+        # Store payment info for refund
+        payment_storage[payment.telegram_payment_charge_id] = {
+            'user_id': user_id,
+            'amount': amount,
+            'charge_id': payment.telegram_payment_charge_id
+        }
+        
+        try:
+            # Refund the payment
+            await context.bot.refund_star_payment(
+                user_id=user_id,
+                telegram_payment_charge_id=payment.telegram_payment_charge_id
+            )
+            
+            # Create inline keyboard with "Get flowers again" button
+            keyboard = [[InlineKeyboardButton("Get flowers again 🌸", callback_data="get_flowers_again")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Send refund message with button
+            refund_msg = random.choice(REFUND_MESSAGES)
+            await update.message.reply_text(refund_msg, reply_markup=reply_markup)
+            
+            log_with_user_info("INFO", "✅ Refund completed successfully", user_info)
+            
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ Error refunding payment: {e}", user_info)
+            await update.message.reply_text("❌ Sorry, there was an issue processing your refund. Please contact support.")
+    
+    else:
+        log_with_user_info("INFO", f"✅ Processing payment of {amount} stars (no refund)", user_info)
+        
+        # Wait 4 seconds after payment
+        await asyncio.sleep(4)
+        
+        # Send random sticker
+        sticker_id = random.choice(PAYMENT_STICKERS)
+        await context.bot.send_sticker(chat_id=update.message.chat.id, sticker=sticker_id)
+        
+        # Wait another 4 seconds
+        await asyncio.sleep(4)
+        
+        # Send thank you message
+        success_msg = random.choice(THANK_YOU_MESSAGES)
+        await update.message.reply_text(success_msg)
+        
+        log_with_user_info("INFO", "✅ Payment processed successfully", user_info)
+
+
 # BOT SETUP FUNCTIONS
 async def setup_bot_commands(application: Application) -> None:
     """Setup bot commands menu"""
@@ -1930,11 +2127,16 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("ping", ping_command))
+    application.add_handler(CommandHandler("get", get_command))
     
     # Callback query handlers
     application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))
     application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_expand_"))
-    application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_"))
+    application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_|^get_flowers_again$"))
+    
+    # Payment handlers
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     
     # Message handler for all message types
     application.add_handler(MessageHandler(
