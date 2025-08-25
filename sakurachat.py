@@ -1699,10 +1699,38 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle broadcast target selection"""
+    """Handle broadcast target selection and get flowers again button"""
     query = update.callback_query
     user_info = extract_user_info(query.message)
     
+    # Handle "Get flowers again" button - available for everyone
+    if query.data == "get_flowers_again":
+        log_with_user_info("INFO", "🌸 'Get flowers again' button clicked", user_info)
+        
+        # Answer the callback
+        await query.answer("🌸 Getting more flowers for you!", show_alert=False)
+        
+        # Send a new invoice with default amount
+        try:
+            await context.bot.send_invoice(
+                chat_id=query.message.chat.id,
+                title="Flowers 🌸",
+                description=random.choice(INVOICE_DESCRIPTIONS),
+                payload=f"sakura_star_{query.from_user.id}",
+                provider_token="",  # Empty for stars
+                currency="XTR",  # Telegram Stars currency
+                prices=[LabeledPrice(label='✨ Sakura Star', amount=50)]
+            )
+            
+            log_with_user_info("INFO", "✅ New invoice sent from 'Get flowers again' button", user_info)
+            
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ Error sending new invoice from button: {e}", user_info)
+            await query.message.reply_text("❌ Oops! Something went wrong. Try using /get command instead! 🔧")
+        
+        return  # Exit early for get_flowers_again
+    
+    # For broadcast-related buttons, check if user is owner
     if query.from_user.id != OWNER_ID:
         log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
         await query.answer("You're not authorized to use this 🚫", show_alert=True)
@@ -1731,31 +1759,6 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode=ParseMode.HTML
         )
         log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
-    
-    elif query.data == "get_flowers_again":
-        # Handle "Get flowers again" button callback
-        log_with_user_info("INFO", "🌸 'Get flowers again' button clicked", user_info)
-        
-        # Answer the callback
-        await query.answer("🌸 Getting more flowers for you!", show_alert=False)
-        
-        # Send a new invoice with default amount
-        try:
-            await context.bot.send_invoice(
-                chat_id=query.message.chat.id,
-                title="Flowers 🌸",
-                description=random.choice(INVOICE_DESCRIPTIONS),
-                payload=f"sakura_star_{query.from_user.id}",
-                provider_token="",  # Empty for stars
-                currency="XTR",  # Telegram Stars currency
-                prices=[LabeledPrice(label='✨ Sakura Star', amount=50)]
-            )
-            
-            log_with_user_info("INFO", "✅ New invoice sent from 'Get flowers again' button", user_info)
-            
-        except Exception as e:
-            log_with_user_info("ERROR", f"❌ Error sending new invoice from button: {e}", user_info)
-            await query.message.reply_text("❌ Oops! Something went wrong. Try using /get command instead! 🔧")
 
 
 # BROADCAST FUNCTIONS
