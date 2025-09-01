@@ -49,9 +49,9 @@ OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
-SESSION_TTL = 3600  
-CACHE_TTL = 300   
-RATE_LIMIT_TTL = 60 
+VALKEY_SESSION_TTL = 3600  
+VALKEY_CACHE_TTL = 300   
+VALKEY_RATE_LIMIT_TTL = 60 
 MESSAGE_LIMIT = 1.0
 BROADCAST_DELAY = 0.03
 CHAT_LENGTH = 20
@@ -846,7 +846,7 @@ async def save_user_session(user_id: int, session_data: dict):
         key = f"session:{user_id}"
         await valkey_client.setex(
             key, 
-            SESSION_TTL, 
+            VALKEY_SESSION_TTL, 
             json.dumps(session_data)
         )
         logger.debug(f"💾 Session saved for user {user_id}")
@@ -885,7 +885,7 @@ async def delete_user_session(user_id: int):
         return False
 
 # CACHING FUNCTIONS
-async def cache_set(key: str, value: any, ttl: int = CACHE_TTL):
+async def cache_set(key: str, value: any, ttl: int = VALKEY_CACHE_TTL):
     """Set cache value in Valkey"""
     if not valkey_client:
         return False
@@ -940,7 +940,7 @@ async def save_user_state(user_id: int, state_data: dict):
         key = f"user_state:{user_id}"
         await valkey_client.setex(
             key,
-            SESSION_TTL,
+            VALKEY_SESSION_TTL,
             json.dumps(state_data)
         )
         logger.debug(f"💾 User state saved for user {user_id}")
@@ -999,7 +999,7 @@ async def is_rate_limited_valkey(user_id: int, limit: int = 5) -> bool:
             
             if current is None:
                 # First request, set counter
-                await valkey_client.setex(key, RATE_LIMIT_TTL, 1)
+                await valkey_client.setex(key, VALKEY_RATE_LIMIT_TTL, 1)
                 return False
             
             current_count = int(current)
@@ -1342,7 +1342,7 @@ async def update_user_response_time_valkey(user_id: int) -> None:
     if valkey_client:
         try:
             key = f"last_response:{user_id}"
-            await valkey_client.setex(key, SESSION_TTL, int(time.time()))
+            await valkey_client.setex(key, VALKEY_SESSION_TTL, int(time.time()))
             logger.debug(f"⏰ Updated response time in Valkey for user {user_id}")
         except Exception as e:
             logger.error(f"❌ Failed to update response time in Valkey for user {user_id}: {e}")
@@ -1440,7 +1440,7 @@ async def add_to_conversation_history(user_id: int, message: str, is_user: bool 
             if len(history) > CHAT_LENGTH:
                 history = history[-CHAT_LENGTH:]
             
-            await valkey_client.setex(key, SESSION_TTL, json.dumps(history))
+            await valkey_client.setex(key, VALKEY_SESSION_TTL, json.dumps(history))
             logger.debug(f"💬 Conversation updated in Valkey for user {user_id}")
             return
             
@@ -1577,7 +1577,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         
         # Cache the response if it was a short, context-free message
         if cache_key and len(user_message) <= 50 and not context:
-            await cache_set(cache_key, ai_response, CACHE_TTL)
+            await cache_set(cache_key, ai_response, VALKEY_CACHE_TTL)
         
         # Add messages to conversation history
         if user_id:
