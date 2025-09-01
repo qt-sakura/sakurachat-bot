@@ -7,6 +7,9 @@ import asyncio
 import logging
 import asyncpg
 import threading
+import json
+import valkey
+from valkey.asyncio import Valkey as AsyncValkey
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -49,6 +52,12 @@ CHAT_LENGTH = 20
 CHAT_CLEANUP = 1800
 OLD_CHAT = 3600
 
+# VALKEY CONFIGURATION
+VALKEY_URL = os.getenv("VALKEY_URL", "valkey://localhost:6379")
+VALKEY_SESSION_TTL = 3600  # 1 hour for session data
+VALKEY_CACHE_TTL = 300     # 5 minutes for cache
+VALKEY_RATE_LIMIT_TTL = 60 # 1 minute for rate limiting
+
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
 group_ids: Set[int] = set()
@@ -58,6 +67,9 @@ user_last_response_time: Dict[int, float] = {}
 conversation_history: Dict[int, list] = {} 
 db_pool = None
 cleanup_task = None
+
+# VALKEY CLIENT
+valkey_client: AsyncValkey = None
 
 # Star payment storage and constants
 payment_storage = {}
@@ -116,7 +128,8 @@ PAYMENT_STICKERS = [
 # Commands dictionary
 COMMANDS = [
     BotCommand("start", "👋 Wake me up"),
-    BotCommand("get", "🌸 Get flowers"),
+    BotCommand("buy", "🌸 Buy flowers"),
+    BotCommand("buyers", "💝 See flower buyers"),
     BotCommand("help", "💬 A short guide")
 ]
 
@@ -790,6 +803,235 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
+# VALKEY FUNCTIONS
+async def init_valkey():
+    """Initialize Valkey connection"""
+    global valkey_client
+    
+    try:
+        valkey_client = AsyncValkey.from_url(
+            VALKEY_URL,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            retry_on_timeout=True,
+            health_check_interval=30
+        )
+        
+        # Test connection
+        await valkey_client.ping()
+        logger.info("✅ Valkey client initialized and connected successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize Valkey client: {e}")
+        valkey_client = None
+        return False
+
+async def close_valkey():
+    """Close Valkey connection"""
+    global valkey_client
+    
+    if valkey_client:
+        try:
+            await valkey_client.aclose()
+            logger.info("✅ Valkey connection closed")
+        except Exception as e:
+            logger.error(f"❌ Error closing Valkey connection: {e}")
+
+# SESSION STORAGE FUNCTIONS
+async def save_user_session(user_id: int, session_data: dict):
+    """Save user session data to Valkey"""
+    if not valkey_client:
+        return False
+    
+    try:
+        key = f"session:{user_id}"
+        await valkey_client.setex(
+            key, 
+            VALKEY_SESSION_TTL, 
+            json.dumps(session_data)
+        )
+        logger.debug(f"💾 Session saved for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to save session for user {user_id}: {e}")
+        return False
+
+async def get_user_session(user_id: int) -> dict:
+    """Get user session data from Valkey"""
+    if not valkey_client:
+        return {}
+    
+    try:
+        key = f"session:{user_id}"
+        data = await valkey_client.get(key)
+        if data:
+            return json.loads(data)
+        return {}
+    except Exception as e:
+        logger.error(f"❌ Failed to get session for user {user_id}: {e}")
+        return {}
+
+async def delete_user_session(user_id: int):
+    """Delete user session from Valkey"""
+    if not valkey_client:
+        return False
+    
+    try:
+        key = f"session:{user_id}"
+        await valkey_client.delete(key)
+        logger.debug(f"🗑️ Session deleted for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to delete session for user {user_id}: {e}")
+        return False
+
+# CACHING FUNCTIONS
+async def cache_set(key: str, value: any, ttl: int = VALKEY_CACHE_TTL):
+    """Set cache value in Valkey"""
+    if not valkey_client:
+        return False
+    
+    try:
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value)
+        await valkey_client.setex(f"cache:{key}", ttl, value)
+        logger.debug(f"📦 Cache set for key: {key}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to set cache for key {key}: {e}")
+        return False
+
+async def cache_get(key: str) -> any:
+    """Get cache value from Valkey"""
+    if not valkey_client:
+        return None
+    
+    try:
+        value = await valkey_client.get(f"cache:{key}")
+        if value:
+            try:
+                return json.loads(value)
+            except:
+                return value
+        return None
+    except Exception as e:
+        logger.error(f"❌ Failed to get cache for key {key}: {e}")
+        return None
+
+async def cache_delete(key: str):
+    """Delete cache value from Valkey"""
+    if not valkey_client:
+        return False
+    
+    try:
+        await valkey_client.delete(f"cache:{key}")
+        logger.debug(f"🗑️ Cache deleted for key: {key}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to delete cache for key {key}: {e}")
+        return False
+
+# USER STATE MANAGEMENT
+async def save_user_state(user_id: int, state_data: dict):
+    """Save user state (help_expanded, broadcast_mode, etc.) to Valkey"""
+    if not valkey_client:
+        return False
+    
+    try:
+        key = f"user_state:{user_id}"
+        await valkey_client.setex(
+            key,
+            VALKEY_SESSION_TTL,
+            json.dumps(state_data)
+        )
+        logger.debug(f"💾 User state saved for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to save user state for user {user_id}: {e}")
+        return False
+
+async def get_user_state(user_id: int) -> dict:
+    """Get user state from Valkey"""
+    if not valkey_client:
+        return {}
+    
+    try:
+        key = f"user_state:{user_id}"
+        data = await valkey_client.get(key)
+        if data:
+            return json.loads(data)
+        return {}
+    except Exception as e:
+        logger.error(f"❌ Failed to get user state for user {user_id}: {e}")
+        return {}
+
+async def update_help_expanded_state(user_id: int, expanded: bool):
+    """Update help expanded state in both memory and Valkey"""
+    global help_expanded
+    
+    # Update memory
+    help_expanded[user_id] = expanded
+    
+    # Update Valkey
+    if valkey_client:
+        state = await get_user_state(user_id)
+        state['help_expanded'] = expanded
+        await save_user_state(user_id, state)
+
+async def get_help_expanded_state(user_id: int) -> bool:
+    """Get help expanded state from Valkey with memory fallback"""
+    # Try Valkey first
+    if valkey_client:
+        state = await get_user_state(user_id)
+        if 'help_expanded' in state:
+            return state['help_expanded']
+    
+    # Fallback to memory
+    return help_expanded.get(user_id, False)
+
+# RATE LIMITING FUNCTIONS
+async def is_rate_limited_valkey(user_id: int, limit: int = 5) -> bool:
+    """Check if user is rate limited using Valkey"""
+    if not valkey_client:
+        return is_rate_limited(user_id)  # Fallback to memory
+    
+    try:
+        key = f"rate_limit:{user_id}"
+        current = await valkey_client.get(key)
+        
+        if current is None:
+            # First request, set counter
+            await valkey_client.setex(key, VALKEY_RATE_LIMIT_TTL, 1)
+            return False
+        
+        current_count = int(current)
+        if current_count >= limit:
+            return True
+        
+        # Increment counter
+        await valkey_client.incr(key)
+        return False
+        
+    except Exception as e:
+        logger.error(f"❌ Rate limit check failed for user {user_id}: {e}")
+        return is_rate_limited(user_id)  # Fallback to memory
+
+async def reset_rate_limit(user_id: int):
+    """Reset rate limit for user"""
+    if not valkey_client:
+        return False
+    
+    try:
+        key = f"rate_limit:{user_id}"
+        await valkey_client.delete(key)
+        logger.debug(f"🔄 Rate limit reset for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to reset rate limit for user {user_id}: {e}")
+        return False
+
 # DATABASE FUNCTIONS
 async def init_database():
     """Initialize database connection and create tables"""
@@ -834,9 +1076,24 @@ async def init_database():
                 )
             """)
             
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS purchases (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    amount INTEGER NOT NULL,
+                    telegram_payment_charge_id TEXT UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             # Create indexes for better performance
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_groups_created_at ON groups(created_at)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases(user_id)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchases_created_at ON purchases(created_at)")
             
         logger.info("✅ Database tables created/verified successfully")
         
@@ -951,6 +1208,46 @@ async def get_groups_from_database():
     except Exception as e:
         logger.error(f"❌ Failed to get groups from database: {e}")
         return list(group_ids)  # Fallback to memory
+
+def save_purchase_to_database_async(user_id: int, username: str = None, first_name: str = None, last_name: str = None, amount: int = 0, charge_id: str = None):
+    """Save purchase to database asynchronously (fire and forget)"""
+    if not db_pool:
+        return
+    
+    async def save_purchase():
+        try:
+            async with db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO purchases (user_id, username, first_name, last_name, amount, telegram_payment_charge_id)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    ON CONFLICT (telegram_payment_charge_id) DO NOTHING
+                """, user_id, username, first_name, last_name, amount, charge_id)
+                
+            logger.debug(f"💾 Purchase saved to database: user {user_id}, amount {amount}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to save purchase to database: {e}")
+    
+    # Schedule the save operation without waiting
+    asyncio.create_task(save_purchase())
+
+async def get_all_purchases():
+    """Get all purchases from database ordered by amount descending"""
+    if not db_pool:
+        return []
+    
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT user_id, username, first_name, last_name, SUM(amount) as total_amount, COUNT(*) as purchase_count
+                FROM purchases 
+                GROUP BY user_id, username, first_name, last_name 
+                ORDER BY total_amount DESC
+            """)
+            return rows
+    except Exception as e:
+        logger.error(f"❌ Failed to get purchases from database: {e}")
+        return []
 
 async def close_database():
     """Close database connection pool"""
@@ -1117,29 +1414,70 @@ def get_user_mention(user) -> str:
 
 
 # CONVERSATION MEMORY FUNCTIONS
-def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
-    """Add message to user's conversation history"""
+async def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
+    """Add message to user's conversation history (Valkey + memory fallback)"""
     global conversation_history
     
+    role = "user" if is_user else "assistant"
+    new_message = {"role": role, "content": message}
+    
+    # Try Valkey first
+    if valkey_client:
+        try:
+            key = f"conversation:{user_id}"
+            existing = await valkey_client.get(key)
+            
+            if existing:
+                history = json.loads(existing)
+            else:
+                history = []
+            
+            history.append(new_message)
+            
+            # Keep only last CHAT_LENGTH messages
+            if len(history) > CHAT_LENGTH:
+                history = history[-CHAT_LENGTH:]
+            
+            await valkey_client.setex(key, VALKEY_SESSION_TTL, json.dumps(history))
+            logger.debug(f"💬 Conversation updated in Valkey for user {user_id}")
+            return
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update conversation in Valkey for user {user_id}: {e}")
+    
+    # Fallback to memory
     if user_id not in conversation_history:
         conversation_history[user_id] = []
     
-    # Add message with role (user or assistant)
-    role = "user" if is_user else "assistant"
-    conversation_history[user_id].append({"role": role, "content": message})
+    conversation_history[user_id].append(new_message)
     
     # Keep only last CHAT_LENGTH messages
     if len(conversation_history[user_id]) > CHAT_LENGTH:
         conversation_history[user_id] = conversation_history[user_id][-CHAT_LENGTH:]
 
-
-def get_conversation_context(user_id: int) -> str:
-    """Get formatted conversation context for the user"""
-    if user_id not in conversation_history or not conversation_history[user_id]:
+async def get_conversation_context(user_id: int) -> str:
+    """Get formatted conversation context for the user (Valkey + memory fallback)"""
+    history = []
+    
+    # Try Valkey first
+    if valkey_client:
+        try:
+            key = f"conversation:{user_id}"
+            existing = await valkey_client.get(key)
+            if existing:
+                history = json.loads(existing)
+        except Exception as e:
+            logger.error(f"❌ Failed to get conversation from Valkey for user {user_id}: {e}")
+    
+    # Fallback to memory
+    if not history and user_id in conversation_history:
+        history = conversation_history[user_id]
+    
+    if not history:
         return ""
     
     context_lines = []
-    for message in conversation_history[user_id]:
+    for message in history:
         if message["role"] == "user":
             context_lines.append(f"User: {message['content']}")
         else:
@@ -1197,7 +1535,7 @@ async def cleanup_old_conversations():
 
 # AI RESPONSE FUNCTIONS
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
-    """Get response from Gemini API with conversation context"""
+    """Get response from Gemini API with conversation context and caching"""
     if user_info:
         log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
     
@@ -1210,12 +1548,23 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         # Get conversation context if user_id provided
         context = ""
         if user_id:
-            context = get_conversation_context(user_id)
+            context = await get_conversation_context(user_id)
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
         
         # Build prompt with context
         prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
+        
+        # Check cache for similar short messages (without personal context)
+        cache_key = None
+        if len(user_message) <= 50 and not context:  # Only cache short, context-free messages
+            import hashlib
+            cache_key = f"gemini_response:{hashlib.md5(user_message.lower().encode()).hexdigest()}"
+            cached_response = await cache_get(cache_key)
+            if cached_response:
+                if user_info:
+                    log_with_user_info("INFO", f"📦 Using cached response for message", user_info)
+                return cached_response
         
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
@@ -1224,10 +1573,14 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         
         ai_response = response.text.strip() if response.text else get_fallback_response()
         
+        # Cache the response if it was a short, context-free message
+        if cache_key and len(user_message) <= 50 and not context:
+            await cache_set(cache_key, ai_response, VALKEY_CACHE_TTL)
+        
         # Add messages to conversation history
         if user_id:
-            add_to_conversation_history(user_id, user_message, is_user=True)
-            add_to_conversation_history(user_id, ai_response, is_user=False)
+            await add_to_conversation_history(user_id, user_message, is_user=True)
+            await add_to_conversation_history(user_id, ai_response, is_user=False)
         
         if user_info:
             log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
@@ -1666,8 +2019,8 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer("This button isn't for you 💔", show_alert=True)
             return
         
-        is_expanded = help_expanded.get(user_id, False)
-        help_expanded[user_id] = not is_expanded
+        is_expanded = await get_help_expanded_state(user_id)
+        await update_help_expanded_state(user_id, not is_expanded)
         
         # Answer callback with appropriate message
         if not is_expanded:
@@ -1703,9 +2056,9 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     user_info = extract_user_info(query.message)
     
-    # Handle "Get flowers again" button - available for everyone
+    # Handle "Buy flowers again" button - available for everyone
     if query.data == "get_flowers_again":
-        log_with_user_info("INFO", "🌸 'Get flowers again' button clicked", user_info)
+        log_with_user_info("INFO", "🌸 'Buy flowers again' button clicked", user_info)
         
         # Answer the callback
         await query.answer("🌸 Getting more flowers for you!", show_alert=False)
@@ -1722,11 +2075,11 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 prices=[LabeledPrice(label='✨ Sakura Star', amount=50)]
             )
             
-            log_with_user_info("INFO", "✅ New invoice sent from 'Get flowers again' button", user_info)
+            log_with_user_info("INFO", "✅ New invoice sent from 'Buy flowers again' button", user_info)
             
         except Exception as e:
             log_with_user_info("ERROR", f"❌ Error sending new invoice from button: {e}", user_info)
-            await query.message.reply_text("❌ Oops! Something went wrong. Try using /get command instead! 🔧")
+            await query.message.reply_text("❌ Oops! Something went wrong. Try using /buy command instead! 🔧")
         
         return  # Exit early for get_flowers_again
     
@@ -1953,8 +2306,8 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             else:
                 log_with_user_info("INFO", "✅ Responding to group message (mentioned/replied)", user_info)
         
-        # Check rate limiting
-        if is_rate_limited(user_id):
+        # Check rate limiting (using Valkey)
+        if await is_rate_limited_valkey(user_id):
             log_with_user_info("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
         
@@ -1996,11 +2349,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # STAR PAYMENT FUNCTIONS
-async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send an invoice for sakura flowers."""
     try:
         user_info = extract_user_info(update.message)
-        log_with_user_info("INFO", "🌸 /get command received", user_info)
+        log_with_user_info("INFO", "🌸 /buy command received", user_info)
         
         # Track user for broadcasting
         track_user_and_chat(update, user_info)
@@ -2032,6 +2385,231 @@ async def get_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         log_with_user_info("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
 
+async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show all flower buyers with their donation amounts."""
+    try:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("INFO", "💝 /buyers command received", user_info)
+        
+        # Track user for broadcasting
+        track_user_and_chat(update, user_info)
+        
+        # Get all purchases from database
+        purchases = await get_all_purchases()
+        
+        if not purchases:
+            await update.message.reply_text(
+                "🌸 <b>Flower Buyers</b>\n\n"
+                "No one has bought flowers yet! Be the first to support with /buy 💝",
+                parse_mode=ParseMode.HTML
+            )
+            log_with_user_info("INFO", "✅ No buyers found message sent", user_info)
+            return
+        
+        # Build the buyers list
+        buyers_text = "🌸 <b>Flower Buyers</b>\n\n"
+        buyers_text += "💝 <i>Thank you to all our wonderful supporters!</i>\n\n"
+        
+        for i, purchase in enumerate(purchases, 1):
+            user_id = purchase['user_id']
+            username = purchase['username']
+            first_name = purchase['first_name'] or "Anonymous"
+            total_amount = purchase['total_amount']
+            purchase_count = purchase['purchase_count']
+            
+            # Create user mention using first name
+            user_mention = f'<a href="tg://user?id={user_id}">{first_name}</a>'
+            
+            # Add rank emoji
+            if i == 1:
+                rank_emoji = "🥇"
+            elif i == 2:
+                rank_emoji = "🥈"
+            elif i == 3:
+                rank_emoji = "🥉"
+            else:
+                rank_emoji = f"{i}."
+            
+            buyers_text += f"{rank_emoji} {user_mention} - {total_amount} ⭐"
+            if purchase_count > 1:
+                buyers_text += f" ({purchase_count} purchases)"
+            buyers_text += "\n"
+        
+        buyers_text += f"\n🌸 <i>Total buyers: {len(purchases)}</i>"
+        
+        await update.message.reply_text(
+            buyers_text,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
+        )
+        
+        log_with_user_info("INFO", f"✅ Buyers list sent with {len(purchases)} buyers", user_info)
+        
+    except Exception as e:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("ERROR", f"❌ Error in buyers command: {e}", user_info)
+        await update.message.reply_text("❌ Something went wrong getting the buyers list. Try again later! 🔧")
+
+
+async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Hidden owner command to refund stars to users. Usage: /back <user_id_or_username> <amount>"""
+    try:
+        user_info = extract_user_info(update.message)
+        
+        # Check if user is owner
+        if update.effective_user.id != OWNER_ID:
+            log_with_user_info("WARNING", "⚠️ Non-owner attempted /back command", user_info)
+            return
+        
+        log_with_user_info("INFO", "🔙 /back command received from owner", user_info)
+        
+        # Parse command arguments
+        args = update.message.text.split()
+        if len(args) < 3:
+            await update.message.reply_text(
+                "❌ <b>Usage:</b> <code>/back &lt;user_id_or_username&gt; &lt;amount&gt;</code>\n\n"
+                "<b>Examples:</b>\n"
+                "• <code>/back 123456789 50</code>\n"
+                "• <code>/back @username 25</code>\n"
+                "• <code>/back username 100</code>",
+                parse_mode=ParseMode.HTML
+            )
+            log_with_user_info("INFO", "❌ Invalid /back command usage", user_info)
+            return
+        
+        user_identifier = args[1]
+        try:
+            amount = int(args[2])
+            if amount <= 0:
+                raise ValueError("Amount must be positive")
+        except ValueError:
+            await update.message.reply_text("❌ Amount must be a positive integer!")
+            log_with_user_info("WARNING", f"❌ Invalid amount in /back command: {args[2]}", user_info)
+            return
+        
+        # Determine target user ID
+        target_user_id = None
+        target_name = user_identifier
+        
+        if user_identifier.isdigit():
+            # Direct user ID
+            target_user_id = int(user_identifier)
+        elif user_identifier.startswith('@'):
+            # Username with @
+            target_name = user_identifier[1:]
+        else:
+            # Username without @
+            target_name = user_identifier
+        
+        # If we don't have user_id, try to get it from database using username
+        if target_user_id is None:
+            if db_pool:
+                try:
+                    async with db_pool.acquire() as conn:
+                        row = await conn.fetchrow(
+                            "SELECT user_id, first_name FROM users WHERE username = $1", 
+                            target_name
+                        )
+                        if row:
+                            target_user_id = row['user_id']
+                            if not user_identifier.isdigit():
+                                target_name = row['first_name'] or target_name
+                        else:
+                            await update.message.reply_text(f"❌ User '{user_identifier}' not found in database!")
+                            log_with_user_info("WARNING", f"❌ User not found: {user_identifier}", user_info)
+                            return
+                except Exception as e:
+                    log_with_user_info("ERROR", f"❌ Database error while looking up user: {e}", user_info)
+                    await update.message.reply_text("❌ Database error while looking up user!")
+                    return
+            else:
+                await update.message.reply_text("❌ Database not available. Please use user ID instead!")
+                log_with_user_info("WARNING", "❌ Database not available for username lookup", user_info)
+                return
+        
+        # Send refund
+        try:
+            await context.bot.send_paid_media(
+                chat_id=target_user_id,
+                star_count=amount,
+                media=[]  # Empty media for just sending stars
+            )
+            
+            # Create success message
+            success_message = (
+                f"✅ <b>Refund Successful!</b>\n\n"
+                f"👤 <b>User:</b> {target_name} (ID: {target_user_id})\n"
+                f"⭐ <b>Amount:</b> {amount} stars\n"
+                f"💝 <b>Status:</b> Sent successfully"
+            )
+            
+            await update.message.reply_text(success_message, parse_mode=ParseMode.HTML)
+            log_with_user_info("INFO", f"✅ Refund sent: {amount} stars to user {target_user_id}", user_info)
+            
+            # Try to notify the user
+            try:
+                notification_msg = (
+                    f"🌸 <b>Star Refund Received!</b>\n\n"
+                    f"You have received {amount} ⭐ stars as a refund from our flower stall!\n\n"
+                    f"💕 Thank you for your continued support!"
+                )
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text=notification_msg,
+                    parse_mode=ParseMode.HTML
+                )
+                log_with_user_info("INFO", f"✅ Refund notification sent to user {target_user_id}", user_info)
+            except Exception as notify_error:
+                log_with_user_info("WARNING", f"⚠️ Could not notify user about refund: {notify_error}", user_info)
+                await update.message.reply_text(f"⚠️ Refund sent but could not notify user: {notify_error}")
+            
+        except Exception as e:
+            error_message = (
+                f"❌ <b>Refund Failed!</b>\n\n"
+                f"👤 <b>User:</b> {target_name} (ID: {target_user_id})\n"
+                f"⭐ <b>Amount:</b> {amount} stars\n"
+                f"💥 <b>Error:</b> {str(e)}"
+            )
+            await update.message.reply_text(error_message, parse_mode=ParseMode.HTML)
+            log_with_user_info("ERROR", f"❌ Refund failed: {e}", user_info)
+        
+    except Exception as e:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("ERROR", f"❌ Error in /back command: {e}", user_info)
+        await update.message.reply_text("❌ Something went wrong with the refund command!")
+
+
+async def get_user_info_by_identifier(identifier: str) -> tuple:
+    """Get user info by user ID or username from database"""
+    if not db_pool:
+        return None, None
+    
+    try:
+        async with db_pool.acquire() as conn:
+            if identifier.isdigit():
+                # Search by user ID
+                row = await conn.fetchrow(
+                    "SELECT user_id, username, first_name, last_name FROM users WHERE user_id = $1", 
+                    int(identifier)
+                )
+            else:
+                # Search by username (remove @ if present)
+                username = identifier.lstrip('@')
+                row = await conn.fetchrow(
+                    "SELECT user_id, username, first_name, last_name FROM users WHERE username = $1", 
+                    username
+                )
+            
+            if row:
+                display_name = row['first_name'] or row['username'] or f"User {row['user_id']}"
+                return row['user_id'], display_name
+            
+        return None, None
+        
+    except Exception as e:
+        logger.error(f"❌ Error looking up user {identifier}: {e}")
+        return None, None
+
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Answer the PreCheckoutQuery."""
@@ -2055,6 +2633,17 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     
     log_with_user_info("INFO", f"💰 Payment received for {amount} stars", user_info)
     
+    # Save purchase to database for amounts > 10 stars (not refunded)
+    if amount > 10:
+        save_purchase_to_database_async(
+            user_id=user_id,
+            username=user_info.get("username"),
+            first_name=user_info.get("first_name"),
+            last_name=user_info.get("last_name"),
+            amount=amount,
+            charge_id=payment.telegram_payment_charge_id
+        )
+    
     # Check if amount is 10 stars or less
     if amount <= 10:
         log_with_user_info("INFO", f"🔄 Refunding payment of {amount} stars (kindness gesture)", user_info)
@@ -2076,8 +2665,8 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                 telegram_payment_charge_id=payment.telegram_payment_charge_id
             )
             
-            # Create inline keyboard with "Get flowers again" button
-            keyboard = [[InlineKeyboardButton("Get flowers again 🌸", callback_data="get_flowers_again")]]
+            # Create inline keyboard with "Buy flowers again" button
+            keyboard = [[InlineKeyboardButton("Buy flowers again 🌸", callback_data="get_flowers_again")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # Send refund message with button
@@ -2130,7 +2719,9 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("ping", ping_command))
-    application.add_handler(CommandHandler("get", get_command))
+    application.add_handler(CommandHandler("buy", buy_command))
+    application.add_handler(CommandHandler("buyers", buyers_command))
+    application.add_handler(CommandHandler("back", back_command))  # Hidden owner command
     
     # Callback query handlers
     application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))
@@ -2171,6 +2762,11 @@ def run_bot() -> None:
     async def post_init(app):
         global cleanup_task
         
+        # Initialize Valkey
+        valkey_success = await init_valkey()
+        if not valkey_success:
+            logger.warning("⚠️ Valkey initialization failed. Bot will continue with memory fallback.")
+        
         # Initialize database
         db_success = await init_database()
         if not db_success:
@@ -2202,6 +2798,7 @@ def run_bot() -> None:
                 logger.error(f"❌ Error cancelling cleanup task: {e}")
         
         await close_database()
+        await close_valkey()
         await stop_effects_client()
         logger.info("🌸 Sakura Bot shutdown completed!")
         
