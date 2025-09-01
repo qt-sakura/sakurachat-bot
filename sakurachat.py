@@ -6,6 +6,8 @@ import random
 import asyncio
 import logging
 import asyncpg
+import psutil
+import datetime
 import threading
 import json
 import valkey
@@ -71,59 +73,8 @@ cleanup_task = None
 # VALKEY CLIENT
 valkey_client: AsyncValkey = None
 
-# Star payment storage and constants
+# Star payment storage
 payment_storage = {}
-
-INVOICE_DESCRIPTIONS = [
-    "Welcome to our flowers stall! 🌸✨",
-    "Take beautiful sakura flowers! 🌸💫",
-    "Pick your favorite cherry blossoms! 🌸🌟",
-    "Get fresh flowers from our stall! 🌸🦋"
-]
-
-THANK_YOU_MESSAGES = [
-    "🌸 Thanks for taking flowers from our stall! Come back anytime! 💕",
-    "✨ Thank you for visiting our flower stall! Your flowers are beautiful! 🌸",
-    "🌟 Thanks for choosing our sakura stall! Enjoy your flowers! 🌸❤️",
-    "🌸 Thank you for shopping at our flower stall! See you again! ✨",
-    "💫 Thanks for getting flowers from us! Have a lovely day! 🌸"
-]
-
-REFUND_MESSAGES = [
-    "🌸 Thanks for showing such kindness! We are returning your payment for your generosity! 💕",
-    "✨ Your kindness touched our hearts! We're refunding your payment as a gesture of appreciation! 🌸",
-    "🌟 Such a kind soul! We're returning your stars because your kindness means more to us! 🌸❤️",
-    "🌸 Your gentle spirit deserves this refund! Thank you for being so wonderfully kind! ✨",
-    "💫 We're touched by your kindness! Here's your refund as our way of saying thank you! 🌸"
-]
-
-PAYMENT_STICKERS = [
-    "CAACAgUAAxkBAAEPHVRomHVszeSnrB2qQBGNHy6BgyZAHwACvxkAAmpxyFT7N37qhVnGmzYE",
-    "CAACAgUAAxkBAAEPHVVomHVsuGrU-zEa0X8i1jn_HW7XawAC-BkAArnxwVRFqeVbp2Mn_TYE",
-    "CAACAgUAAxkBAAEPHVZomHVsuf3QWObxnD9mavVnmS4XPgACPhgAAqMryVT761H_MmILCjYE",
-    "CAACAgUAAxkBAAEPHVdomHVs87jwVjxQjM7k37cUAwnJXQACwxYAAs2CyFRnx4YgWFPZkjYE",
-    "CAACAgUAAxkBAAEPHVhomHVsnB4iVT8jr56ZtGPq98KQeQACfRgAAoQAAcBUyVgSjnENUUo2BA",
-    "CAACAgUAAxkBAAEPHVlomHVsRWNXE2vkgSYrBU9K-JB9UwACoxcAAi4MyFS0w-gqFTBWQjYE",
-    "CAACAgUAAxkBAAEPHVpomHVsfUZT06tR7jgqmHNJA-j5fAACpBgAAuhZyVSaY0y3w0zVLjYE",
-    "CAACAgUAAxkBAAEPHVtomHVsqjujca8HBOPQpEvJY-I0WQACZRQAAhX0wFS2YntXBMU6ATYE",
-    "CAACAgUAAxkBAAEPHVxomHVsw09_FKmfugTeaqTXrIOMNwACzhQAAlyLwFSL4-96tJu0STYE",
-    "CAACAgUAAxkBAAEPHV1omHVsP9aNtLlGJyErPF8yEvuuawAC6RcAAj7DwFSKnv319y6jnTYE",
-    "CAACAgUAAxkBAAEPHV5omHVsuz9c3bxncAXOQ6BDzhrTnwACKxwAAm4QwVRdrk0EgrotFjYE",
-    "CAACAgUAAxkBAAEPHV9omHVs3df-rmdlDbJFu-MREg5RrwAC5RYAAsCewVSvwTepiO6BlTYE",
-    "CAACAgUAAxkBAAEPHWBomHVshaztRlsJ2d3p6qV1TAolvgACChkAAjf9wFSqz_XgZVhTLTYE",
-    "CAACAgUAAxkBAAEPHWFomHVsrjl_UqIUYgs8NUKycyXbuQAChRgAApa6wFQoEbjt-4UEUDYE",
-    "CAACAgUAAxkBAAEPHWJomHVssUsAAU8BbI1lcPdQ2hJbbrwAAg4YAAI4lchULkVARTsFmjI2BA",
-    "CAACAgUAAxkBAAEPHWNomHVs0wFx3n8i8r6TefoJzP_3XAACqRYAAvKvyFQiY8XErd3KFDYE",
-    "CAACAgUAAxkBAAEPHWRomHVsXNHMWzXxpKxSrze5yM0kzAACRx4AAt7oyFS3n9YnyqQwCjYE",
-    "CAACAgUAAxkBAAEPHWVomHVsQxKxih6IfqUeZ7aQaCXBvAACyBgAAkHPwVT8uW_J5GUHQTYE",
-    "CAACAgUAAxkBAAEPHWZomHVsFSeBqaNqm5rWNu8LdszNcAACxhUAAuEtwVQi2t0gazmalDYE",
-    "CAACAgUAAxkBAAEPHWdomHVsFOXCOM_DZb1VuGPlXfkY2AAC4RgAAu2CwVSxJETZ5OhUGTYE",
-    "CAACAgUAAxkBAAEPHWhomHVsovXP8XqbvEjEB508DTW6VQAC2BcAAoJLwFRRhczsSdgAASg2BA",
-    "CAACAgUAAxkBAAEPHWlomHVsNkxBtCovGit7bjWNEV5kTwACFhYAArQ9wFRAwzg1qA0TrTYE",
-    "CAACAgUAAxkBAAEPHWpomHVs8vADDgs56H30a5uM2uNvhQACtxcAAj_QQVSXTCvC5zEIPjYE",
-    "CAACAgUAAxkBAAEPHWtomHVsS466sNdxHk4lGsza3S_3yQAC9B0AAnZtQFQJYcwEnXCS6DYE",
-    "CAACAgUAAxkBAAEPJzFonedaEsY_x_cVxB5i5WHRmYDfZwACdBgAAnTX8VThqO2DUegdyjYE"
-]
 
 # Commands dictionary
 COMMANDS = [
@@ -282,6 +233,58 @@ SAKURA_IMAGES = [
 ]
 
 # MESSAGE DICTIONARIES
+# Star Payment Messages Dictionaries
+INVOICE_DESCRIPTIONS = [
+    "Welcome to our flowers stall! 🌸✨",
+    "Take beautiful sakura flowers! 🌸💫",
+    "Pick your favorite cherry blossoms! 🌸🌟",
+    "Get fresh flowers from our stall! 🌸🦋"
+]
+
+THANK_YOU_MESSAGES = [
+    "🌸 Thanks for taking flowers from our stall! Come back anytime! 💕",
+    "✨ Thank you for visiting our flower stall! Your flowers are beautiful! 🌸",
+    "🌟 Thanks for choosing our sakura stall! Enjoy your flowers! 🌸❤️",
+    "🌸 Thank you for shopping at our flower stall! See you again! ✨",
+    "💫 Thanks for getting flowers from us! Have a lovely day! 🌸"
+]
+
+REFUND_MESSAGES = [
+    "🌸 Thanks for showing such kindness! We are returning your payment for your generosity! 💕",
+    "✨ Your kindness touched our hearts! We're refunding your payment as a gesture of appreciation! 🌸",
+    "🌟 Such a kind soul! We're returning your stars because your kindness means more to us! 🌸❤️",
+    "🌸 Your gentle spirit deserves this refund! Thank you for being so wonderfully kind! ✨",
+    "💫 We're touched by your kindness! Here's your refund as our way of saying thank you! 🌸"
+]
+
+PAYMENT_STICKERS = [
+    "CAACAgUAAxkBAAEPHVRomHVszeSnrB2qQBGNHy6BgyZAHwACvxkAAmpxyFT7N37qhVnGmzYE",
+    "CAACAgUAAxkBAAEPHVVomHVsuGrU-zEa0X8i1jn_HW7XawAC-BkAArnxwVRFqeVbp2Mn_TYE",
+    "CAACAgUAAxkBAAEPHVZomHVsuf3QWObxnD9mavVnmS4XPgACPhgAAqMryVT761H_MmILCjYE",
+    "CAACAgUAAxkBAAEPHVdomHVs87jwVjxQjM7k37cUAwnJXQACwxYAAs2CyFRnx4YgWFPZkjYE",
+    "CAACAgUAAxkBAAEPHVhomHVsnB4iVT8jr56ZtGPq98KQeQACfRgAAoQAAcBUyVgSjnENUUo2BA",
+    "CAACAgUAAxkBAAEPHVlomHVsRWNXE2vkgSYrBU9K-JB9UwACoxcAAi4MyFS0w-gqFTBWQjYE",
+    "CAACAgUAAxkBAAEPHVpomHVsfUZT06tR7jgqmHNJA-j5fAACpBgAAuhZyVSaY0y3w0zVLjYE",
+    "CAACAgUAAxkBAAEPHVtomHVsqjujca8HBOPQpEvJY-I0WQACZRQAAhX0wFS2YntXBMU6ATYE",
+    "CAACAgUAAxkBAAEPHVxomHVsw09_FKmfugTeaqTXrIOMNwACzhQAAlyLwFSL4-96tJu0STYE",
+    "CAACAgUAAxkBAAEPHV1omHVsP9aNtLlGJyErPF8yEvuuawAC6RcAAj7DwFSKnv319y6jnTYE",
+    "CAACAgUAAxkBAAEPHV5omHVsuz9c3bxncAXOQ6BDzhrTnwACKxwAAm4QwVRdrk0EgrotFjYE",
+    "CAACAgUAAxkBAAEPHV9omHVs3df-rmdlDbJFu-MREg5RrwAC5RYAAsCewVSvwTepiO6BlTYE",
+    "CAACAgUAAxkBAAEPHWBomHVshaztRlsJ2d3p6qV1TAolvgACChkAAjf9wFSqz_XgZVhTLTYE",
+    "CAACAgUAAxkBAAEPHWFomHVsrjl_UqIUYgs8NUKycyXbuQAChRgAApa6wFQoEbjt-4UEUDYE",
+    "CAACAgUAAxkBAAEPHWJomHVssUsAAU8BbI1lcPdQ2hJbbrwAAg4YAAI4lchULkVARTsFmjI2BA",
+    "CAACAgUAAxkBAAEPHWNomHVs0wFx3n8i8r6TefoJzP_3XAACqRYAAvKvyFQiY8XErd3KFDYE",
+    "CAACAgUAAxkBAAEPHWRomHVsXNHMWzXxpKxSrze5yM0kzAACRx4AAt7oyFS3n9YnyqQwCjYE",
+    "CAACAgUAAxkBAAEPHWVomHVsQxKxih6IfqUeZ7aQaCXBvAACyBgAAkHPwVT8uW_J5GUHQTYE",
+    "CAACAgUAAxkBAAEPHWZomHVsFSeBqaNqm5rWNu8LdszNcAACxhUAAuEtwVQi2t0gazmalDYE",
+    "CAACAgUAAxkBAAEPHWdomHVsFOXCOM_DZb1VuGPlXfkY2AAC4RgAAu2CwVSxJETZ5OhUGTYE",
+    "CAACAgUAAxkBAAEPHWhomHVsovXP8XqbvEjEB508DTW6VQAC2BcAAoJLwFRRhczsSdgAASg2BA",
+    "CAACAgUAAxkBAAEPHWlomHVsNkxBtCovGit7bjWNEV5kTwACFhYAArQ9wFRAwzg1qA0TrTYE",
+    "CAACAgUAAxkBAAEPHWpomHVs8vADDgs56H30a5uM2uNvhQACtxcAAj_QQVSXTCvC5zEIPjYE",
+    "CAACAgUAAxkBAAEPHWtomHVsS466sNdxHk4lGsza3S_3yQAC9B0AAnZtQFQJYcwEnXCS6DYE",
+    "CAACAgUAAxkBAAEPJzFonedaEsY_x_cVxB5i5WHRmYDfZwACdBgAAnTX8VThqO2DUegdyjYE"
+]
+
 # Start Command Messages Dictionary
 START_MESSAGES = {
     "initial_caption": """
@@ -993,30 +996,33 @@ async def get_help_expanded_state(user_id: int) -> bool:
 
 # RATE LIMITING FUNCTIONS
 async def is_rate_limited_valkey(user_id: int, limit: int = 5) -> bool:
-    """Check if user is rate limited using Valkey"""
-    if not valkey_client:
-        return is_rate_limited(user_id)  # Fallback to memory
-    
-    try:
-        key = f"rate_limit:{user_id}"
-        current = await valkey_client.get(key)
-        
-        if current is None:
-            # First request, set counter
-            await valkey_client.setex(key, VALKEY_RATE_LIMIT_TTL, 1)
+    """Check if user is rate limited using Valkey with memory fallback"""
+    # Try Valkey first
+    if valkey_client:
+        try:
+            key = f"rate_limit:{user_id}"
+            current = await valkey_client.get(key)
+            
+            if current is None:
+                # First request, set counter
+                await valkey_client.setex(key, VALKEY_RATE_LIMIT_TTL, 1)
+                return False
+            
+            current_count = int(current)
+            if current_count >= limit:
+                return True
+            
+            # Increment counter
+            await valkey_client.incr(key)
             return False
-        
-        current_count = int(current)
-        if current_count >= limit:
-            return True
-        
-        # Increment counter
-        await valkey_client.incr(key)
-        return False
-        
-    except Exception as e:
-        logger.error(f"❌ Rate limit check failed for user {user_id}: {e}")
-        return is_rate_limited(user_id)  # Fallback to memory
+            
+        except Exception as e:
+            logger.error(f"❌ Rate limit check failed for user {user_id}: {e}")
+    
+    # Fallback to memory-based rate limiting
+    current_time = time.time()
+    last_response = user_last_response_time.get(user_id, 0)
+    return current_time - last_response < MESSAGE_LIMIT
 
 async def reset_rate_limit(user_id: int):
     """Reset rate limit for user"""
@@ -1337,15 +1343,17 @@ def validate_config() -> bool:
     return True
 
 
-def is_rate_limited(user_id: int) -> bool:
-    """Check if user is rate limited"""
-    current_time = time.time()
-    last_response = user_last_response_time.get(user_id, 0)
-    return current_time - last_response < MESSAGE_LIMIT
-
-
-def update_user_response_time(user_id: int) -> None:
-    """Update the last response time for user"""
+async def update_user_response_time_valkey(user_id: int) -> None:
+    """Update the last response time for user in Valkey"""
+    if valkey_client:
+        try:
+            key = f"last_response:{user_id}"
+            await valkey_client.setex(key, VALKEY_SESSION_TTL, int(time.time()))
+            logger.debug(f"⏰ Updated response time in Valkey for user {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Failed to update response time in Valkey for user {user_id}: {e}")
+    
+    # Also update memory as fallback
     user_last_response_time[user_id] = time.time()
 
 
@@ -2306,7 +2314,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             else:
                 log_with_user_info("INFO", "✅ Responding to group message (mentioned/replied)", user_info)
         
-        # Check rate limiting (using Valkey)
+        # Check rate limiting (using Valkey with memory fallback)
         if await is_rate_limited_valkey(user_id):
             log_with_user_info("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
@@ -2318,8 +2326,8 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             await handle_text_message(update, context)
         
         # Update response time after sending response
-        update_user_response_time(user_id)
-        log_with_user_info("DEBUG", "⏰ Updated user response time", user_info)
+        await update_user_response_time_valkey(user_id)
+        log_with_user_info("DEBUG", "⏰ Updated user response time in Valkey", user_info)
         
     except Exception as e:
         user_info = extract_user_info(update.message)
@@ -2579,6 +2587,180 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("❌ Something went wrong with the refund command!")
 
 
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Hidden owner command to show bot statistics with refresh functionality"""
+    try:
+        user_info = extract_user_info(update.message)
+        
+        # Check if user is owner
+        if update.effective_user.id != OWNER_ID:
+            log_with_user_info("WARNING", "⚠️ Non-owner attempted /stats command", user_info)
+            return
+        
+        log_with_user_info("INFO", "📊 /stats command received from owner", user_info)
+        
+        # Send stats with refresh button
+        await send_stats_message(update.message.chat.id, context, is_refresh=False)
+        
+        log_with_user_info("INFO", "✅ Bot statistics sent to owner", user_info)
+        
+    except Exception as e:
+        user_info = extract_user_info(update.message)
+        log_with_user_info("ERROR", f"❌ Error in /stats command: {e}", user_info)
+        await update.message.reply_text("❌ Something went wrong getting bot statistics!")
+
+
+async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refresh: bool = False) -> None:
+    """Send or update stats message with current data"""
+    try:
+        # Calculate ping to Telegram servers
+        ping_start = time.time()
+        try:
+            await context.bot.get_me()
+            ping_ms = round((time.time() - ping_start) * 1000, 2)
+        except Exception:
+            ping_ms = "Error"
+        
+        # Calculate bot uptime (using process start time)
+        try:
+            boot_time = psutil.boot_time()
+            process = psutil.Process()
+            process_start = process.create_time()
+            uptime_seconds = time.time() - process_start
+            
+            # Format uptime
+            days = int(uptime_seconds // 86400)
+            hours = int((uptime_seconds % 86400) // 3600)
+            minutes = int((uptime_seconds % 3600) // 60)
+            uptime_str = f"{days}d {hours}h {minutes}m"
+        except Exception as e:
+            uptime_str = "Unknown"
+        
+        # Get current time
+        current_time = datetime.datetime.now()
+        
+        # System Information
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        memory = psutil.virtual_memory()
+        
+        # Database Statistics
+        db_stats = {
+            'users_count': len(user_ids),
+            'groups_count': len(group_ids),
+            'total_purchases': 0,
+            'total_revenue': 0,
+            'active_conversations': len(conversation_history)
+        }
+        
+        if db_pool:
+            try:
+                async with db_pool.acquire() as conn:
+                    # Get purchase statistics
+                    purchase_stats = await conn.fetchrow("""
+                        SELECT COUNT(*) as total_purchases, COALESCE(SUM(amount), 0) as total_revenue
+                        FROM purchases
+                    """)
+                    if purchase_stats:
+                        db_stats['total_purchases'] = purchase_stats['total_purchases']
+                        db_stats['total_revenue'] = purchase_stats['total_revenue']
+                    
+                    # Get recent activity (last 24 hours)
+                    recent_users = await conn.fetchval("""
+                        SELECT COUNT(*) FROM users 
+                        WHERE updated_at > NOW() - INTERVAL '24 hours'
+                    """)
+                    db_stats['recent_users'] = recent_users or 0
+                    
+                    recent_purchases = await conn.fetchval("""
+                        SELECT COUNT(*) FROM purchases 
+                        WHERE created_at > NOW() - INTERVAL '24 hours'
+                    """)
+                    db_stats['recent_purchases'] = recent_purchases or 0
+                    
+            except Exception as e:
+                logger.error(f"Error getting database stats: {e}")
+        
+        # Build stats message
+        stats_message = f"""📊 <b>Sakura Bot Statistics</b>
+<i>Last Updated: {current_time.strftime('%H:%M:%S')}</i>
+
+🏓 <b>Bot Performance</b>
+├ Uptime: <b>{uptime_str}</b>
+└ Ping: <b>{ping_ms}ms</b>
+
+👥 <b>User Statistics</b>
+├ Total Users: <b>{db_stats['users_count']}</b>
+├ Total Groups: <b>{db_stats['groups_count']}</b>
+├ Recent Users (24h): <b>{db_stats.get('recent_users', 'N/A')}</b>
+├ Active Conversations: <b>{db_stats['active_conversations']}</b>
+├ Total Purchases: <b>{db_stats['total_purchases']}</b>
+├ Total Revenue: <b>{db_stats['total_revenue']} ⭐</b>
+└ Recent Purchases (24h): <b>{db_stats.get('recent_purchases', 'N/A')}</b>
+
+🖥️ <b>System Resources</b>
+├ CPU Usage: <b>{cpu_percent}%</b>
+└ Memory: <b>{memory.percent}%</b> ({memory.used // (1024**3)}GB / {memory.total // (1024**3)}GB)"""
+
+        # Create refresh button
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="refresh_stats")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        if is_refresh:
+            return stats_message, reply_markup
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=stats_message,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+                disable_web_page_preview=True
+            )
+        
+    except Exception as e:
+        logger.error(f"❌ Error generating stats message: {e}")
+        if not is_refresh:
+            await context.bot.send_message(chat_id, "❌ Error generating statistics!")
+
+
+async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle stats refresh button callback"""
+    try:
+        query = update.callback_query
+        user_info = extract_user_info(query.message)
+        
+        # Check if user is owner
+        if query.from_user.id != OWNER_ID:
+            log_with_user_info("WARNING", "⚠️ Non-owner attempted stats refresh", user_info)
+            await query.answer("You're not authorized to use this 🚫", show_alert=True)
+            return
+        
+        log_with_user_info("INFO", "🔄 Stats refresh callback received from owner", user_info)
+        
+        # Answer the callback
+        await query.answer("🔄 Refreshing statistics...", show_alert=False)
+        
+        # Get updated stats
+        stats_message, reply_markup = await send_stats_message(query.message.chat.id, context, is_refresh=True)
+        
+        # Update the message
+        await query.edit_message_text(
+            text=stats_message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+            disable_web_page_preview=True
+        )
+        
+        log_with_user_info("INFO", "✅ Stats refreshed successfully", user_info)
+        
+    except Exception as e:
+        user_info = extract_user_info(query.message) if query.message else {}
+        log_with_user_info("ERROR", f"❌ Error refreshing stats: {e}", user_info)
+        try:
+            await query.answer("❌ Error refreshing statistics!", show_alert=True)
+        except:
+            pass
+
+
 async def get_user_info_by_identifier(identifier: str) -> tuple:
     """Get user info by user ID or username from database"""
     if not db_pool:
@@ -2722,11 +2904,13 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("buy", buy_command))
     application.add_handler(CommandHandler("buyers", buyers_command))
     application.add_handler(CommandHandler("back", back_command))  # Hidden owner command
+    application.add_handler(CommandHandler("stats", stats_command))  # Hidden owner command
     
     # Callback query handlers
     application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))
     application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_expand_"))
     application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_|^get_flowers_again$"))
+    application.add_handler(CallbackQueryHandler(stats_refresh_callback, pattern="^refresh_stats$"))
     
     # Payment handlers
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
