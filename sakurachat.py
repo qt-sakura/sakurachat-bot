@@ -1,16 +1,17 @@
 import os
 import time
-import json
 import uvloop
-import random
-import psutil
-import valkey
-import asyncio
 import aiohttp
+import random
+import asyncio
 import logging
 import asyncpg
+import psutil
 import datetime
 import threading
+import json
+import valkey
+from valkey.asyncio import Valkey as AsyncValkey
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -34,7 +35,6 @@ from google import genai
 from typing import Dict, Set, Optional
 from telegram.error import TelegramError
 from telethon import TelegramClient, events
-from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -42,21 +42,23 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-VALKEY_URL = os.getenv("VALKEY_URL", "valkey://localhost:6379")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
-VALKEY_SESSION_TTL = 3600  
-VALKEY_CACHE_TTL = 300   
-VALKEY_RATE_LIMIT_TTL = 60 
 MESSAGE_LIMIT = 1.0
 BROADCAST_DELAY = 0.03
 CHAT_LENGTH = 20
 CHAT_CLEANUP = 1800
 OLD_CHAT = 3600
+
+# VALKEY CONFIGURATION
+VALKEY_URL = os.getenv("VALKEY_URL", "valkey://localhost:6379")
+VALKEY_SESSION_TTL = 3600  # 1 hour for session data
+VALKEY_CACHE_TTL = 300     # 5 minutes for cache
+VALKEY_RATE_LIMIT_TTL = 60 # 1 minute for rate limiting
 
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
@@ -67,14 +69,18 @@ user_last_response_time: Dict[int, float] = {}
 conversation_history: Dict[int, list] = {} 
 db_pool = None
 cleanup_task = None
+
+# VALKEY CLIENT
 valkey_client: AsyncValkey = None
+
+# Star payment storage
 payment_storage = {}
 
 # Commands dictionary
 COMMANDS = [
     BotCommand("start", "👋 Wake me up"),
-    BotCommand("buy", "🌸 Get flowers"),
-    BotCommand("buyers", "💝 Flower buyers"),
+    BotCommand("buy", "🌸 Buy flowers"),
+    BotCommand("buyers", "💝 See flower buyers"),
     BotCommand("help", "💬 A short guide")
 ]
 
