@@ -1597,6 +1597,75 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         return get_error_response()
 
 
+async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+    """Analyze image using Gemini 2.5 Flash with conversation context"""
+    if user_info:
+        log_with_user_info("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
+    
+    if not gemini_client:
+        if user_info:
+            log_with_user_info("WARNING", "❌ Gemini client not available for image analysis", user_info)
+        return "Samjh nahi paa rahi image kya hai 😔"
+    
+    try:
+        # Get conversation context if user_id provided
+        context = ""
+        if user_id:
+            context = await get_conversation_context(user_id)
+            if context:
+                context = f"\n\nPrevious conversation:\n{context}\n"
+        
+        # Build image analysis prompt
+        image_prompt = f"""{SAKURA_PROMPT}
+
+User name: {user_name}{context}
+
+User has sent an image. Caption: "{caption if caption else 'No caption'}"
+
+Analyze this image and respond in Sakura's style about what you see. Be descriptive but keep it to one or two lines as per your character rules. Comment on what's in the image, colors, mood, or anything interesting you notice.
+
+Sakura's response:"""
+
+        # Create the request with image using proper format
+        import base64
+        
+        # Convert bytes to base64 string
+        image_data = base64.b64encode(image_bytes).decode('utf-8')
+        
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                image_prompt,
+                {
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": image_data
+                    }
+                }
+            ]
+        )
+        
+        ai_response = response.text.strip() if response.text else "Kya cute image hai! 😍"
+        
+        # Add messages to conversation history
+        if user_id:
+            image_description = f"[Image: {caption}]" if caption else "[Image sent]"
+            await add_to_conversation_history(user_id, image_description, is_user=True)
+            await add_to_conversation_history(user_id, ai_response, is_user=False)
+        
+        if user_info:
+            log_with_user_info("INFO", f"✅ Image analysis completed: '{ai_response[:50]}...'", user_info)
+        
+        return ai_response
+            
+    except Exception as e:
+        if user_info:
+            log_with_user_info("ERROR", f"❌ Image analysis error: {e}", user_info)
+        else:
+            logger.error(f"Image analysis error: {e}")
+        return "Image dekh nahi paa rahi properly 😕"
+
+
 # CHAT ACTION FUNCTIONS
 async def send_typing_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send typing action to show bot is processing"""
@@ -2241,6 +2310,13 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     log_with_user_info("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
     
+    # Check for ping command with prefixes
+    ping_prefixes = ['?ping', '!ping', '*ping', '#ping']
+    if any(user_message.lower().startswith(prefix) for prefix in ping_prefixes):
+        log_with_user_info("INFO", f"🏓 Ping command detected with prefix: {user_message}", user_info)
+        await ping_command(update, context)
+        return
+    
     await send_typing_action(context, update.effective_chat.id, user_info)
     
     user_name = update.effective_user.first_name or ""
@@ -2279,6 +2355,66 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
 
+async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle image messages with AI analysis using Gemini 2.5 Flash"""
+    user_info = extract_user_info(update.message)
+    log_with_user_info("INFO", "📷 Image message received", user_info)
+    
+    await send_typing_action(context, update.effective_chat.id, user_info)
+    
+    try:
+        # Get the largest photo
+        photo = update.message.photo[-1]
+        
+        # Get file info
+        file = await context.bot.get_file(photo.file_id)
+        
+        # Download the image
+        image_bytes = await file.download_as_bytearray()
+        
+        log_with_user_info("DEBUG", f"📥 Image downloaded: {len(image_bytes)} bytes", user_info)
+        
+        # Analyze image with Gemini 2.5 Flash
+        user_name = update.effective_user.first_name or ""
+        caption = update.message.caption or ""
+        
+        response = await analyze_image_with_gemini(image_bytes, caption, user_name, user_info, update.effective_user.id)
+        
+        log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
+        
+        # Send with effects if in private chat
+        if update.effective_chat.type == "private":
+            # Try sending with effects first
+            effect_sent = await send_with_effect(update.effective_chat.id, response)
+            if effect_sent:
+                log_with_user_info("INFO", "✨ Image analysis with effects sent successfully", user_info)
+            else:
+                # Fallback to normal PTB message if effects fail
+                await update.message.reply_text(
+                    response,
+                    reply_markup=ForceReply(
+                        selective=True,
+                        input_field_placeholder="Cute text 💓"
+                    )
+                )
+                log_with_user_info("WARNING", "⚠️ Image analysis sent without effects (fallback)", user_info)
+        else:
+            # Group chat - no effects, just normal message
+            await update.message.reply_text(
+                response,
+                reply_markup=ForceReply(
+                    selective=True,
+                    input_field_placeholder="Cute text 💓"
+                )
+            )
+        
+        log_with_user_info("INFO", "✅ Image analysis response sent successfully", user_info)
+        
+    except Exception as e:
+        log_with_user_info("ERROR", f"❌ Error analyzing image: {e}", user_info)
+        await update.message.reply_text(get_error_response())
+
+
 async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all types of messages (text, stickers, voice, photos, etc.)"""
     try:
@@ -2288,7 +2424,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         log_with_user_info("DEBUG", f"📨 Processing message in {chat_type}", user_info)
         
-        # Track user and group IDs for broadcasting
+        # Track user and chat IDs for broadcasting
         track_user_and_chat(update, user_info)
         
         # Check if owner is in broadcast mode
@@ -2316,6 +2452,8 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Handle different message types
         if update.message.sticker:
             await handle_sticker_message(update, context)
+        elif update.message.photo:
+            await handle_image_message(update, context)
         else:
             await handle_text_message(update, context)
         
@@ -2356,10 +2494,37 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /buy command received", user_info)
-        
+
         # Track user for broadcasting
         track_user_and_chat(update, user_info)
-        
+
+        # Step 1: React to the buy message with random emoji and animation
+        if EMOJI_REACT:
+            try:
+                random_emoji = random.choice(EMOJI_REACT)
+
+                # Use Telethon for animated emoji reactions
+                if effects_client and update.effective_chat.type == "private":
+                    reaction_sent = await send_animated_reaction(
+                        update.effective_chat.id,
+                        update.message.message_id,
+                        random_emoji
+                    )
+                    if reaction_sent:
+                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                    else:
+                        # Fallback to PTB reaction without animation
+                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                else:
+                    # Group chat or no Telethon - use PTB reaction
+                    await add_ptb_reaction(context, update, random_emoji, user_info)
+
+            except Exception as e:
+                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+
+        # Step 1.5: Send typing action
+        await send_typing_action(context, update.effective_chat.id, user_info)
+
         # Default to 50 stars, but allow user to specify amount
         amount = 50
         if len(update.message.text.split()) > 1 and update.message.text.split()[1].isdigit():
@@ -2369,19 +2534,56 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 amount = 100000
             elif amount < 1:
                 amount = 1
-        
-        invoice_message = await context.bot.send_invoice(
-            chat_id=update.message.chat.id,
-            title="Flowers 🌸",
-            description=random.choice(INVOICE_DESCRIPTIONS),
-            payload=f"sakura_star_{update.message.from_user.id}",
-            provider_token="",  # Empty for stars
-            currency="XTR",  # Telegram Stars currency
-            prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
-        )
-        
-        log_with_user_info("INFO", f"✅ Invoice sent for {amount} stars", user_info)
-        
+
+        # Step 2: Send invoice with effects if in private chat
+        if update.effective_chat.type == "private":
+            # Use direct API to send invoice with effects
+            try:
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice"
+                payload = {
+                    'chat_id': update.message.chat.id,
+                    'title': "Flowers 🌸",
+                    'description': random.choice(INVOICE_DESCRIPTIONS),
+                    'payload': f"sakura_star_{update.message.from_user.id}",
+                    'provider_token': "",  # Empty for stars
+                    'currency': "XTR",  # Telegram Stars currency
+                    'prices': [{'label': '✨ Sakura Star', 'amount': amount}],
+                    'message_effect_id': random.choice(EFFECTS)
+                }
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload) as response:
+                        result = await response.json()
+                        if result.get('ok'):
+                            log_with_user_info("INFO", f"✨ Invoice with effects sent for {amount} stars", user_info)
+                        else:
+                            # Fallback to normal invoice
+                            raise Exception("Effects invoice failed")
+            except Exception:
+                # Fallback to normal PTB invoice
+                await context.bot.send_invoice(
+                    chat_id=update.message.chat.id,
+                    title="Flowers 🌸",
+                    description=random.choice(INVOICE_DESCRIPTIONS),
+                    payload=f"sakura_star_{update.message.from_user.id}",
+                    provider_token="",  # Empty for stars
+                    currency="XTR",  # Telegram Stars currency
+                    prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
+                )
+                log_with_user_info("WARNING", f"⚠️ Invoice sent without effects (fallback) for {amount} stars", user_info)
+        else:
+            # Group chat - no effects, just normal invoice
+            await context.bot.send_invoice(
+                chat_id=update.message.chat.id,
+                title="Flowers 🌸",
+                description=random.choice(INVOICE_DESCRIPTIONS),
+                payload=f"sakura_star_{update.message.from_user.id}",
+                provider_token="",  # Empty for stars
+                currency="XTR",  # Telegram Stars currency
+                prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
+            )
+            log_with_user_info("INFO", f"✅ Invoice sent for {amount} stars", user_info)
+
     except Exception as e:
         user_info = extract_user_info(update.message)
         log_with_user_info("ERROR", f"❌ Error sending invoice: {e}", user_info)
@@ -2392,36 +2594,101 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "💝 /buyers command received", user_info)
-        
+
         # Track user for broadcasting
         track_user_and_chat(update, user_info)
-        
+
+        # Step 1: React to the buyers message with random emoji and animation
+        if EMOJI_REACT:
+            try:
+                random_emoji = random.choice(EMOJI_REACT)
+
+                # Use Telethon for animated emoji reactions
+                if effects_client and update.effective_chat.type == "private":
+                    reaction_sent = await send_animated_reaction(
+                        update.effective_chat.id,
+                        update.message.message_id,
+                        random_emoji
+                    )
+                    if reaction_sent:
+                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                    else:
+                        # Fallback to PTB reaction without animation
+                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                else:
+                    # Group chat or no Telethon - use PTB reaction
+                    await add_ptb_reaction(context, update, random_emoji, user_info)
+
+            except Exception as e:
+                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+
+        # Step 2: Send typing action
+        await send_typing_action(context, update.effective_chat.id, user_info)
+
         # Get all purchases from database
         purchases = await get_all_purchases()
-        
+
         if not purchases:
-            await update.message.reply_text(
+            no_buyers_text = (
                 "🌸 <b>Flower Buyers</b>\n\n"
-                "No one has bought flowers yet! Be the first to support with /buy 💝",
-                parse_mode=ParseMode.HTML
+                "No one has bought flowers yet! Be the first to support with /buy 💝"
             )
+
+            # Send with effects if in private chat
+            if update.effective_chat.type == "private":
+                # Use direct API to send no buyers message with effects
+                try:
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                    payload = {
+                        'chat_id': update.effective_chat.id,
+                        'text': no_buyers_text,
+                        'message_effect_id': random.choice(EFFECTS),
+                        'parse_mode': 'HTML'
+                    }
+
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=payload) as response:
+                            result = await response.json()
+                            if result.get('ok'):
+                                log_with_user_info("INFO", "✨ No buyers message with effects sent successfully", user_info)
+                            else:
+                                # Fallback to normal PTB message if effects fail
+                                await update.message.reply_text(
+                                    no_buyers_text,
+                                    parse_mode=ParseMode.HTML
+                                )
+                                log_with_user_info("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
+                except Exception:
+                    # Fallback to normal PTB message if effects fail
+                    await update.message.reply_text(
+                        no_buyers_text,
+                        parse_mode=ParseMode.HTML
+                    )
+                    log_with_user_info("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
+            else:
+                # Group chat - no effects, just normal message
+                await update.message.reply_text(
+                    no_buyers_text,
+                    parse_mode=ParseMode.HTML
+                )
+
             log_with_user_info("INFO", "✅ No buyers found message sent", user_info)
             return
-        
+
         # Build the buyers list
         buyers_text = "🌸 <b>Flower Buyers</b>\n\n"
         buyers_text += "💝 <i>Thank you to all our wonderful supporters!</i>\n\n"
-        
+
         for i, purchase in enumerate(purchases, 1):
             user_id = purchase['user_id']
             username = purchase['username']
             first_name = purchase['first_name'] or "Anonymous"
             total_amount = purchase['total_amount']
             purchase_count = purchase['purchase_count']
-            
+
             # Create user mention using first name
             user_mention = f'<a href="tg://user?id={user_id}">{first_name}</a>'
-            
+
             # Add rank emoji
             if i == 1:
                 rank_emoji = "🥇"
@@ -2431,22 +2698,57 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 rank_emoji = "🥉"
             else:
                 rank_emoji = f"{i}."
-            
+
             buyers_text += f"{rank_emoji} {user_mention} - {total_amount} ⭐"
             if purchase_count > 1:
                 buyers_text += f" ({purchase_count} purchases)"
             buyers_text += "\n"
-        
+
         buyers_text += f"\n🌸 <i>Total buyers: {len(purchases)}</i>"
-        
-        await update.message.reply_text(
-            buyers_text,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True
-        )
-        
-        log_with_user_info("INFO", f"✅ Buyers list sent with {len(purchases)} buyers", user_info)
-        
+
+        # Step 3: Send buyers list with effects if in private chat
+        if update.effective_chat.type == "private":
+            # Use direct API to send buyers list with effects
+            try:
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                payload = {
+                    'chat_id': update.effective_chat.id,
+                    'text': buyers_text,
+                    'message_effect_id': random.choice(EFFECTS),
+                    'parse_mode': 'HTML',
+                    'disable_web_page_preview': True
+                }
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload) as response:
+                        result = await response.json()
+                        if result.get('ok'):
+                            log_with_user_info("INFO", f"✨ Buyers list with effects sent with {len(purchases)} buyers", user_info)
+                        else:
+                            # Fallback to normal PTB message if effects fail
+                            await update.message.reply_text(
+                                buyers_text,
+                                parse_mode=ParseMode.HTML,
+                                disable_web_page_preview=True
+                            )
+                            log_with_user_info("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
+            except Exception:
+                # Fallback to normal PTB message if effects fail
+                await update.message.reply_text(
+                    buyers_text,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True
+                )
+                log_with_user_info("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
+        else:
+            # Group chat - no effects, just normal message
+            await update.message.reply_text(
+                buyers_text,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True
+            )
+            log_with_user_info("INFO", f"✅ Buyers list sent with {len(purchases)} buyers", user_info)
+
     except Exception as e:
         user_info = extract_user_info(update.message)
         log_with_user_info("ERROR", f"❌ Error in buyers command: {e}", user_info)
@@ -2845,9 +3147,38 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             keyboard = [[InlineKeyboardButton("Buy flowers again 🌸", callback_data="get_flowers_again")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            # Send refund message with button
+            # Send refund message with button and effects
             refund_msg = random.choice(REFUND_MESSAGES)
-            await update.message.reply_text(refund_msg, reply_markup=reply_markup)
+            
+            # Send with effects if in private chat
+            if update.message.chat.type == "private":
+                # Use direct API to send refund message with effects
+                try:
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                    payload = {
+                        'chat_id': update.message.chat.id,
+                        'text': refund_msg,
+                        'message_effect_id': random.choice(EFFECTS),
+                        'parse_mode': 'HTML',
+                        'reply_markup': reply_markup.to_json()
+                    }
+
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=payload) as response:
+                            result = await response.json()
+                            if result.get('ok'):
+                                log_with_user_info("INFO", "✨ Refund message with effects sent successfully", user_info)
+                            else:
+                                # Fallback to normal PTB message if effects fail
+                                await update.message.reply_text(refund_msg, reply_markup=reply_markup)
+                                log_with_user_info("WARNING", "⚠️ Refund message sent without effects (fallback)", user_info)
+                except Exception:
+                    # Fallback to normal PTB message if effects fail
+                    await update.message.reply_text(refund_msg, reply_markup=reply_markup)
+                    log_with_user_info("WARNING", "⚠️ Refund message sent without effects (fallback)", user_info)
+            else:
+                # Group chat - no effects, just normal message
+                await update.message.reply_text(refund_msg, reply_markup=reply_markup)
             
             log_with_user_info("INFO", "✅ Refund completed successfully", user_info)
             
@@ -2868,9 +3199,42 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         # Wait another 4 seconds
         await asyncio.sleep(4)
         
-        # Send thank you message
+        # Create inline keyboard with "Buy flowers again" button
+        keyboard = [[InlineKeyboardButton("Buy flowers again 🌸", callback_data="get_flowers_again")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Send thank you message with button and effects
         success_msg = random.choice(THANK_YOU_MESSAGES)
-        await update.message.reply_text(success_msg)
+        
+        # Send with effects if in private chat
+        if update.message.chat.type == "private":
+            # Use direct API to send thank you message with effects
+            try:
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                payload = {
+                    'chat_id': update.message.chat.id,
+                    'text': success_msg,
+                    'message_effect_id': random.choice(EFFECTS),
+                    'parse_mode': 'HTML',
+                    'reply_markup': reply_markup.to_json()
+                }
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload) as response:
+                        result = await response.json()
+                        if result.get('ok'):
+                            log_with_user_info("INFO", "✨ Thank you message with effects sent successfully", user_info)
+                        else:
+                            # Fallback to normal PTB message if effects fail
+                            await update.message.reply_text(success_msg, reply_markup=reply_markup)
+                            log_with_user_info("WARNING", "⚠️ Thank you message sent without effects (fallback)", user_info)
+            except Exception:
+                # Fallback to normal PTB message if effects fail
+                await update.message.reply_text(success_msg, reply_markup=reply_markup)
+                log_with_user_info("WARNING", "⚠️ Thank you message sent without effects (fallback)", user_info)
+        else:
+            # Group chat - no effects, just normal message
+            await update.message.reply_text(success_msg, reply_markup=reply_markup)
         
         log_with_user_info("INFO", "✅ Payment processed successfully", user_info)
 
