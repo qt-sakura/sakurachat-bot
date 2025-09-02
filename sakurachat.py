@@ -549,24 +549,24 @@ class Colors:
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter to add colors to entire log messages"""
-    
+
     COLORS = {
         'DEBUG': Colors.GREEN,
         'INFO': Colors.YELLOW,
         'WARNING': Colors.BLUE,
         'ERROR': Colors.RED,
     }
-    
+
     def format(self, record):
         # Get the original formatted message
         original_format = super().format(record)
-        
+
         # Get color based on log level
         color = self.COLORS.get(record.levelname, Colors.RESET)
-        
+
         # Apply color to the entire message
         colored_format = f"{color}{original_format}{Colors.RESET}"
-        
+
         return colored_format
 
 # Configure logging with colors
@@ -574,25 +574,25 @@ def setup_colored_logging():
     """Setup colored logging configuration"""
     logger = logging.getLogger("SAKURA 🌸")
     logger.setLevel(logging.INFO)
-    
+
     # Remove existing handlers
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-    
+
     # Create console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)
-    
+
     # Create colored formatter with enhanced format
     formatter = ColoredFormatter(
         fmt='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     console_handler.setFormatter(formatter)
-    
+
     # Add handler to logger
     logger.addHandler(console_handler)
-    
+
     return logger
 
 # Clean Telethon session
@@ -616,7 +616,7 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
         return False
-    
+
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         payload = {
@@ -625,7 +625,7 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
             'message_effect_id': random.choice(EFFECTS),
             'parse_mode': 'HTML'
         }
-        
+
         # Add reply markup if provided (for ForceReply)
         if reply_markup:
             payload['reply_markup'] = reply_markup.to_json()
@@ -633,7 +633,7 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
             # Default ForceReply for Gemini responses
             force_reply = ForceReply(selective=True, input_field_placeholder="Cute text 💓")
             payload['reply_markup'] = force_reply.to_json()
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
                 result = await response.json()
@@ -657,7 +657,7 @@ async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> b
             'reaction': [{'type': 'emoji', 'emoji': emoji}],
             'is_big': True  # This makes the reaction animated/big
         }
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
                 result = await response.json()
@@ -683,7 +683,7 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
                 reaction=reaction
             )
             log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {emoji}", user_info)
-        
+
         except ImportError:
             # Fallback to direct emoji string (older versions)
             try:
@@ -693,7 +693,7 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
                     reaction=emoji
                 )
                 log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {emoji}", user_info)
-            
+
             except Exception:
                 # Try with list of strings
                 await context.bot.set_message_reaction(
@@ -702,7 +702,7 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
                     reaction=[emoji]
                 )
                 log_with_user_info("DEBUG", f"🍓 Added emoji reaction (list format): {emoji}", user_info)
-    
+
     except Exception as e:
         log_with_user_info("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
 
@@ -711,7 +711,7 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
         return False
-    
+
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
         payload = {
@@ -721,11 +721,11 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
             'message_effect_id': random.choice(EFFECTS),
             'parse_mode': 'HTML'
         }
-        
+
         # Add reply markup if provided
         if reply_markup:
             payload['reply_markup'] = reply_markup.to_json()
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
                 result = await response.json()
@@ -742,7 +742,7 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
         return False
-    
+
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
         payload = {
@@ -752,11 +752,11 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
             'message_effect_id': random.choice(EFFECTS),
             'parse_mode': 'HTML'
         }
-        
+
         # Add reply markup if provided
         if reply_markup:
             payload['reply_markup'] = reply_markup.to_json()
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
                 result = await response.json()
@@ -804,7 +804,7 @@ except Exception as e:
 async def init_valkey():
     """Initialize Valkey connection"""
     global valkey_client
-    
+
     try:
         valkey_client = AsyncValkey.from_url(
             VALKEY_URL,
@@ -814,12 +814,12 @@ async def init_valkey():
             retry_on_timeout=True,
             health_check_interval=30
         )
-        
+
         # Test connection
         await valkey_client.ping()
         logger.info("✅ Valkey client initialized and connected successfully")
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to initialize Valkey client: {e}")
         valkey_client = None
@@ -828,7 +828,7 @@ async def init_valkey():
 async def close_valkey():
     """Close Valkey connection"""
     global valkey_client
-    
+
     if valkey_client:
         try:
             await valkey_client.aclose()
@@ -841,7 +841,7 @@ async def save_user_session(user_id: int, session_data: dict):
     """Save user session data to Valkey"""
     if not valkey_client:
         return False
-    
+
     try:
         key = f"session:{user_id}"
         await valkey_client.setex(
@@ -859,7 +859,7 @@ async def get_user_session(user_id: int) -> dict:
     """Get user session data from Valkey"""
     if not valkey_client:
         return {}
-    
+
     try:
         key = f"session:{user_id}"
         data = await valkey_client.get(key)
@@ -874,7 +874,7 @@ async def delete_user_session(user_id: int):
     """Delete user session from Valkey"""
     if not valkey_client:
         return False
-    
+
     try:
         key = f"session:{user_id}"
         await valkey_client.delete(key)
@@ -889,7 +889,7 @@ async def cache_set(key: str, value: any, ttl: int = CACHE_TTL):
     """Set cache value in Valkey"""
     if not valkey_client:
         return False
-    
+
     try:
         if isinstance(value, (dict, list)):
             value = json.dumps(value)
@@ -904,7 +904,7 @@ async def cache_get(key: str) -> any:
     """Get cache value from Valkey"""
     if not valkey_client:
         return None
-    
+
     try:
         value = await valkey_client.get(f"cache:{key}")
         if value:
@@ -921,7 +921,7 @@ async def cache_delete(key: str):
     """Delete cache value from Valkey"""
     if not valkey_client:
         return False
-    
+
     try:
         await valkey_client.delete(f"cache:{key}")
         logger.debug(f"🗑️ Cache deleted for key: {key}")
@@ -935,7 +935,7 @@ async def save_user_state(user_id: int, state_data: dict):
     """Save user state (help_expanded, broadcast_mode, etc.) to Valkey"""
     if not valkey_client:
         return False
-    
+
     try:
         key = f"user_state:{user_id}"
         await valkey_client.setex(
@@ -953,7 +953,7 @@ async def get_user_state(user_id: int) -> dict:
     """Get user state from Valkey"""
     if not valkey_client:
         return {}
-    
+
     try:
         key = f"user_state:{user_id}"
         data = await valkey_client.get(key)
@@ -967,10 +967,10 @@ async def get_user_state(user_id: int) -> dict:
 async def update_help_expanded_state(user_id: int, expanded: bool):
     """Update help expanded state in both memory and Valkey"""
     global help_expanded
-    
+
     # Update memory
     help_expanded[user_id] = expanded
-    
+
     # Update Valkey
     if valkey_client:
         state = await get_user_state(user_id)
@@ -984,7 +984,7 @@ async def get_help_expanded_state(user_id: int) -> bool:
         state = await get_user_state(user_id)
         if 'help_expanded' in state:
             return state['help_expanded']
-    
+
     # Fallback to memory
     return help_expanded.get(user_id, False)
 
@@ -996,23 +996,23 @@ async def is_rate_limited_valkey(user_id: int, limit: int = 5) -> bool:
         try:
             key = f"rate_limit:{user_id}"
             current = await valkey_client.get(key)
-            
+
             if current is None:
                 # First request, set counter
                 await valkey_client.setex(key, RATE_LIMIT_TTL, 1)
                 return False
-            
+
             current_count = int(current)
             if current_count >= limit:
                 return True
-            
+
             # Increment counter
             await valkey_client.incr(key)
             return False
-            
+
         except Exception as e:
             logger.error(f"❌ Rate limit check failed for user {user_id}: {e}")
-    
+
     # Fallback to memory-based rate limiting
     current_time = time.time()
     last_response = user_last_response_time.get(user_id, 0)
@@ -1022,7 +1022,7 @@ async def reset_rate_limit(user_id: int):
     """Reset rate limit for user"""
     if not valkey_client:
         return False
-    
+
     try:
         key = f"rate_limit:{user_id}"
         await valkey_client.delete(key)
@@ -1036,11 +1036,11 @@ async def reset_rate_limit(user_id: int):
 async def init_database():
     """Initialize database connection and create tables"""
     global db_pool
-    
+
     if not DATABASE_URL:
         logger.error("❌ DATABASE_URL not found in environment variables")
         return False
-    
+
     try:
         # Create connection pool with optimized settings
         db_pool = await asyncpg.create_pool(
@@ -1051,7 +1051,7 @@ async def init_database():
             server_settings={'application_name': 'sakura_bot'}
         )
         logger.info("✅ Database connection pool created successfully")
-        
+
         # Create tables if they don't exist
         async with db_pool.acquire() as conn:
             await conn.execute("""
@@ -1064,7 +1064,7 @@ async def init_database():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS groups (
                     group_id BIGINT PRIMARY KEY,
@@ -1075,7 +1075,7 @@ async def init_database():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS purchases (
                     id SERIAL PRIMARY KEY,
@@ -1088,20 +1088,20 @@ async def init_database():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             # Create indexes for better performance
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_groups_created_at ON groups(created_at)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases(user_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchases_created_at ON purchases(created_at)")
-            
+
         logger.info("✅ Database tables created/verified successfully")
-        
+
         # Load existing users and groups into memory
         await load_data_from_database()
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
         return False
@@ -1109,23 +1109,23 @@ async def init_database():
 async def load_data_from_database():
     """Load user IDs and group IDs from database into memory"""
     global user_ids, group_ids
-    
+
     if not db_pool:
         logger.warning("⚠️ Database pool not available for loading data")
         return
-    
+
     try:
         async with db_pool.acquire() as conn:
             # Load user IDs
             user_rows = await conn.fetch("SELECT user_id FROM users")
             user_ids = {row['user_id'] for row in user_rows}
-            
+
             # Load group IDs
             group_rows = await conn.fetch("SELECT group_id FROM groups")
             group_ids = {row['group_id'] for row in group_rows}
-            
+
         logger.info(f"✅ Loaded {len(user_ids)} users and {len(group_ids)} groups from database")
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to load data from database: {e}")
 
@@ -1133,7 +1133,7 @@ def save_user_to_database_async(user_id: int, username: str = None, first_name: 
     """Save user to database asynchronously (fire and forget)"""
     if not db_pool:
         return
-    
+
     async def save_user():
         try:
             async with db_pool.acquire() as conn:
@@ -1147,12 +1147,12 @@ def save_user_to_database_async(user_id: int, username: str = None, first_name: 
                         last_name = EXCLUDED.last_name,
                         updated_at = CURRENT_TIMESTAMP
                 """, user_id, username, first_name, last_name)
-                
+
             logger.debug(f"💾 User {user_id} saved to database")
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to save user {user_id} to database: {e}")
-    
+
     # Schedule the save operation without waiting
     asyncio.create_task(save_user())
 
@@ -1160,7 +1160,7 @@ def save_group_to_database_async(group_id: int, title: str = None, username: str
     """Save group to database asynchronously (fire and forget)"""
     if not db_pool:
         return
-    
+
     async def save_group():
         try:
             async with db_pool.acquire() as conn:
@@ -1174,12 +1174,12 @@ def save_group_to_database_async(group_id: int, title: str = None, username: str
                         type = EXCLUDED.type,
                         updated_at = CURRENT_TIMESTAMP
                 """, group_id, title, username, chat_type)
-                
+
             logger.debug(f"💾 Group {group_id} saved to database")
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to save group {group_id} to database: {e}")
-    
+
     # Schedule the save operation without waiting
     asyncio.create_task(save_group())
 
@@ -1187,7 +1187,7 @@ async def get_users_from_database():
     """Get all user IDs from database"""
     if not db_pool:
         return list(user_ids)  # Fallback to memory
-    
+
     try:
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("SELECT user_id FROM users")
@@ -1200,7 +1200,7 @@ async def get_groups_from_database():
     """Get all group IDs from database"""
     if not db_pool:
         return list(group_ids)  # Fallback to memory
-    
+
     try:
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("SELECT group_id FROM groups")
@@ -1213,7 +1213,7 @@ def save_purchase_to_database_async(user_id: int, username: str = None, first_na
     """Save purchase to database asynchronously (fire and forget)"""
     if not db_pool:
         return
-    
+
     async def save_purchase():
         try:
             async with db_pool.acquire() as conn:
@@ -1222,12 +1222,12 @@ def save_purchase_to_database_async(user_id: int, username: str = None, first_na
                     VALUES ($1, $2, $3, $4, $5, $6)
                     ON CONFLICT (telegram_payment_charge_id) DO NOTHING
                 """, user_id, username, first_name, last_name, amount, charge_id)
-                
+
             logger.debug(f"💾 Purchase saved to database: user {user_id}, amount {amount}")
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to save purchase to database: {e}")
-    
+
     # Schedule the save operation without waiting
     asyncio.create_task(save_purchase())
 
@@ -1235,7 +1235,7 @@ async def get_all_purchases():
     """Get all purchases from database ordered by amount descending"""
     if not db_pool:
         return []
-    
+
     try:
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("""
@@ -1252,7 +1252,7 @@ async def get_all_purchases():
 async def close_database():
     """Close database connection pool"""
     global db_pool
-    
+
     if db_pool:
         await db_pool.close()
         logger.info("✅ Database connection pool closed")
@@ -1291,7 +1291,7 @@ def log_with_user_info(level: str, message: str, user_info: Dict[str, any]) -> N
         f"({user_info['chat_type']}) {user_info['chat_link']}"
     )
     full_message = f"{message} | {user_detail}"
-    
+
     if level.upper() == "INFO":
         logger.info(full_message)
     elif level.upper() == "DEBUG":
@@ -1346,7 +1346,7 @@ async def update_user_response_time_valkey(user_id: int) -> None:
             logger.debug(f"⏰ Updated response time in Valkey for user {user_id}")
         except Exception as e:
             logger.error(f"❌ Failed to update response time in Valkey for user {user_id}: {e}")
-    
+
     # Also update memory as fallback
     user_last_response_time[user_id] = time.time()
 
@@ -1354,16 +1354,16 @@ async def update_user_response_time_valkey(user_id: int) -> None:
 def should_respond_in_group(update: Update, bot_id: int) -> bool:
     """Determine if bot should respond in group chat"""
     user_message = update.message.text or update.message.caption or ""
-    
+
     # Respond if message contains "sakura" (case insensitive)
     if "sakura" in user_message.lower():
         return True
-    
+
     # Respond if message is a reply to bot's message
     if (update.message.reply_to_message and 
         update.message.reply_to_message.from_user.id == bot_id):
         return True
-    
+
     return False
 
 
@@ -1372,11 +1372,11 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
     user_id = user_info["user_id"]
     chat_id = user_info["chat_id"]
     chat_type = user_info["chat_type"]
-    
+
     if chat_type == "private":
         # Add to memory immediately (fast)
         user_ids.add(user_id)
-        
+
         # Save to database asynchronously (non-blocking)
         save_user_to_database_async(
             user_id, 
@@ -1384,14 +1384,14 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
             user_info.get("first_name"), 
             user_info.get("last_name")
         )
-        
+
         log_with_user_info("INFO", f"👤 User tracked for broadcasting", user_info)
-        
+
     elif chat_type in ['group', 'supergroup']:
         # Add to memory immediately (fast)
         group_ids.add(chat_id)
         user_ids.add(user_id)
-        
+
         # Save to database asynchronously (non-blocking)
         save_group_to_database_async(
             chat_id, 
@@ -1405,7 +1405,7 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
             user_info.get("first_name"), 
             user_info.get("last_name")
         )
-        
+
         log_with_user_info("INFO", f"📢 Group and user tracked for broadcasting", user_info)
 
 
@@ -1419,40 +1419,40 @@ def get_user_mention(user) -> str:
 async def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
     """Add message to user's conversation history (Valkey + memory fallback)"""
     global conversation_history
-    
+
     role = "user" if is_user else "assistant"
     new_message = {"role": role, "content": message}
-    
+
     # Try Valkey first
     if valkey_client:
         try:
             key = f"conversation:{user_id}"
             existing = await valkey_client.get(key)
-            
+
             if existing:
                 history = json.loads(existing)
             else:
                 history = []
-            
+
             history.append(new_message)
-            
+
             # Keep only last CHAT_LENGTH messages
             if len(history) > CHAT_LENGTH:
                 history = history[-CHAT_LENGTH:]
-            
+
             await valkey_client.setex(key, SESSION_TTL, json.dumps(history))
             logger.debug(f"💬 Conversation updated in Valkey for user {user_id}")
             return
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to update conversation in Valkey for user {user_id}: {e}")
-    
+
     # Fallback to memory
     if user_id not in conversation_history:
         conversation_history[user_id] = []
-    
+
     conversation_history[user_id].append(new_message)
-    
+
     # Keep only last CHAT_LENGTH messages
     if len(conversation_history[user_id]) > CHAT_LENGTH:
         conversation_history[user_id] = conversation_history[user_id][-CHAT_LENGTH:]
@@ -1460,7 +1460,7 @@ async def add_to_conversation_history(user_id: int, message: str, is_user: bool 
 async def get_conversation_context(user_id: int) -> str:
     """Get formatted conversation context for the user (Valkey + memory fallback)"""
     history = []
-    
+
     # Try Valkey first
     if valkey_client:
         try:
@@ -1470,42 +1470,42 @@ async def get_conversation_context(user_id: int) -> str:
                 history = json.loads(existing)
         except Exception as e:
             logger.error(f"❌ Failed to get conversation from Valkey for user {user_id}: {e}")
-    
+
     # Fallback to memory
     if not history and user_id in conversation_history:
         history = conversation_history[user_id]
-    
+
     if not history:
         return ""
-    
+
     context_lines = []
     for message in history:
         if message["role"] == "user":
             context_lines.append(f"User: {message['content']}")
         else:
             context_lines.append(f"Sakura: {message['content']}")
-    
+
     return "\n".join(context_lines)
 
 
 async def cleanup_old_conversations():
     """Clean up old conversation histories and response times periodically"""
     global conversation_history, user_last_response_time
-    
+
     logger.info("🧹 Conversation cleanup task started")
-    
+
     while True:
         try:
             current_time = time.time()
             conversations_cleaned = 0
-            
+
             # Find expired conversations
             expired_users = []
             for user_id in list(conversation_history.keys()):
                 last_response_time = user_last_response_time.get(user_id, 0)
                 if current_time - last_response_time > OLD_CHAT:
                     expired_users.append(user_id)
-            
+
             # Remove expired conversations
             for user_id in expired_users:
                 if user_id in conversation_history:
@@ -1513,39 +1513,39 @@ async def cleanup_old_conversations():
                     conversations_cleaned += 1
                 if user_id in user_last_response_time:
                     del user_last_response_time[user_id]
-            
+
             # Log cleanup results
             if conversations_cleaned > 0:
                 logger.info(f"🧹 Cleaned {conversations_cleaned} old conversations")
-            
+
             logger.debug(f"📊 Active conversations: {len(conversation_history)}")
-                
+
         except asyncio.CancelledError:
             # Handle graceful shutdown
             logger.info("🧹 Cleanup task cancelled - shutting down gracefully")
             break
         except Exception as e:
             logger.error(f"❌ Error in conversation cleanup: {e}")
-        
+
         # Wait for next cleanup cycle (with cancellation support)
         try:
             await asyncio.sleep(CHAT_CLEANUP)
         except asyncio.CancelledError:
             logger.info("🧹 Cleanup task sleep cancelled - shutting down")
             break
- 
+
 
 # AI RESPONSE FUNCTIONS
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context and caching"""
     if user_info:
         log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
-    
+
     if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available, using fallback response", user_info)
         return get_fallback_response()
-    
+
     try:
         # Get conversation context if user_id provided
         context = ""
@@ -1553,10 +1553,10 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
             context = await get_conversation_context(user_id)
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
-        
+
         # Build prompt with context
         prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
-        
+
         # Check cache for similar short messages (without personal context)
         cache_key = None
         if len(user_message) <= 50 and not context:  # Only cache short, context-free messages
@@ -1567,28 +1567,28 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
                 if user_info:
                     log_with_user_info("INFO", f"📦 Using cached response for message", user_info)
                 return cached_response
-        
+
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
         )
-        
+
         ai_response = response.text.strip() if response.text else get_fallback_response()
-        
+
         # Cache the response if it was a short, context-free message
         if cache_key and len(user_message) <= 50 and not context:
             await cache_set(cache_key, ai_response, CACHE_TTL)
-        
+
         # Add messages to conversation history
         if user_id:
             await add_to_conversation_history(user_id, user_message, is_user=True)
             await add_to_conversation_history(user_id, ai_response, is_user=False)
-        
+
         if user_info:
             log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
-        
+
         return ai_response
-            
+
     except Exception as e:
         if user_info:
             log_with_user_info("ERROR", f"❌ Gemini API error: {e}", user_info)
@@ -1601,12 +1601,12 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
     """Analyze image using Gemini 2.5 Flash with conversation context"""
     if user_info:
         log_with_user_info("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
-    
+
     if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available for image analysis", user_info)
         return "Samjh nahi paa rahi image kya hai 😔"
-    
+
     try:
         # Get conversation context if user_id provided
         context = ""
@@ -1614,7 +1614,7 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
             context = await get_conversation_context(user_id)
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
-        
+
         # Build image analysis prompt
         image_prompt = f"""{SAKURA_PROMPT}
 
@@ -1628,10 +1628,10 @@ Sakura's response:"""
 
         # Create the request with image using proper format
         import base64
-        
+
         # Convert bytes to base64 string
         image_data = base64.b64encode(image_bytes).decode('utf-8')
-        
+
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
@@ -1644,26 +1644,238 @@ Sakura's response:"""
                 }
             ]
         )
-        
+
         ai_response = response.text.strip() if response.text else "Kya cute image hai! 😍"
-        
+
         # Add messages to conversation history
         if user_id:
             image_description = f"[Image: {caption}]" if caption else "[Image sent]"
             await add_to_conversation_history(user_id, image_description, is_user=True)
             await add_to_conversation_history(user_id, ai_response, is_user=False)
-        
+
         if user_info:
             log_with_user_info("INFO", f"✅ Image analysis completed: '{ai_response[:50]}...'", user_info)
-        
+
         return ai_response
-            
+
     except Exception as e:
         if user_info:
             log_with_user_info("ERROR", f"❌ Image analysis error: {e}", user_info)
         else:
             logger.error(f"Image analysis error: {e}")
         return "Image dekh nahi paa rahi properly 😕"
+
+
+async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
+    """Check if user is asking to analyze a previously sent poll and handle it"""
+    # Check if message contains requests for poll analysis
+    poll_analysis_triggers = [
+        "poll", "question", "answer", "correct", "option", "choice",
+        "batao", "jawab", "sahi", "galat", "kya hai", "what is", "tell me",
+        "this", "isme", "ismein", "yeh", "ye", "is", "mein", "sawal"
+    ]
+
+    # Check if user is asking about a poll
+    message_lower = user_message.lower()
+    contains_poll_request = any(trigger in message_lower for trigger in poll_analysis_triggers)
+
+    if not contains_poll_request:
+        return False
+
+    log_with_user_info("DEBUG", "🔍 Detected potential poll analysis request", user_info)
+
+    # Check if replying to a message with poll
+    if update.message.reply_to_message and update.message.reply_to_message.poll:
+        log_with_user_info("INFO", "🔍 User asking about replied poll", user_info)
+
+        # Send typing action to show bot is processing
+        await send_typing_action(context, update.effective_chat.id, user_info)
+
+        try:
+            poll = update.message.reply_to_message.poll
+            poll_question = poll.question
+            poll_options = [option.text for option in poll.options]
+
+            user_name = update.effective_user.first_name or ""
+
+            # Analyze the referenced poll
+            response = await analyze_poll_with_gemini(
+                poll_question, poll_options, user_name, user_info, user_info["user_id"]
+            )
+
+            # Send response with effects
+            if update.effective_chat.type == "private":
+                effect_sent = await send_with_effect(update.effective_chat.id, response)
+                if not effect_sent:
+                    await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            else:
+                await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+
+            log_with_user_info("INFO", "✅ Referenced poll analyzed successfully", user_info)
+            return True
+
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ Error analyzing referenced poll: {e}", user_info)
+
+            error_response = "Poll analyze nahi kar paa rahi 😔"
+            if update.effective_chat.type == "private":
+                effect_sent = await send_with_effect(update.effective_chat.id, error_response)
+                if not effect_sent:
+                    await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            else:
+                await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+
+            return True
+
+    return False
+
+
+async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
+    """Check if user is asking to analyze a previously sent image and handle it"""
+    # Check if message contains requests for image analysis
+    image_analysis_triggers = [
+        "photo", "image", "picture", "pic", "foto", "tasveer",
+        "analyze", "batao", "dekho", "kya hai", "what is", "tell me",
+        "this", "isme", "ismein", "yeh", "ye", "is", "mein"
+    ]
+
+    # Check if user is asking about an image
+    message_lower = user_message.lower()
+    contains_image_request = any(trigger in message_lower for trigger in image_analysis_triggers)
+
+    if not contains_image_request:
+        return False
+
+    log_with_user_info("DEBUG", "🔍 Detected potential image analysis request", user_info)
+
+    # Priority 1: Check if replying to a message with photo
+    if update.message.reply_to_message and update.message.reply_to_message.photo:
+        log_with_user_info("INFO", "🔍 User asking about replied image", user_info)
+
+        # Send typing action to show bot is processing
+        await send_typing_action(context, update.effective_chat.id, user_info)
+
+        try:
+            photo = update.message.reply_to_message.photo[-1]
+            file = await context.bot.get_file(photo.file_id)
+            image_bytes = await file.download_as_bytearray()
+
+            user_name = update.effective_user.first_name or ""
+            caption = update.message.reply_to_message.caption or ""
+
+            # Analyze the referenced image
+            response = await analyze_image_with_gemini(
+                image_bytes, caption, user_name, user_info, user_info["user_id"]
+            )
+
+            # Send response with effects
+            if update.effective_chat.type == "private":
+                effect_sent = await send_with_effect(update.effective_chat.id, response)
+                if not effect_sent:
+                    await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            else:
+                await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+
+            log_with_user_info("INFO", "✅ Referenced image analyzed successfully", user_info)
+            return True
+
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ Error analyzing referenced image: {e}", user_info)
+
+            error_response = "Image analyze nahi kar paa rahi 😔"
+            if update.effective_chat.type == "private":
+                effect_sent = await send_with_effect(update.effective_chat.id, error_response)
+                if not effect_sent:
+                    await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            else:
+                await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+
+            return True
+
+    # Priority 2: Look for recent images in conversation history (for private chats mainly)
+    if user_info["user_id"] in conversation_history:
+        history = conversation_history[user_info["user_id"]]
+
+        # Find the most recent image reference
+        for message in reversed(history):
+            if message["role"] == "user" and "[Image:" in message["content"]:
+                log_with_user_info("INFO", "🔍 User asking about previously sent image from history", user_info)
+
+                # If no recent replied image found, inform user
+                no_image_response = "Koi recent image nahi mil rahi analyze karne ke liye 😔"
+                if update.effective_chat.type == "private":
+                    effect_sent = await send_with_effect(update.effective_chat.id, no_image_response)
+                    if not effect_sent:
+                        await update.message.reply_text(no_image_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+                else:
+                    await update.message.reply_text(no_image_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+
+                return True
+
+    return False
+
+
+async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+    """Analyze poll using Gemini 2.5 Flash to suggest the correct answer"""
+    if user_info:
+        log_with_user_info("DEBUG", f"📊 Analyzing poll with Gemini: '{poll_question[:50]}...'", user_info)
+
+    if not gemini_client:
+        if user_info:
+            log_with_user_info("WARNING", "❌ Gemini client not available for poll analysis", user_info)
+        return "Poll samjh nahi paa rahi 😔"
+
+    try:
+        # Get conversation context if user_id provided
+        context = ""
+        if user_id:
+            context = await get_conversation_context(user_id)
+            if context:
+                context = f"\n\nPrevious conversation:\n{context}\n"
+
+        # Format poll options
+        options_text = "\n".join([f"{i+1}. {option}" for i, option in enumerate(poll_options)])
+
+        # Build poll analysis prompt
+        poll_prompt = f"""{SAKURA_PROMPT}
+
+User name: {user_name}{context}
+
+User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
+
+Poll Question: "{poll_question}"
+
+Options:
+{options_text}
+
+Analyze this poll question and respond in Sakura's style about which option you think is correct and why. Keep it to one or two lines as per your character rules. Be helpful and give a quick reason.
+
+Sakura's response:"""
+
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=poll_prompt
+        )
+
+        ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
+
+        # Add messages to conversation history
+        if user_id:
+            poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
+            await add_to_conversation_history(user_id, poll_description, is_user=True)
+            await add_to_conversation_history(user_id, ai_response, is_user=False)
+
+        if user_info:
+            log_with_user_info("INFO", f"✅ Poll analysis completed: '{ai_response[:50]}...'", user_info)
+
+        return ai_response
+
+    except Exception as e:
+        if user_info:
+            log_with_user_info("ERROR", f"❌ Poll analysis error: {e}", user_info)
+        else:
+            logger.error(f"Poll analysis error: {e}")
+        return "Poll analyze nahi kar paa rahi 😕"
 
 
 # CHAT ACTION FUNCTIONS
@@ -1728,7 +1940,7 @@ def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboard
         button_text = HELP_MESSAGES["button_texts"]["minimize"]
     else:
         button_text = HELP_MESSAGES["button_texts"]["expand"]
-    
+
     keyboard = [[InlineKeyboardButton(button_text, callback_data=f"help_expand_{user_id}")]]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1772,14 +1984,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "🌸 /start command received", user_info)
-        
+
         track_user_and_chat(update, user_info)
-        
+
         # Step 1: React to the start message with random emoji and animation
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
-                
+
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
                     reaction_sent = await send_animated_reaction(
@@ -1795,33 +2007,33 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 else:
                     # Group chat or no Telethon - use PTB reaction
                     await add_ptb_reaction(context, update, random_emoji, user_info)
-                
+
             except Exception as e:
                 log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
-        
+
         # Step 2: Send random sticker (only in private chat)
         if update.effective_chat.type == "private" and START_STICKERS:
             await send_sticker_action(context, update.effective_chat.id, user_info)
-            
+
             random_sticker = random.choice(START_STICKERS)
             log_with_user_info("DEBUG", f"🎭 Sending start sticker: {random_sticker}", user_info)
-            
+
             await context.bot.send_sticker(
                 chat_id=update.effective_chat.id,
                 sticker=random_sticker
             )
             log_with_user_info("INFO", "✅ Start sticker sent successfully", user_info)
-        
+
         # Step 3: Send the initial welcome message with photo and two-step buttons
         await send_photo_action(context, update.effective_chat.id, user_info)
-        
+
         random_image = random.choice(SAKURA_IMAGES)
         keyboard = create_initial_start_keyboard()
         user_mention = get_user_mention(update.effective_user)
         caption = get_initial_start_caption(user_mention)
-        
+
         log_with_user_info("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
-        
+
         # Send with effects if in private chat, normal otherwise
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main start message
@@ -1852,9 +2064,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard
             )
-        
+
         log_with_user_info("INFO", "✅ Start command completed successfully", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(update.message)
         log_with_user_info("ERROR", f"❌ Error in start command: {e}", user_info)
@@ -1866,14 +2078,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         user_info = extract_user_info(update.message)
         log_with_user_info("INFO", "ℹ️ /help command received", user_info)
-        
+
         track_user_and_chat(update, user_info)
-        
+
         # Step 1: React to the help message with random emoji and animation
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
-                
+
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
                     reaction_sent = await send_animated_reaction(
@@ -1889,23 +2101,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 else:
                     # Group chat or no Telethon - use PTB reaction
                     await add_ptb_reaction(context, update, random_emoji, user_info)
-                
+
             except Exception as e:
                 log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
-        
+
         # Step 2: Send photo action indicator
         await send_photo_action(context, update.effective_chat.id, user_info)
-        
+
         # Step 3: Prepare help content
         user_id = update.effective_user.id
         keyboard = create_help_keyboard(user_id, False)
         user_mention = get_user_mention(update.effective_user)
         help_text = get_help_text(user_mention, False)
-        
+
         # Step 4: Send help message with random image
         random_image = random.choice(SAKURA_IMAGES)
         log_with_user_info("DEBUG", f"📷 Sending help photo: {random_image[:50]}...", user_info)
-        
+
         # Send with effects if in private chat, normal otherwise
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main help message
@@ -1936,9 +2148,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard
             )
-        
+
         log_with_user_info("INFO", "✅ Help command completed successfully", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(update.message)
         log_with_user_info("ERROR", f"❌ Error in help command: {e}", user_info)
@@ -1948,30 +2160,30 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast command (owner only)"""
     user_info = extract_user_info(update.message)
-    
+
     if update.effective_user.id != OWNER_ID:
         log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast command", user_info)
         return
-    
+
     log_with_user_info("INFO", "📢 Broadcast command received from owner", user_info)
-    
+
     # Refresh counts from database
     db_users = await get_users_from_database()
     db_groups = await get_groups_from_database()
-    
+
     # Sync memory with database
     user_ids.update(db_users)
     group_ids.update(db_groups)
-    
+
     keyboard = create_broadcast_keyboard()
     broadcast_text = get_broadcast_text()
-    
+
     await update.message.reply_text(
         broadcast_text,
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
     )
-    
+
     log_with_user_info("INFO", "✅ Broadcast selection menu sent", user_info)
 
 
@@ -1979,22 +2191,22 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Handle ping command for everyone"""
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "🏓 Ping command received", user_info)
-    
+
     start_time = time.time()
-    
+
     # Send initial message
     msg = await update.message.reply_text("🛰️ Pinging...")
-    
+
     # Calculate response time
     response_time = round((time.time() - start_time) * 1000, 2)  # milliseconds
-    
+
     # Edit message with response time and group link (no preview)
     await msg.edit_text(
         f"🏓 <a href='{GROUP_LINK}'>Pong!</a> {response_time}ms",
         parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
     )
-    
+
     log_with_user_info("INFO", f"✅ Ping completed: {response_time}ms", user_info)
 
 
@@ -2063,7 +2275,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         input_field_placeholder="Cute text 💓"
                     )
                 )
-            
+
             log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
 
     except Exception as e:
@@ -2081,37 +2293,37 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         query = update.callback_query
         user_info = extract_user_info(query.message)
         log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
-        
+
         callback_data = query.data
         user_id = int(callback_data.split('_')[2])
-        
+
         if update.effective_user.id != user_id:
             log_with_user_info("WARNING", "⚠️ Unauthorized help button access attempt", user_info)
             await query.answer("This button isn't for you 💔", show_alert=True)
             return
-        
+
         is_expanded = await get_help_expanded_state(user_id)
         await update_help_expanded_state(user_id, not is_expanded)
-        
+
         # Answer callback with appropriate message
         if not is_expanded:
             await query.answer(HELP_MESSAGES["callback_answers"]["expand"], show_alert=False)
         else:
             await query.answer(HELP_MESSAGES["callback_answers"]["minimize"], show_alert=False)
-        
+
         keyboard = create_help_keyboard(user_id, not is_expanded)
         user_mention = get_user_mention(update.effective_user)
         help_text = get_help_text(user_mention, not is_expanded)
-        
+
         # Update the photo caption with new help text and keyboard
         await query.edit_message_caption(
             caption=help_text,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
         )
-        
+
         log_with_user_info("INFO", f"✅ Help message {'expanded' if not is_expanded else 'minimized'}", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(query.message) if query.message else {}
         log_with_user_info("ERROR", f"❌ Error editing help message: {e}", user_info)
@@ -2126,14 +2338,14 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Handle broadcast target selection and get flowers again button"""
     query = update.callback_query
     user_info = extract_user_info(query.message)
-    
+
     # Handle "Buy flowers again" button - available for everyone
     if query.data == "get_flowers_again":
         log_with_user_info("INFO", "🌸 'Buy flowers again' button clicked", user_info)
-        
+
         # Answer the callback
         await query.answer("🌸 Getting more flowers for you!", show_alert=False)
-        
+
         # Send a new invoice with default amount
         try:
             await context.bot.send_invoice(
@@ -2145,38 +2357,38 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 currency="XTR",  # Telegram Stars currency
                 prices=[LabeledPrice(label='✨ Sakura Star', amount=50)]
             )
-            
+
             log_with_user_info("INFO", "✅ New invoice sent from 'Buy flowers again' button", user_info)
-            
+
         except Exception as e:
             log_with_user_info("ERROR", f"❌ Error sending new invoice from button: {e}", user_info)
             await query.message.reply_text("❌ Oops! Something went wrong. Try using /buy command instead! 🔧")
-        
+
         return  # Exit early for get_flowers_again
-    
+
     # For broadcast-related buttons, check if user is owner
     if query.from_user.id != OWNER_ID:
         log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
         await query.answer("You're not authorized to use this 🚫", show_alert=True)
         return
-    
+
     log_with_user_info("INFO", f"🎯 Broadcast target selected: {query.data}", user_info)
-    
+
     if query.data == "bc_users":
         # Answer callback with proper message
         await query.answer(BROADCAST_MESSAGES["callback_answers"]["users"], show_alert=False)
-        
+
         broadcast_mode[OWNER_ID] = "users"
         await query.edit_message_text(
             BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
             parse_mode=ParseMode.HTML
         )
         log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
-        
+
     elif query.data == "bc_groups":
         # Answer callback with proper message
         await query.answer(BROADCAST_MESSAGES["callback_answers"]["groups"], show_alert=False)
-        
+
         broadcast_mode[OWNER_ID] = "groups"
         await query.edit_message_text(
             BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
@@ -2201,30 +2413,30 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             target_name = "groups"
         else:
             return
-        
+
         log_with_user_info("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
-        
+
         if not target_list:
             await update.message.reply_text(
                 BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
             )
             log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
             return
-        
+
         # Check if the message is forwarded
         is_forwarded = update.message.forward_origin is not None
         broadcast_method = "forward" if is_forwarded else "copy"
-        
+
         log_with_user_info("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
-        
+
         # Show initial status
         status_msg = await update.message.reply_text(
             BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
         )
-        
+
         broadcast_count = 0
         failed_count = 0
-        
+
         # Broadcast the current message to all targets
         for i, target_id in enumerate(target_list, 1):
             try:
@@ -2242,19 +2454,19 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                         from_chat_id=update.effective_chat.id,
                         message_id=update.message.message_id
                     )
-                
+
                 broadcast_count += 1
-                
+
                 if i % 10 == 0:  # Log progress every 10 messages
                     log_with_user_info("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)} using {broadcast_method}", user_info)
-                
+
                 # Small delay to avoid rate limits
                 await asyncio.sleep(BROADCAST_DELAY)
-                
+
             except Exception as e:
                 failed_count += 1
                 logger.error(f"Failed to broadcast to {target_id}: {e}")
-        
+
         # Final status update
         await status_msg.edit_text(
             BROADCAST_MESSAGES["completed"].format(
@@ -2265,9 +2477,9 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             ) + f"\n<i>Method used: {broadcast_method}</i>",
             parse_mode=ParseMode.HTML
         )
-        
+
         log_with_user_info("INFO", f"✅ Broadcast completed using {broadcast_method}: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
-        
+
     except Exception as e:
         log_with_user_info("ERROR", f"❌ Broadcast error: {e}", user_info)
         await update.message.reply_text(
@@ -2280,14 +2492,14 @@ async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_T
     """Handle sticker messages"""
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "🎭 Sticker message received", user_info)
-    
+
     await send_sticker_action(context, update.effective_chat.id, user_info)
-    
+
     random_sticker = random.choice(SAKURA_STICKERS)
     chat_type = update.effective_chat.type
-    
+
     log_with_user_info("DEBUG", f"📤 Sending random sticker: {random_sticker}", user_info)
-    
+
     # In groups, reply to the user's sticker when they replied to bot
     if (chat_type in ['group', 'supergroup'] and 
         update.message.reply_to_message and 
@@ -2307,25 +2519,33 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Handle text and media messages with AI response and effects in private chat"""
     user_info = extract_user_info(update.message)
     user_message = update.message.text or update.message.caption or "Media message"
-    
+
     log_with_user_info("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
-    
+
     # Check for ping command with prefixes
     ping_prefixes = ['?ping', '!ping', '*ping', '#ping']
     if any(user_message.lower().startswith(prefix) for prefix in ping_prefixes):
         log_with_user_info("INFO", f"🏓 Ping command detected with prefix: {user_message}", user_info)
         await ping_command(update, context)
         return
-    
+
+    # Check if user is asking to analyze a previously sent image
+    if await analyze_referenced_image(update, context, user_message, user_info):
+        return
+
+    # Check if user is asking to analyze a previously sent poll
+    if await analyze_referenced_poll(update, context, user_message, user_info):
+        return
+
     await send_typing_action(context, update.effective_chat.id, user_info)
-    
+
     user_name = update.effective_user.first_name or ""
-    
+
     # Get response from Gemini
     response = await get_gemini_response(user_message, user_name, user_info, update.effective_user.id)
-    
+
     log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
-    
+
     # Send with effects if in private chat
     if update.effective_chat.type == "private":
         # Try sending with effects first
@@ -2351,7 +2571,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 input_field_placeholder="Cute text 💓"
             )
         )
-    
+
     log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
 
@@ -2359,29 +2579,29 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
     """Handle image messages with AI analysis using Gemini 2.5 Flash"""
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "📷 Image message received", user_info)
-    
+
     await send_typing_action(context, update.effective_chat.id, user_info)
-    
+
     try:
         # Get the largest photo
         photo = update.message.photo[-1]
-        
+
         # Get file info
         file = await context.bot.get_file(photo.file_id)
-        
+
         # Download the image
         image_bytes = await file.download_as_bytearray()
-        
+
         log_with_user_info("DEBUG", f"📥 Image downloaded: {len(image_bytes)} bytes", user_info)
-        
+
         # Analyze image with Gemini 2.5 Flash
         user_name = update.effective_user.first_name or ""
         caption = update.message.caption or ""
-        
+
         response = await analyze_image_with_gemini(image_bytes, caption, user_name, user_info, update.effective_user.id)
-        
+
         log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
-        
+
         # Send with effects if in private chat
         if update.effective_chat.type == "private":
             # Try sending with effects first
@@ -2407,11 +2627,65 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
                     input_field_placeholder="Cute text 💓"
                 )
             )
-        
+
         log_with_user_info("INFO", "✅ Image analysis response sent successfully", user_info)
-        
+
     except Exception as e:
         log_with_user_info("ERROR", f"❌ Error analyzing image: {e}", user_info)
+        await update.message.reply_text(get_error_response())
+
+
+async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle poll messages with AI analysis using Gemini 2.5 Flash"""
+    user_info = extract_user_info(update.message)
+    log_with_user_info("INFO", "📊 Poll message received", user_info)
+
+    await send_typing_action(context, update.effective_chat.id, user_info)
+
+    try:
+        poll = update.message.poll
+        poll_question = poll.question
+        poll_options = [option.text for option in poll.options]
+
+        log_with_user_info("DEBUG", f"📊 Poll question: '{poll_question}' with {len(poll_options)} options", user_info)
+
+        # Analyze poll with Gemini 2.5 Flash
+        user_name = update.effective_user.first_name or ""
+
+        response = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, update.effective_user.id)
+
+        log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
+
+        # Send with effects if in private chat
+        if update.effective_chat.type == "private":
+            # Try sending with effects first
+            effect_sent = await send_with_effect(update.effective_chat.id, response)
+            if effect_sent:
+                log_with_user_info("INFO", "✨ Poll analysis with effects sent successfully", user_info)
+            else:
+                # Fallback to normal PTB message if effects fail
+                await update.message.reply_text(
+                    response,
+                    reply_markup=ForceReply(
+                        selective=True,
+                        input_field_placeholder="Cute text 💓"
+                    )
+                )
+                log_with_user_info("WARNING", "⚠️ Poll analysis sent without effects (fallback)", user_info)
+        else:
+            # Group chat - no effects, just normal message
+            await update.message.reply_text(
+                response,
+                reply_markup=ForceReply(
+                    selective=True,
+                    input_field_placeholder="Cute text 💓"
+                )
+            )
+
+        log_with_user_info("INFO", "✅ Poll analysis response sent successfully", user_info)
+
+    except Exception as e:
+        log_with_user_info("ERROR", f"❌ Error analyzing poll: {e}", user_info)
         await update.message.reply_text(get_error_response())
 
 
@@ -2421,19 +2695,19 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         user_info = extract_user_info(update.message)
         user_id = update.effective_user.id
         chat_type = update.effective_chat.type
-        
+
         log_with_user_info("DEBUG", f"📨 Processing message in {chat_type}", user_info)
-        
+
         # Track user and chat IDs for broadcasting
         track_user_and_chat(update, user_info)
-        
+
         # Check if owner is in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
             log_with_user_info("INFO", f"📢 Executing broadcast to {broadcast_mode[OWNER_ID]}", user_info)
             await execute_broadcast_direct(update, context, broadcast_mode[OWNER_ID], user_info)
             del broadcast_mode[OWNER_ID]
             return
-        
+
         # Determine if bot should respond
         should_respond = True
         if chat_type in ['group', 'supergroup']:
@@ -2443,24 +2717,26 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
                 return
             else:
                 log_with_user_info("INFO", "✅ Responding to group message (mentioned/replied)", user_info)
-        
+
         # Check rate limiting (using Valkey with memory fallback)
         if await is_rate_limited_valkey(user_id):
             log_with_user_info("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
-        
+
         # Handle different message types
         if update.message.sticker:
             await handle_sticker_message(update, context)
         elif update.message.photo:
             await handle_image_message(update, context)
+        elif update.message.poll:
+            await handle_poll_message(update, context)
         else:
             await handle_text_message(update, context)
-        
+
         # Update response time after sending response
         await update_user_response_time_valkey(user_id)
         log_with_user_info("DEBUG", "⏰ Updated user response time in Valkey", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(update.message)
         log_with_user_info("ERROR", f"❌ Error handling message: {e}", user_info)
@@ -2472,7 +2748,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
-    
+
     # Try to extract user info if update has a message
     if hasattr(update, 'message') and update.message:
         try:
@@ -2759,14 +3035,14 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Hidden owner command to refund stars to users. Usage: /back <user_id_or_username> <amount>"""
     try:
         user_info = extract_user_info(update.message)
-        
+
         # Check if user is owner
         if update.effective_user.id != OWNER_ID:
             log_with_user_info("WARNING", "⚠️ Non-owner attempted /back command", user_info)
             return
-        
+
         log_with_user_info("INFO", "🔙 /back command received from owner", user_info)
-        
+
         # Parse command arguments
         args = update.message.text.split()
         if len(args) < 3:
@@ -2780,7 +3056,7 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
             log_with_user_info("INFO", "❌ Invalid /back command usage", user_info)
             return
-        
+
         user_identifier = args[1]
         try:
             amount = int(args[2])
@@ -2790,11 +3066,11 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text("❌ Amount must be a positive integer!")
             log_with_user_info("WARNING", f"❌ Invalid amount in /back command: {args[2]}", user_info)
             return
-        
+
         # Determine target user ID
         target_user_id = None
         target_name = user_identifier
-        
+
         if user_identifier.isdigit():
             # Direct user ID
             target_user_id = int(user_identifier)
@@ -2804,7 +3080,7 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         else:
             # Username without @
             target_name = user_identifier
-        
+
         # If we don't have user_id, try to get it from database using username
         if target_user_id is None:
             if db_pool:
@@ -2830,7 +3106,7 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 await update.message.reply_text("❌ Database not available. Please use user ID instead!")
                 log_with_user_info("WARNING", "❌ Database not available for username lookup", user_info)
                 return
-        
+
         # Send refund
         try:
             await context.bot.send_paid_media(
@@ -2838,7 +3114,7 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 star_count=amount,
                 media=[]  # Empty media for just sending stars
             )
-            
+
             # Create success message
             success_message = (
                 f"✅ <b>Refund Successful!</b>\n\n"
@@ -2846,10 +3122,10 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 f"⭐ <b>Amount:</b> {amount} stars\n"
                 f"💝 <b>Status:</b> Sent successfully"
             )
-            
+
             await update.message.reply_text(success_message, parse_mode=ParseMode.HTML)
             log_with_user_info("INFO", f"✅ Refund sent: {amount} stars to user {target_user_id}", user_info)
-            
+
             # Try to notify the user
             try:
                 notification_msg = (
@@ -2866,7 +3142,7 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             except Exception as notify_error:
                 log_with_user_info("WARNING", f"⚠️ Could not notify user about refund: {notify_error}", user_info)
                 await update.message.reply_text(f"⚠️ Refund sent but could not notify user: {notify_error}")
-            
+
         except Exception as e:
             error_message = (
                 f"❌ <b>Refund Failed!</b>\n\n"
@@ -2876,7 +3152,7 @@ async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
             await update.message.reply_text(error_message, parse_mode=ParseMode.HTML)
             log_with_user_info("ERROR", f"❌ Refund failed: {e}", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(update.message)
         log_with_user_info("ERROR", f"❌ Error in /back command: {e}", user_info)
@@ -2887,19 +3163,19 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Hidden owner command to show bot statistics with refresh functionality"""
     try:
         user_info = extract_user_info(update.message)
-        
+
         # Check if user is owner
         if update.effective_user.id != OWNER_ID:
             log_with_user_info("WARNING", "⚠️ Non-owner attempted /stats command", user_info)
             return
-        
+
         log_with_user_info("INFO", "📊 /stats command received from owner", user_info)
-        
+
         # Send stats with refresh button
         await send_stats_message(update.message.chat.id, context, is_refresh=False)
-        
+
         log_with_user_info("INFO", "✅ Bot statistics sent to owner", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(update.message)
         log_with_user_info("ERROR", f"❌ Error in /stats command: {e}", user_info)
@@ -2916,14 +3192,14 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
             ping_ms = round((time.time() - ping_start) * 1000, 2)
         except Exception:
             ping_ms = "Error"
-        
+
         # Calculate bot uptime (using process start time)
         try:
             boot_time = psutil.boot_time()
             process = psutil.Process()
             process_start = process.create_time()
             uptime_seconds = time.time() - process_start
-            
+
             # Format uptime
             days = int(uptime_seconds // 86400)
             hours = int((uptime_seconds % 86400) // 3600)
@@ -2931,14 +3207,14 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
             uptime_str = f"{days}d {hours}h {minutes}m"
         except Exception as e:
             uptime_str = "Unknown"
-        
+
         # Get current time
         current_time = datetime.datetime.now()
-        
+
         # System Information
         cpu_percent = psutil.cpu_percent(interval=0.1)
         memory = psutil.virtual_memory()
-        
+
         # Database Statistics
         db_stats = {
             'users_count': len(user_ids),
@@ -2947,7 +3223,7 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
             'total_revenue': 0,
             'active_conversations': len(conversation_history)
         }
-        
+
         if db_pool:
             try:
                 async with db_pool.acquire() as conn:
@@ -2959,23 +3235,23 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
                     if purchase_stats:
                         db_stats['total_purchases'] = purchase_stats['total_purchases']
                         db_stats['total_revenue'] = purchase_stats['total_revenue']
-                    
+
                     # Get recent activity (last 24 hours)
                     recent_users = await conn.fetchval("""
                         SELECT COUNT(*) FROM users 
                         WHERE updated_at > NOW() - INTERVAL '24 hours'
                     """)
                     db_stats['recent_users'] = recent_users or 0
-                    
+
                     recent_purchases = await conn.fetchval("""
                         SELECT COUNT(*) FROM purchases 
                         WHERE created_at > NOW() - INTERVAL '24 hours'
                     """)
                     db_stats['recent_purchases'] = recent_purchases or 0
-                    
+
             except Exception as e:
                 logger.error(f"Error getting database stats: {e}")
-        
+
         # Build stats message
         stats_message = f"""📊 <b>Sakura Bot Statistics</b>
 <i>Last Updated: {current_time.strftime('%H:%M:%S')}</i>
@@ -3011,7 +3287,7 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
                 reply_markup=reply_markup,
                 disable_web_page_preview=True
             )
-        
+
     except Exception as e:
         logger.error(f"❌ Error generating stats message: {e}")
         if not is_refresh:
@@ -3023,21 +3299,21 @@ async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
     try:
         query = update.callback_query
         user_info = extract_user_info(query.message)
-        
+
         # Check if user is owner
         if query.from_user.id != OWNER_ID:
             log_with_user_info("WARNING", "⚠️ Non-owner attempted stats refresh", user_info)
             await query.answer("You're not authorized to use this 🚫", show_alert=True)
             return
-        
+
         log_with_user_info("INFO", "🔄 Stats refresh callback received from owner", user_info)
-        
+
         # Answer the callback
         await query.answer("🔄 Refreshing statistics...", show_alert=False)
-        
+
         # Get updated stats
         stats_message, reply_markup = await send_stats_message(query.message.chat.id, context, is_refresh=True)
-        
+
         # Update the message
         await query.edit_message_text(
             text=stats_message,
@@ -3045,9 +3321,9 @@ async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
-        
+
         log_with_user_info("INFO", "✅ Stats refreshed successfully", user_info)
-        
+
     except Exception as e:
         user_info = extract_user_info(query.message) if query.message else {}
         log_with_user_info("ERROR", f"❌ Error refreshing stats: {e}", user_info)
@@ -3061,7 +3337,7 @@ async def get_user_info_by_identifier(identifier: str) -> tuple:
     """Get user info by user ID or username from database"""
     if not db_pool:
         return None, None
-    
+
     try:
         async with db_pool.acquire() as conn:
             if identifier.isdigit():
@@ -3077,13 +3353,13 @@ async def get_user_info_by_identifier(identifier: str) -> tuple:
                     "SELECT user_id, username, first_name, last_name FROM users WHERE username = $1", 
                     username
                 )
-            
+
             if row:
                 display_name = row['first_name'] or row['username'] or f"User {row['user_id']}"
                 return row['user_id'], display_name
-            
+
         return None, None
-        
+
     except Exception as e:
         logger.error(f"❌ Error looking up user {identifier}: {e}")
         return None, None
@@ -3092,13 +3368,13 @@ async def get_user_info_by_identifier(identifier: str) -> tuple:
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Answer the PreCheckoutQuery."""
     query = update.pre_checkout_query
-    
+
     # Always approve the payment
     await context.bot.answer_pre_checkout_query(
         pre_checkout_query_id=query.id, 
         ok=True
     )
-    
+
     logger.info(f"💳 Pre-checkout approved for user {query.from_user.id}")
 
 
@@ -3108,9 +3384,9 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     user_id = update.message.from_user.id
     amount = payment.total_amount
     user_info = extract_user_info(update.message)
-    
+
     log_with_user_info("INFO", f"💰 Payment received for {amount} stars", user_info)
-    
+
     # Save purchase to database for amounts > 10 stars (not refunded)
     if amount > 10:
         save_purchase_to_database_async(
@@ -3121,35 +3397,35 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             amount=amount,
             charge_id=payment.telegram_payment_charge_id
         )
-    
+
     # Check if amount is 10 stars or less
     if amount <= 10:
         log_with_user_info("INFO", f"🔄 Refunding payment of {amount} stars (kindness gesture)", user_info)
-        
+
         # Wait 4 seconds after payment
         await asyncio.sleep(4)
-        
+
         # Store payment info for refund
         payment_storage[payment.telegram_payment_charge_id] = {
             'user_id': user_id,
             'amount': amount,
             'charge_id': payment.telegram_payment_charge_id
         }
-        
+
         try:
             # Refund the payment
             await context.bot.refund_star_payment(
                 user_id=user_id,
                 telegram_payment_charge_id=payment.telegram_payment_charge_id
             )
-            
+
             # Create inline keyboard with "Buy flowers again" button
             keyboard = [[InlineKeyboardButton("Buy flowers again 🌸", callback_data="get_flowers_again")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             # Send refund message with button and effects
             refund_msg = random.choice(REFUND_MESSAGES)
-            
+
             # Send with effects if in private chat
             if update.message.chat.type == "private":
                 # Use direct API to send refund message with effects
@@ -3179,33 +3455,33 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             else:
                 # Group chat - no effects, just normal message
                 await update.message.reply_text(refund_msg, reply_markup=reply_markup)
-            
+
             log_with_user_info("INFO", "✅ Refund completed successfully", user_info)
-            
+
         except Exception as e:
             log_with_user_info("ERROR", f"❌ Error refunding payment: {e}", user_info)
             await update.message.reply_text("❌ Sorry, there was an issue processing your refund. Please contact support.")
-    
+
     else:
         log_with_user_info("INFO", f"✅ Processing payment of {amount} stars (no refund)", user_info)
-        
+
         # Wait 4 seconds after payment
         await asyncio.sleep(4)
-        
+
         # Send random sticker
         sticker_id = random.choice(PAYMENT_STICKERS)
         await context.bot.send_sticker(chat_id=update.message.chat.id, sticker=sticker_id)
-        
+
         # Wait another 4 seconds
         await asyncio.sleep(4)
-        
+
         # Create inline keyboard with "Buy flowers again" button
         keyboard = [[InlineKeyboardButton("Buy flowers again 🌸", callback_data="get_flowers_again")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         # Send thank you message with button and effects
         success_msg = random.choice(THANK_YOU_MESSAGES)
-        
+
         # Send with effects if in private chat
         if update.message.chat.type == "private":
             # Use direct API to send thank you message with effects
@@ -3235,7 +3511,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         else:
             # Group chat - no effects, just normal message
             await update.message.reply_text(success_msg, reply_markup=reply_markup)
-        
+
         log_with_user_info("INFO", "✅ Payment processed successfully", user_info)
 
 
@@ -3245,7 +3521,7 @@ async def setup_bot_commands(application: Application) -> None:
     try:
         await application.bot.set_my_commands(COMMANDS)
         logger.info("✅ Bot commands menu set successfully")
-        
+
     except Exception as e:
         logger.error(f"Failed to set bot commands: {e}")
 
@@ -3253,7 +3529,7 @@ async def setup_bot_commands(application: Application) -> None:
 def setup_handlers(application: Application) -> None:
     """Setup all command and message handlers"""
     logger.info("🔧 Setting up bot handlers...")
-    
+
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
@@ -3263,27 +3539,27 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("buyers", buyers_command))
     application.add_handler(CommandHandler("back", back_command))  # Hidden owner command
     application.add_handler(CommandHandler("stats", stats_command))  # Hidden owner command
-    
+
     # Callback query handlers
     application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))
     application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_expand_"))
     application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_|^get_flowers_again$"))
     application.add_handler(CallbackQueryHandler(stats_refresh_callback, pattern="^refresh_stats$"))
-    
+
     # Payment handlers
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-    
+
     # Message handler for all message types
     application.add_handler(MessageHandler(
         filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE | 
-        filters.PHOTO | filters.Document.ALL & ~filters.COMMAND, 
+        filters.PHOTO | filters.Document.ALL | filters.POLL & ~filters.COMMAND, 
         handle_all_messages
     ))
-    
+
     # Error handler
     application.add_error_handler(error_handler)
-    
+
     logger.info("✅ All handlers setup completed")
 
 
@@ -3291,43 +3567,43 @@ def run_bot() -> None:
     """Run the bot"""
     if not validate_config():
         return
-    
+
     logger.info("🚀 Initializing Sakura Bot...")
-    
+
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
-    
+
     # Setup handlers
     setup_handlers(application)
-    
+
     # Setup bot commands and database using post_init
     async def post_init(app):
         global cleanup_task
-        
+
         # Initialize Valkey
         valkey_success = await init_valkey()
         if not valkey_success:
             logger.warning("⚠️ Valkey initialization failed. Bot will continue with memory fallback.")
-        
+
         # Initialize database
         db_success = await init_database()
         if not db_success:
             logger.error("❌ Database initialization failed. Bot will continue without persistence.")
-        
+
         # Start Telethon effects client
         await start_effects_client()
-        
+
         await setup_bot_commands(app)
-        
+
         # Start conversation cleanup task and store reference
         cleanup_task = asyncio.create_task(cleanup_old_conversations())
-        
+
         logger.info("🌸 Sakura Bot initialization completed!")
-        
+
     # Setup shutdown handler
     async def post_shutdown(app):
         global cleanup_task
-        
+
         # Cancel cleanup task gracefully
         if cleanup_task and not cleanup_task.done():
             logger.info("🛑 Cancelling cleanup task...")
@@ -3338,17 +3614,17 @@ def run_bot() -> None:
                 logger.info("✅ Cleanup task cancelled successfully")
             except Exception as e:
                 logger.error(f"❌ Error cancelling cleanup task: {e}")
-        
+
         await close_database()
         await close_valkey()
         await stop_effects_client()
         logger.info("🌸 Sakura Bot shutdown completed!")
-        
+
     application.post_init = post_init
     application.post_shutdown = post_shutdown
-    
+
     logger.info("🌸 Sakura Bot is starting...")
-    
+
     # Run the bot with polling
     application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
@@ -3356,7 +3632,7 @@ def run_bot() -> None:
 # HTTP SERVER FOR DEPLOYMENT
 class DummyHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler for keep-alive server"""
-    
+
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
@@ -3365,7 +3641,7 @@ class DummyHandler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.send_response(200)
         self.end_headers()
-    
+
     def log_message(self, format, *args):
         # Suppress HTTP server logs
         pass
@@ -3392,15 +3668,15 @@ def main() -> None:
         except Exception as e:
             logger.warning(f"⚠️ uvloop setup failed: {e}")
         # END OF UVLOOP SETUP
-        
+
         logger.info("🌸 Sakura Bot starting up...")
-        
+
         # Start dummy server in background thread
         threading.Thread(target=start_dummy_server, daemon=True).start()
-        
+
         # Run the bot
         run_bot()
-        
+
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
     except Exception as e:
