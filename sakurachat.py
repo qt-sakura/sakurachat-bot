@@ -2484,13 +2484,6 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     log_with_user_info("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
 
-    # Check for ping command with prefixes
-    ping_prefixes = ['?ping', '!ping', '*ping', '#ping']
-    if any(user_message.lower().startswith(prefix) for prefix in ping_prefixes):
-        log_with_user_info("INFO", f"🏓 Ping command detected with prefix: {user_message}", user_info)
-        await ping_command(update, context)
-        return
-
     # Check if user is asking to analyze a previously sent image
     if await analyze_referenced_image(update, context, user_message, user_info):
         return
@@ -2599,6 +2592,14 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             log_with_user_info("INFO", f"📢 Executing broadcast to {broadcast_mode[OWNER_ID]}", user_info)
             await execute_broadcast_direct(update, context, broadcast_mode[OWNER_ID], user_info)
             del broadcast_mode[OWNER_ID]
+            return
+
+        # Check for ping command with prefixes BEFORE group response logic
+        user_message = update.message.text or update.message.caption or ""
+        ping_prefixes = ['?ping', '!ping', '*ping', '#ping']
+        if any(user_message.lower().startswith(prefix) for prefix in ping_prefixes):
+            log_with_user_info("INFO", f"🏓 Ping command detected with prefix: {user_message}", user_info)
+            await ping_command(update, context)
             return
 
         # Determine if bot should respond
