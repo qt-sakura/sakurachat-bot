@@ -18,7 +18,6 @@ from telegram import (
     BotCommand,
     Message,
     ReactionTypeEmoji,
-    ForceReply,
     LabeledPrice
 )
 from telegram.ext import (
@@ -134,7 +133,7 @@ SAKURA_STICKERS = [
     "CAACAgUAAxkBAAEPHY5omHbXujQsxWB6OsTuyCTtOk2nlAACKxYAAhspsFV1qXoueKQAAUM2BA",
     "CAACAgUAAxkBAAEPHY9omHbX7S-80hbGGWRuLVj_wtKqygACXxkAAj60sVXgsb-vzSnt_TYE",
     "CAACAgUAAxkBAAEPHZBomHbXUxsXqH2zbJFK1GOiZzDcCwACuRUAAo2isVWykxNLWnwcYTYE",
-    "CAACAgUAAxkBAAEPHZFomHbXjRN4Qa9WUbcWlRECLPp6NAACRx4AAp2SqFXcarUkpU5jzjYE",
+    "CAACAgUAAxkBAAEPHZFemHbXjRN4Qa9WUbcWlRECLPp6NAACRx4AAp2SqFXcarUkpU5jzjYE",
     "CAACAgUAAxkBAAEPHZJomHbXX_4GTnA25ivpOWqe1UC66QACaBQAAu0uqFXKL-cNi_ZBJDYE",
     "CAACAgUAAxkBAAEPHZNomHbXWqwAAeuc7FCe0yCUd3DVx5YAAq8YAALcXbBVTI07io7mR2Q2BA",
     "CAACAgUAAxkBAAEPHZRomHbXxi3SDeeUOnqON0D3czFrEAACCxcAAidVsFWEt7xrqmGJxjYE",
@@ -146,12 +145,12 @@ SAKURA_STICKERS = [
     "CAACAgUAAxkBAAEPHZpomHbXPh9D5VSlhmSX2HEIClk92AACPxcAArtosFXxg3weTZPx5TYE",
     "CAACAgUAAxkBAAEPHZtomHbXpeFGlpeqcKIrzEsxC7PCkAACdxQAAhX8qVW1te9rkWttOzYE",
     "CAACAgUAAxkBAAEPHZxomHbXSi44c4Umy_H5JxN7BY8-8QACtRcAAtggqVVx1D8N-Hwp8TYE",
-    "CAACAgUAAxkBAAEPHZ1omHbXk6anHTgwctmKjCTV6u9SYwACkxMAAnySsVWvpS8AAVbu0ds2BA",
+    "CAACAgUAAxkBAAEPHZ1omHbXIuMqO0K098jc3On6mCgQYAAC5hoAAnAbcFe9bbelWKStUTYE",
     "CAACAgUAAxkBAAEPHZ5omHbXVHEhhoXyZlaTtXG5YNhUwwACQhUAAqGYqFXmCuT6Lrdn-jYE",
     "CAACAgUAAxkBAAEPHZ9omHbXuHwrW1hOKXwYn9euLXxufQACHxgAAvpMqVWpxtBkEZPfPjYE",
     "CAACAgUAAxkBAAEPHaBomHbXge6qzFuLoA_ahtyIe9ptVgAC6x4AAiU7sVUROxvmQwqc0zYE",
     "CAACAgUAAxkBAAEPHaFomHbXG7wOX3wP-PNMH5uBmZqZvwACnhMAAilDsVUIsplzTkTefTYE",
-    "CAACAgUAAxkBAAEPHaJomHbX7QPeD1aj_RrFRlh7MLLDFAAC6BgAAj5bsVVO6H1Fuc4YijYE",
+    "CAACAgUAAxkBAAEPHaJomHbX3Q6jptPInCK75s45AAHneSsAArsUAAJp9qhV4C7LO05mEJM2BA",
     "CAACAgUAAxkBAAEPHaNomHbX3Q6jptPInCK75s45AAHneSsAArsUAAJp9qhV4C7LO05mEJM2BA",
     "CAACAgUAAxkBAAEPHaRomHbXia_R6dE0FmqOKe-b3CcLkgACKBkAAjb_4FVt48Cz-d5N1jYE",
     "CAACAgUAAxkBAAEPC_xoizPIGzAQCLzAjUzmRbgMYxeKbQACmRcAAnUn-VUG3_UOew4L4jYE",
@@ -626,13 +625,9 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
             'parse_mode': 'HTML'
         }
 
-        # Add reply markup if provided (for ForceReply)
+        # Add reply markup if provided
         if reply_markup:
             payload['reply_markup'] = reply_markup.to_json()
-        else:
-            # Default ForceReply for Gemini responses
-            force_reply = ForceReply(selective=True, input_field_placeholder="Cute text 💓")
-            payload['reply_markup'] = force_reply.to_json()
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
@@ -1285,10 +1280,10 @@ def extract_user_info(msg: Message) -> Dict[str, any]:
 def log_with_user_info(level: str, message: str, user_info: Dict[str, any]) -> None:
     """Log message with user information"""
     user_detail = (
-        f"👤 {user_info['full_name']} (@{user_info['username']}) "
-        f"[ID: {user_info['user_id']}] | "
-        f"💬 {user_info['chat_title']} [{user_info['chat_id']}] "
-        f"({user_info['chat_type']}) {user_info['chat_link']}"
+        f"👤 {user_info.get('full_name', 'N/A')} (@{user_info.get('username', 'N/A')}) "
+        f"[ID: {user_info.get('user_id', 'N/A')}] | "
+        f"💬 {user_info.get('chat_title', 'N/A')} [{user_info.get('chat_id', 'N/A')}] "
+        f"({user_info.get('chat_type', 'N/A')}) {user_info.get('chat_link', 'N/A')}"
     )
     full_message = f"{message} | {user_detail}"
 
@@ -1663,7 +1658,7 @@ Sakura's response:"""
             log_with_user_info("ERROR", f"❌ Image analysis error: {e}", user_info)
         else:
             logger.error(f"Image analysis error: {e}")
-        return "Image dekh nahi paa rahi properly 😕"
+        return "Image analyze nahi kar paa rahi 😕"
 
 
 async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
@@ -1703,13 +1698,8 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
                 poll_question, poll_options, user_name, user_info, user_info["user_id"]
             )
 
-            # Send response with effects
-            if update.effective_chat.type == "private":
-                effect_sent = await send_with_effect(update.effective_chat.id, response)
-                if not effect_sent:
-                    await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
-            else:
-                await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            # Send response (no effects for Gemini responses)
+            await update.message.reply_text(response)
 
             log_with_user_info("INFO", "✅ Referenced poll analyzed successfully", user_info)
             return True
@@ -1718,12 +1708,7 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
             log_with_user_info("ERROR", f"❌ Error analyzing referenced poll: {e}", user_info)
 
             error_response = "Poll analyze nahi kar paa rahi 😔"
-            if update.effective_chat.type == "private":
-                effect_sent = await send_with_effect(update.effective_chat.id, error_response)
-                if not effect_sent:
-                    await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
-            else:
-                await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            await update.message.reply_text(error_response)
 
             return True
 
@@ -1768,13 +1753,8 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
                 image_bytes, caption, user_name, user_info, user_info["user_id"]
             )
 
-            # Send response with effects
-            if update.effective_chat.type == "private":
-                effect_sent = await send_with_effect(update.effective_chat.id, response)
-                if not effect_sent:
-                    await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
-            else:
-                await update.message.reply_text(response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            # Send response (no effects for Gemini responses)
+            await update.message.reply_text(response)
 
             log_with_user_info("INFO", "✅ Referenced image analyzed successfully", user_info)
             return True
@@ -1783,12 +1763,7 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
             log_with_user_info("ERROR", f"❌ Error analyzing referenced image: {e}", user_info)
 
             error_response = "Image analyze nahi kar paa rahi 😔"
-            if update.effective_chat.type == "private":
-                effect_sent = await send_with_effect(update.effective_chat.id, error_response)
-                if not effect_sent:
-                    await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
-            else:
-                await update.message.reply_text(error_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+            await update.message.reply_text(error_response)
 
             return True
 
@@ -1803,12 +1778,7 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
 
                 # If no recent replied image found, inform user
                 no_image_response = "Koi recent image nahi mil rahi analyze karne ke liye 😔"
-                if update.effective_chat.type == "private":
-                    effect_sent = await send_with_effect(update.effective_chat.id, no_image_response)
-                    if not effect_sent:
-                        await update.message.reply_text(no_image_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
-                else:
-                    await update.message.reply_text(no_image_response, reply_markup=ForceReply(selective=True, input_field_placeholder="Cute text 💓"))
+                await update.message.reply_text(no_image_response)
 
                 return True
 
@@ -2034,7 +2004,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         log_with_user_info("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
 
-        # Send with effects if in private chat, normal otherwise
+        # Send with effects if in private chat
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main start message
             effect_sent = await send_with_effect_photo(
@@ -2118,7 +2088,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         random_image = random.choice(SAKURA_IMAGES)
         log_with_user_info("DEBUG", f"📷 Sending help photo: {random_image[:50]}...", user_info)
 
-        # Send with effects if in private chat, normal otherwise
+        # Send with effects if in private chat
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main help message
             effect_sent = await send_with_effect_photo(
@@ -2207,7 +2177,7 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         disable_web_page_preview=True
     )
 
-    log_with_user_info("INFO", f"✅ Ping completed: {response_time}ms", user_info)
+    log_with_user_info("INFO", "✅ Ping completed", user_info)
 
 
 
@@ -2258,22 +2228,14 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     # Fallback to normal PTB message if effects fail
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
-                        text=hi_response,
-                        reply_markup=ForceReply(
-                            selective=True,
-                            input_field_placeholder="Cute text 💓"
-                        )
+                        text=hi_response
                     )
                     log_with_user_info("WARNING", "⚠️ Start Hi response sent without effects (fallback)", user_info)
             else:
                 # Group chat - no effects, just normal message
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=hi_response,
-                    reply_markup=ForceReply(
-                        selective=True,
-                        input_field_placeholder="Cute text 💓"
-                    )
+                    text=hi_response
                 )
 
             log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
@@ -2546,31 +2508,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
 
-    # Send with effects if in private chat
-    if update.effective_chat.type == "private":
-        # Try sending with effects first
-        effect_sent = await send_with_effect(update.effective_chat.id, response)
-        if effect_sent:
-            log_with_user_info("INFO", "✨ Gemini response with effects sent successfully", user_info)
-        else:
-            # Fallback to normal PTB message if effects fail
-            await update.message.reply_text(
-                response,
-                reply_markup=ForceReply(
-                    selective=True,
-                    input_field_placeholder="Cute text 💓"
-                )
-            )
-            log_with_user_info("WARNING", "⚠️ Gemini response sent without effects (fallback)", user_info)
-    else:
-        # Group chat - no effects, just normal message
-        await update.message.reply_text(
-            response,
-            reply_markup=ForceReply(
-                selective=True,
-                input_field_placeholder="Cute text 💓"
-            )
-        )
+    # Send response (no effects for Gemini responses)
+    await update.message.reply_text(response)
 
     log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
@@ -2602,31 +2541,8 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
         log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
 
-        # Send with effects if in private chat
-        if update.effective_chat.type == "private":
-            # Try sending with effects first
-            effect_sent = await send_with_effect(update.effective_chat.id, response)
-            if effect_sent:
-                log_with_user_info("INFO", "✨ Image analysis with effects sent successfully", user_info)
-            else:
-                # Fallback to normal PTB message if effects fail
-                await update.message.reply_text(
-                    response,
-                    reply_markup=ForceReply(
-                        selective=True,
-                        input_field_placeholder="Cute text 💓"
-                    )
-                )
-                log_with_user_info("WARNING", "⚠️ Image analysis sent without effects (fallback)", user_info)
-        else:
-            # Group chat - no effects, just normal message
-            await update.message.reply_text(
-                response,
-                reply_markup=ForceReply(
-                    selective=True,
-                    input_field_placeholder="Cute text 💓"
-                )
-            )
+        # Send response (no effects for Gemini responses)
+        await update.message.reply_text(response)
 
         log_with_user_info("INFO", "✅ Image analysis response sent successfully", user_info)
 
@@ -2656,31 +2572,8 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
 
-        # Send with effects if in private chat
-        if update.effective_chat.type == "private":
-            # Try sending with effects first
-            effect_sent = await send_with_effect(update.effective_chat.id, response)
-            if effect_sent:
-                log_with_user_info("INFO", "✨ Poll analysis with effects sent successfully", user_info)
-            else:
-                # Fallback to normal PTB message if effects fail
-                await update.message.reply_text(
-                    response,
-                    reply_markup=ForceReply(
-                        selective=True,
-                        input_field_placeholder="Cute text 💓"
-                    )
-                )
-                log_with_user_info("WARNING", "⚠️ Poll analysis sent without effects (fallback)", user_info)
-        else:
-            # Group chat - no effects, just normal message
-            await update.message.reply_text(
-                response,
-                reply_markup=ForceReply(
-                    selective=True,
-                    input_field_placeholder="Cute text 💓"
-                )
-            )
+        # Send response (no effects for Gemini responses)
+        await update.message.reply_text(response)
 
         log_with_user_info("INFO", "✅ Poll analysis response sent successfully", user_info)
 
@@ -2701,7 +2594,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Track user and chat IDs for broadcasting
         track_user_and_chat(update, user_info)
 
-        # Check if owner is in broadcast mode
+        # Check if user is owner and in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
             log_with_user_info("INFO", f"📢 Executing broadcast to {broadcast_mode[OWNER_ID]}", user_info)
             await execute_broadcast_direct(update, context, broadcast_mode[OWNER_ID], user_info)
