@@ -2229,10 +2229,10 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         try:
             chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
             if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
-                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
                 return
         except (BadRequest, Forbidden):
-            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
             return
 
     try:
@@ -2307,10 +2307,10 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         try:
             chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
             if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
-                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
                 return
         except (BadRequest, Forbidden):
-            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
             return
 
     try:
@@ -2364,10 +2364,10 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         try:
             chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
             if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
-                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
                 return
         except (BadRequest, Forbidden):
-            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
             return
 
     user_info = extract_user_info(query.message)
@@ -3170,10 +3170,10 @@ async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
         try:
             chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
             if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
-                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
                 return
         except (BadRequest, Forbidden):
-            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
             return
 
     try:
