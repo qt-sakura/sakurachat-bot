@@ -986,32 +986,38 @@ async def get_help_expanded_state(user_id: int) -> bool:
 # RATE LIMITING FUNCTIONS
 async def is_rate_limited_valkey(user_id: int, limit: int = 5) -> bool:
     """Check if user is rate limited using Valkey with memory fallback"""
-    # Try Valkey first
-    if valkey_client:
-        try:
-            key = f"rate_limit:{user_id}"
-            current = await valkey_client.get(key)
+    if not valkey_client:
+        # Fallback to memory-based rate limiting if Valkey is down
+        current_time = time.time()
+        last_response = user_last_response_time.get(user_id, 0)
+        return current_time - last_response < MESSAGE_LIMIT
 
-            if current is None:
-                # First request, set counter
-                await valkey_client.setex(key, RATE_LIMIT_TTL, 1)
-                return False
+    try:
+        key = f"rate_limit:{user_id}"
 
-            current_count = int(current)
-            if current_count >= limit:
-                return True
+        # Use a pipeline to atomically increment the counter and check the TTL
+        pipe = valkey_client.pipeline()
+        pipe.incr(key)
+        pipe.ttl(key)
+        results = await pipe.execute()
 
-            # Increment counter
-            await valkey_client.incr(key)
-            return False
+        current_count = results[0]
+        ttl = results[1]
 
-        except Exception as e:
-            logger.error(f"❌ Rate limit check failed for user {user_id}: {e}")
+        # If the key was just created by INCR, it has a TTL of -1 (no expiry).
+        # This also handles fixing keys that were stuck without a TTL from the old bug.
+        if ttl == -1:
+            await valkey_client.expire(key, RATE_LIMIT_TTL)
 
-    # Fallback to memory-based rate limiting
-    current_time = time.time()
-    last_response = user_last_response_time.get(user_id, 0)
-    return current_time - last_response < MESSAGE_LIMIT
+        # Allow 5 messages per user. Block on the 6th.
+        return current_count > limit
+
+    except Exception as e:
+        logger.error(f"❌ Rate limit check failed for user {user_id}: {e}")
+        # Fallback to memory on error
+        current_time = time.time()
+        last_response = user_last_response_time.get(user_id, 0)
+        return current_time - last_response < MESSAGE_LIMIT
 
 async def reset_rate_limit(user_id: int):
     """Reset rate limit for user"""
