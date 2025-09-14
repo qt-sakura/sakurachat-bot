@@ -2224,6 +2224,17 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # CALLBACK HANDLERS
 async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle start command inline button callbacks"""
+    query = update.callback_query
+    if query.message.chat.type in ['group', 'supergroup']:
+        try:
+            chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
+            if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
+                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                return
+        except (BadRequest, Forbidden):
+            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            return
+
     try:
         query = update.callback_query
         user_info = extract_user_info(query.message)
@@ -2291,8 +2302,18 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
+    query = update.callback_query
+    if query.message.chat.type in ['group', 'supergroup']:
+        try:
+            chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
+            if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
+                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                return
+        except (BadRequest, Forbidden):
+            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            return
+
     try:
-        query = update.callback_query
         user_info = extract_user_info(query.message)
         log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
 
@@ -2339,6 +2360,16 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast target selection and get flowers again button"""
     query = update.callback_query
+    if query.message.chat.type in ['group', 'supergroup']:
+        try:
+            chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
+            if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
+                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                return
+        except (BadRequest, Forbidden):
+            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            return
+
     user_info = extract_user_info(query.message)
 
     # Handle "Buy flowers again" button - available for everyone
@@ -3134,8 +3165,18 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
 
 async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle stats refresh button callback"""
+    query = update.callback_query
+    if query.message.chat.type in ['group', 'supergroup']:
+        try:
+            chat_member = await context.bot.get_chat_member(query.message.chat.id, context.bot.id)
+            if chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
+                await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+                return
+        except (BadRequest, Forbidden):
+            await query.answer("add me first, my soul might be here but my body not", show_alert=True)
+            return
+
     try:
-        query = update.callback_query
         user_info = extract_user_info(query.message)
 
         # Check if user is owner
