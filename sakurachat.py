@@ -1414,39 +1414,34 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
     chat_type = user_info["chat_type"]
 
     if chat_type == "private":
+        is_new_user = user_id not in user_ids
         # Add to memory immediately (fast)
         user_ids.add(user_id)
 
-        # Save to database asynchronously (non-blocking)
+        # Save to database asynchronously (non-blocking) to add or update user info
         save_user_to_database_async(
             user_id,
             user_info.get("username"),
             user_info.get("first_name"),
             user_info.get("last_name")
         )
-
-        log_with_user_info("INFO", f"👤 User tracked for broadcasting", user_info)
+        if is_new_user:
+            log_with_user_info("INFO", f"👤 New user tracked for broadcasting", user_info)
 
     elif chat_type in ['group', 'supergroup']:
+        is_new_group = chat_id not in group_ids
         # Add to memory immediately (fast)
         group_ids.add(chat_id)
-        user_ids.add(user_id)
 
-        # Save to database asynchronously (non-blocking)
+        # Save to database asynchronously (non-blocking) to add or update group info
         save_group_to_database_async(
             chat_id,
             user_info.get("chat_title"),
             user_info.get("username"),
             chat_type
         )
-        save_user_to_database_async(
-            user_id,
-            user_info.get("username"),
-            user_info.get("first_name"),
-            user_info.get("last_name")
-        )
-
-        log_with_user_info("INFO", f"📢 Group and user tracked for broadcasting", user_info)
+        if is_new_group:
+            log_with_user_info("INFO", f"📢 New group tracked for broadcasting", user_info)
 
 
 def get_user_mention(user) -> str:
