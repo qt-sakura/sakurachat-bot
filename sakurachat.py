@@ -18,7 +18,8 @@ from telegram import (
     BotCommand,
     Message,
     ReactionTypeEmoji,
-    LabeledPrice
+    LabeledPrice,
+    ChatMember
 )
 from telegram.ext import (
     Application,
@@ -27,11 +28,12 @@ from telegram.ext import (
     CallbackQueryHandler,
     PreCheckoutQueryHandler,
     ContextTypes,
-    filters
+    filters,
+    ChatMemberHandler
 )
 from google import genai
 from typing import Dict, Set, Optional
-from telegram.error import TelegramError
+from telegram.error import TelegramError, Forbidden, BadRequest
 from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
@@ -1258,6 +1260,43 @@ async def close_database():
         await db_pool.close()
         logger.info("✅ Database connection pool closed")
 
+
+async def remove_user_from_database(user_id: int):
+    """Remove a user from the database and memory."""
+    global user_ids
+    if user_id in user_ids:
+        user_ids.remove(user_id)
+
+    if not db_pool:
+        logger.warning(f"⚠️ DB pool not available. Cannot remove user {user_id}.")
+        return
+
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("DELETE FROM users WHERE user_id = $1", user_id)
+        logger.info(f"✅ User {user_id} removed from database.")
+    except Exception as e:
+        logger.error(f"❌ Failed to remove user {user_id} from database: {e}")
+
+
+async def remove_group_from_database(group_id: int):
+    """Remove a group from the database and memory."""
+    global group_ids
+    if group_id in group_ids:
+        group_ids.remove(group_id)
+
+    if not db_pool:
+        logger.warning(f"⚠️ DB pool not available. Cannot remove group {group_id}.")
+        return
+
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("DELETE FROM groups WHERE group_id = $1", group_id)
+        logger.info(f"✅ Group {group_id} removed from database.")
+    except Exception as e:
+        logger.error(f"❌ Failed to remove group {group_id} from database: {e}")
+
+
 # UTILITY FUNCTIONS
 def extract_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
@@ -2431,9 +2470,23 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                 # Small delay to avoid rate limits
                 await asyncio.sleep(BROADCAST_DELAY)
 
+            except Forbidden:
+                failed_count += 1
+                logger.warning(f"⚠️ User {target_id} blocked the bot. Removing from DB.")
+                await remove_user_from_database(target_id)
+            except BadRequest as e:
+                failed_count += 1
+                if "chat not found" in str(e).lower():
+                    logger.warning(f"⚠️ Chat {target_id} not found. Removing from DB.")
+                    if target_name == "users":
+                        await remove_user_from_database(target_id)
+                    else:
+                        await remove_group_from_database(target_id)
+                else:
+                    logger.error(f"❌ Broadcast failed for {target_id}: {e}")
             except Exception as e:
                 failed_count += 1
-                logger.error(f"Failed to broadcast to {target_id}: {e}")
+                logger.error(f"❌ Unhandled broadcast error for {target_id}: {e}")
 
         # Final status update
         await status_msg.edit_text(
@@ -2642,6 +2695,24 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         log_with_user_info("ERROR", f"❌ Error handling message: {e}", user_info)
         if update.message.text:
             await update.message.reply_text(get_error_response())
+
+
+async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle when a user blocks the bot or the bot is removed from a group."""
+    result = update.my_chat_member
+    if not result:
+        return
+
+    chat = result.chat
+    new_status = result.new_chat_member.status
+
+    if new_status in [ChatMember.BANNED, ChatMember.LEFT]:
+        if chat.type == 'private':
+            logger.info(f"User {chat.id} blocked the bot. Removing from database.")
+            await remove_user_from_database(chat.id)
+        elif chat.type in ['group', 'supergroup']:
+            logger.info(f"Bot was removed from group {chat.id}. Removing from database.")
+            await remove_group_from_database(chat.id)
 
 
 # ERROR HANDLER
@@ -3327,6 +3398,9 @@ def setup_handlers(application: Application) -> None:
         filters.PHOTO | filters.Document.ALL | filters.POLL & ~filters.COMMAND,
         handle_all_messages
     ))
+
+    # Chat member handler to track when bot is added/removed from chats
+    application.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
 
     # Error handler
     application.add_error_handler(error_handler)
