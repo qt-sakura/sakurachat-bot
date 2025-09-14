@@ -48,9 +48,9 @@ OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
 GROUP_LINK = "https://t.me/SoulMeetsHQ"
-SESSION_TTL = 3600  
-CACHE_TTL = 300   
-RATE_LIMIT_TTL = 60 
+SESSION_TTL = 3600
+CACHE_TTL = 300
+RATE_LIMIT_TTL = 60
 MESSAGE_LIMIT = 1.0
 BROADCAST_DELAY = 0.03
 CHAT_LENGTH = 20
@@ -63,7 +63,7 @@ group_ids: Set[int] = set()
 help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_last_response_time: Dict[int, float] = {}
-conversation_history: Dict[int, list] = {} 
+conversation_history: Dict[int, list] = {}
 db_pool = None
 cleanup_task = None
 valkey_client: AsyncValkey = None
@@ -80,8 +80,8 @@ COMMANDS = [
 # EMOJI REACTIONS AND STICKERS
 # Emoji reactions for /start command
 EMOJI_REACT = [
-    "🍓",  "💊",  "🦄",  "💅",  "💘",  
-    "💋",  "🍌",  "⚡",  "🕊️",  "❤️‍🔥",  
+    "🍓",  "💊",  "🦄",  "💅",  "💘",
+    "💋",  "🍌",  "⚡",  "🕊️",  "❤️‍🔥",
     "🔥",  "❤️"
 ]
 
@@ -294,7 +294,7 @@ Join our channel for updates! Be part of our group or add me to yours. 💓
         "info": "📒 Info",
         "hi": "👋 Hello",
         "updates": "🗯️️ Updates",
-        "support": "💕 Support", 
+        "support": "💕 Support",
         "add_to_group": "🫂 Add Me To Your Group"
     },
     "callback_answers": {
@@ -308,20 +308,20 @@ HELP_MESSAGES = {
     "minimal": """
 🌸 <b>Short Guide for {user_mention}</b>
 
-✨ I'm your helpful friend  
-💭 You can ask me anything  
-🫶 Let's talk in simple Hindi  
+✨ I'm your helpful friend
+💭 You can ask me anything
+🫶 Let's talk in simple Hindi
 
 <i>Tap the button below to expand the guide</i> ⬇️
 """,
     "expanded": """
 🌸 <b>Short Guide for {user_mention}</b> 🌸
 
-🗣️ Talk in Hindi, English, or Bangla  
-💭 Ask simple questions  
-🎓 Help with study, advice, or math  
-🎭 Send a sticker, I'll send one too  
-❤️ Kind, caring, and always here  
+🗣️ Talk in Hindi, English, or Bangla
+💭 Ask simple questions
+🎓 Help with study, advice, or math
+🎭 Send a sticker, I'll send one too
+❤️ Kind, caring, and always here
 
 <i>Let's talk! 🫶</i>
 """,
@@ -619,8 +619,8 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         payload = {
-            'chat_id': chat_id, 
-            'text': text, 
+            'chat_id': chat_id,
+            'text': text,
             'message_effect_id': random.choice(EFFECTS),
             'parse_mode': 'HTML'
         }
@@ -840,8 +840,8 @@ async def save_user_session(user_id: int, session_data: dict):
     try:
         key = f"session:{user_id}"
         await valkey_client.setex(
-            key, 
-            SESSION_TTL, 
+            key,
+            SESSION_TTL,
             json.dumps(session_data)
         )
         logger.debug(f"💾 Session saved for user {user_id}")
@@ -1039,8 +1039,8 @@ async def init_database():
     try:
         # Create connection pool with optimized settings
         db_pool = await asyncpg.create_pool(
-            DATABASE_URL, 
-            min_size=5, 
+            DATABASE_URL,
+            min_size=5,
             max_size=20,
             command_timeout=3,
             server_settings={'application_name': 'sakura_bot'}
@@ -1135,8 +1135,8 @@ def save_user_to_database_async(user_id: int, username: str = None, first_name: 
                 await conn.execute("""
                     INSERT INTO users (user_id, username, first_name, last_name, updated_at)
                     VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-                    ON CONFLICT (user_id) 
-                    DO UPDATE SET 
+                    ON CONFLICT (user_id)
+                    DO UPDATE SET
                         username = EXCLUDED.username,
                         first_name = EXCLUDED.first_name,
                         last_name = EXCLUDED.last_name,
@@ -1162,8 +1162,8 @@ def save_group_to_database_async(group_id: int, title: str = None, username: str
                 await conn.execute("""
                     INSERT INTO groups (group_id, title, username, type, updated_at)
                     VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-                    ON CONFLICT (group_id) 
-                    DO UPDATE SET 
+                    ON CONFLICT (group_id)
+                    DO UPDATE SET
                         title = EXCLUDED.title,
                         username = EXCLUDED.username,
                         type = EXCLUDED.type,
@@ -1235,8 +1235,8 @@ async def get_all_purchases():
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("""
                 SELECT user_id, username, first_name, last_name, SUM(amount) as total_amount, COUNT(*) as purchase_count
-                FROM purchases 
-                GROUP BY user_id, username, first_name, last_name 
+                FROM purchases
+                GROUP BY user_id, username, first_name, last_name
                 ORDER BY total_amount DESC
             """)
             return rows
@@ -1355,7 +1355,7 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
         return True
 
     # Respond if message is a reply to bot's message
-    if (update.message.reply_to_message and 
+    if (update.message.reply_to_message and
         update.message.reply_to_message.from_user.id == bot_id):
         return True
 
@@ -1374,9 +1374,9 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
 
         # Save to database asynchronously (non-blocking)
         save_user_to_database_async(
-            user_id, 
-            user_info.get("username"), 
-            user_info.get("first_name"), 
+            user_id,
+            user_info.get("username"),
+            user_info.get("first_name"),
             user_info.get("last_name")
         )
 
@@ -1389,15 +1389,15 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
 
         # Save to database asynchronously (non-blocking)
         save_group_to_database_async(
-            chat_id, 
-            user_info.get("chat_title"), 
-            user_info.get("username"), 
+            chat_id,
+            user_info.get("chat_title"),
+            user_info.get("username"),
             chat_type
         )
         save_user_to_database_async(
-            user_id, 
-            user_info.get("username"), 
-            user_info.get("first_name"), 
+            user_id,
+            user_info.get("username"),
+            user_info.get("first_name"),
             user_info.get("last_name")
         )
 
@@ -1887,7 +1887,7 @@ def create_info_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(START_MESSAGES["button_texts"]["support"], url=SUPPORT_LINK)
         ],
         [
-            InlineKeyboardButton(START_MESSAGES["button_texts"]["add_to_group"], 
+            InlineKeyboardButton(START_MESSAGES["button_texts"]["add_to_group"],
                                url=f"https://t.me/{bot_username}?startgroup=true")
         ]
     ]
@@ -1928,11 +1928,11 @@ def create_broadcast_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["users"].format(count=len(user_ids)), 
+                BROADCAST_MESSAGES["button_texts"]["users"].format(count=len(user_ids)),
                 callback_data="bc_users"
             ),
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=len(group_ids)), 
+                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=len(group_ids)),
                 callback_data="bc_groups"
             )
         ]
@@ -2008,9 +2008,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main start message
             effect_sent = await send_with_effect_photo(
-                update.effective_chat.id, 
-                random_image, 
-                caption, 
+                update.effective_chat.id,
+                random_image,
+                caption,
                 keyboard
             )
             if effect_sent:
@@ -2463,8 +2463,8 @@ async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_T
     log_with_user_info("DEBUG", f"📤 Sending random sticker: {random_sticker}", user_info)
 
     # In groups, reply to the user's sticker when they replied to bot
-    if (chat_type in ['group', 'supergroup'] and 
-        update.message.reply_to_message and 
+    if (chat_type in ['group', 'supergroup'] and
+        update.message.reply_to_message and
         update.message.reply_to_message.from_user.id == context.bot.id):
         await update.message.reply_sticker(sticker=random_sticker)
         log_with_user_info("INFO", "✅ Replied to user's sticker in group", user_info)
@@ -2925,134 +2925,6 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ Something went wrong getting the buyers list. Try again later! 🔧")
 
 
-async def back_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Hidden owner command to refund stars to users. Usage: /back <user_id_or_username> <amount>"""
-    try:
-        user_info = extract_user_info(update.message)
-
-        # Check if user is owner
-        if update.effective_user.id != OWNER_ID:
-            log_with_user_info("WARNING", "⚠️ Non-owner attempted /back command", user_info)
-            return
-
-        log_with_user_info("INFO", "🔙 /back command received from owner", user_info)
-
-        # Parse command arguments
-        args = update.message.text.split()
-        if len(args) < 3:
-            await update.message.reply_text(
-                "❌ <b>Usage:</b> <code>/back &lt;user_id_or_username&gt; &lt;amount&gt;</code>\n\n"
-                "<b>Examples:</b>\n"
-                "• <code>/back 123456789 50</code>\n"
-                "• <code>/back @username 25</code>\n"
-                "• <code>/back username 100</code>",
-                parse_mode=ParseMode.HTML
-            )
-            log_with_user_info("INFO", "❌ Invalid /back command usage", user_info)
-            return
-
-        user_identifier = args[1]
-        try:
-            amount = int(args[2])
-            if amount <= 0:
-                raise ValueError("Amount must be positive")
-        except ValueError:
-            await update.message.reply_text("❌ Amount must be a positive integer!")
-            log_with_user_info("WARNING", f"❌ Invalid amount in /back command: {args[2]}", user_info)
-            return
-
-        # Determine target user ID
-        target_user_id = None
-        target_name = user_identifier
-
-        if user_identifier.isdigit():
-            # Direct user ID
-            target_user_id = int(user_identifier)
-        elif user_identifier.startswith('@'):
-            # Username with @
-            target_name = user_identifier[1:]
-        else:
-            # Username without @
-            target_name = user_identifier
-
-        # If we don't have user_id, try to get it from database using username
-        if target_user_id is None:
-            if db_pool:
-                try:
-                    async with db_pool.acquire() as conn:
-                        row = await conn.fetchrow(
-                            "SELECT user_id, first_name FROM users WHERE username = $1", 
-                            target_name
-                        )
-                        if row:
-                            target_user_id = row['user_id']
-                            if not user_identifier.isdigit():
-                                target_name = row['first_name'] or target_name
-                        else:
-                            await update.message.reply_text(f"❌ User '{user_identifier}' not found in database!")
-                            log_with_user_info("WARNING", f"❌ User not found: {user_identifier}", user_info)
-                            return
-                except Exception as e:
-                    log_with_user_info("ERROR", f"❌ Database error while looking up user: {e}", user_info)
-                    await update.message.reply_text("❌ Database error while looking up user!")
-                    return
-            else:
-                await update.message.reply_text("❌ Database not available. Please use user ID instead!")
-                log_with_user_info("WARNING", "❌ Database not available for username lookup", user_info)
-                return
-
-        # Send refund
-        try:
-            await context.bot.send_paid_media(
-                chat_id=target_user_id,
-                star_count=amount,
-                media=[]  # Empty media for just sending stars
-            )
-
-            # Create success message
-            success_message = (
-                f"✅ <b>Refund Successful!</b>\n\n"
-                f"👤 <b>User:</b> {target_name} (ID: {target_user_id})\n"
-                f"⭐ <b>Amount:</b> {amount} stars\n"
-                f"💝 <b>Status:</b> Sent successfully"
-            )
-
-            await update.message.reply_text(success_message, parse_mode=ParseMode.HTML)
-            log_with_user_info("INFO", f"✅ Refund sent: {amount} stars to user {target_user_id}", user_info)
-
-            # Try to notify the user
-            try:
-                notification_msg = (
-                    f"🌸 <b>Star Refund Received!</b>\n\n"
-                    f"You have received {amount} ⭐ stars as a refund from our flower stall!\n\n"
-                    f"💕 Thank you for your continued support!"
-                )
-                await context.bot.send_message(
-                    chat_id=target_user_id,
-                    text=notification_msg,
-                    parse_mode=ParseMode.HTML
-                )
-                log_with_user_info("INFO", f"✅ Refund notification sent to user {target_user_id}", user_info)
-            except Exception as notify_error:
-                log_with_user_info("WARNING", f"⚠️ Could not notify user about refund: {notify_error}", user_info)
-                await update.message.reply_text(f"⚠️ Refund sent but could not notify user: {notify_error}")
-
-        except Exception as e:
-            error_message = (
-                f"❌ <b>Refund Failed!</b>\n\n"
-                f"👤 <b>User:</b> {target_name} (ID: {target_user_id})\n"
-                f"⭐ <b>Amount:</b> {amount} stars\n"
-                f"💥 <b>Error:</b> {str(e)}"
-            )
-            await update.message.reply_text(error_message, parse_mode=ParseMode.HTML)
-            log_with_user_info("ERROR", f"❌ Refund failed: {e}", user_info)
-
-    except Exception as e:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("ERROR", f"❌ Error in /back command: {e}", user_info)
-        await update.message.reply_text("❌ Something went wrong with the refund command!")
-
-
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Hidden owner command to show bot statistics with refresh functionality"""
     try:
@@ -3132,13 +3004,13 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
 
                     # Get recent activity (last 24 hours)
                     recent_users = await conn.fetchval("""
-                        SELECT COUNT(*) FROM users 
+                        SELECT COUNT(*) FROM users
                         WHERE updated_at > NOW() - INTERVAL '24 hours'
                     """)
                     db_stats['recent_users'] = recent_users or 0
 
                     recent_purchases = await conn.fetchval("""
-                        SELECT COUNT(*) FROM purchases 
+                        SELECT COUNT(*) FROM purchases
                         WHERE created_at > NOW() - INTERVAL '24 hours'
                     """)
                     db_stats['recent_purchases'] = recent_purchases or 0
@@ -3237,14 +3109,14 @@ async def get_user_info_by_identifier(identifier: str) -> tuple:
             if identifier.isdigit():
                 # Search by user ID
                 row = await conn.fetchrow(
-                    "SELECT user_id, username, first_name, last_name FROM users WHERE user_id = $1", 
+                    "SELECT user_id, username, first_name, last_name FROM users WHERE user_id = $1",
                     int(identifier)
                 )
             else:
                 # Search by username (remove @ if present)
                 username = identifier.lstrip('@')
                 row = await conn.fetchrow(
-                    "SELECT user_id, username, first_name, last_name FROM users WHERE username = $1", 
+                    "SELECT user_id, username, first_name, last_name FROM users WHERE username = $1",
                     username
                 )
 
@@ -3265,7 +3137,7 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Always approve the payment
     await context.bot.answer_pre_checkout_query(
-        pre_checkout_query_id=query.id, 
+        pre_checkout_query_id=query.id,
         ok=True
     )
 
@@ -3431,7 +3303,6 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("ping", ping_command))
     application.add_handler(CommandHandler("buy", buy_command))
     application.add_handler(CommandHandler("buyers", buyers_command))
-    application.add_handler(CommandHandler("back", back_command))  # Hidden owner command
     application.add_handler(CommandHandler("stats", stats_command))  # Hidden owner command
 
     # Callback query handlers
@@ -3446,8 +3317,8 @@ def setup_handlers(application: Application) -> None:
 
     # Message handler for all message types
     application.add_handler(MessageHandler(
-        filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE | 
-        filters.PHOTO | filters.Document.ALL | filters.POLL & ~filters.COMMAND, 
+        filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE |
+        filters.PHOTO | filters.Document.ALL | filters.POLL & ~filters.COMMAND,
         handle_all_messages
     ))
 
