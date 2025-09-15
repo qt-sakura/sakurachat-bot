@@ -1,3 +1,5 @@
+cryptg
+tgcrypto
 uvloop==0.21.0
 valkey==6.1.1
 psutil==7.0.0
