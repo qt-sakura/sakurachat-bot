@@ -73,6 +73,7 @@ db_pool = None
 cleanup_task = None
 valkey_client: AsyncValkey = None
 payment_storage = {}
+user_locks: Dict[str, asyncio.Lock] = {}
 
 # Commands dictionary
 COMMANDS = [
@@ -992,7 +993,6 @@ async def get_help_expanded_state(user_id: int) -> bool:
 async def is_rate_limited(user_id: int, chat_id: int) -> bool:
     """
     Checks if a user is rate-limited based on a per-user, per-chat basis.
-
     - Allows 1 message per second.
     - Ignores messages 2-5 within the same second without a hard limit.
     - Hard rate-limits (60s) if more than 5 messages are sent in one second.
@@ -1006,65 +1006,67 @@ async def is_rate_limited(user_id: int, chat_id: int) -> bool:
 
             message_count_key = f"message_count:{user_id}:{chat_id}"
 
-            pipe = valkey_client.pipeline()
-            pipe.incr(message_count_key)
-            pipe.ttl(message_count_key)
-            results = await pipe.execute()
+            # Atomically increment the counter.
+            count = await valkey_client.incr(message_count_key)
 
-            count = results[0]
-            ttl = results[1]
-
-            if ttl == -1:
-                # Key was just created, set expiry
-                await valkey_client.expire(message_count_key, int(MESSAGE_LIMIT))
+            # On the first increment, set the key to expire in 1 second.
+            if count == 1:
+                await valkey_client.expire(message_count_key, 1)
 
             if count > RATE_LIMIT_COUNT:
                 # Hard rate limit
                 await valkey_client.setex(hard_limit_key, RATE_LIMIT_TTL, "1")
-                return True # Ignore and hard limit
+                return True  # Ignore and hard limit
 
             if count > 1:
-                return True # Ignore subsequent messages
+                return True  # Ignore subsequent messages
 
-            return False # Process this message
+            return False  # Process this message
 
         except Exception as e:
             logger.error(f"❌ Valkey rate limit check failed for user {user_id}:{chat_id}: {e}. Falling back to memory.")
             # Fallback to memory if Valkey fails
             pass
 
-    # In-memory fallback logic
+    # In-memory fallback logic (with race condition fix)
     key = f"{user_id}:{chat_id}"
-    current_time = time.time()
 
-    # Check for hard limit
-    if key in rate_limited_users and current_time < rate_limited_users[key]:
-        return True
-    elif key in rate_limited_users:
-        # Clean up expired hard limit
-        del rate_limited_users[key]
+    # Get or create a lock for this user/chat to prevent race conditions
+    if key not in user_locks:
+        user_locks[key] = asyncio.Lock()
+    lock = user_locks[key]
 
-    # Get message timestamps for the user-chat combo
-    timestamps = user_message_counts.get(key, [])
+    async with lock:
+        current_time = time.time()
 
-    # Filter out timestamps older than our window (1 second)
-    timestamps = [ts for ts in timestamps if current_time - ts < MESSAGE_LIMIT]
+        # Check for hard limit
+        if key in rate_limited_users and current_time < rate_limited_users[key]:
+            return True
+        elif key in rate_limited_users:
+            # Clean up expired hard limit
+            del rate_limited_users[key]
 
-    # Add current message timestamp
-    timestamps.append(current_time)
-    user_message_counts[key] = timestamps
+        # Get message timestamps for the user-chat combo
+        timestamps = user_message_counts.get(key, [])
 
-    count = len(timestamps)
+        # Filter out timestamps older than our window (1 second)
+        timestamps = [ts for ts in timestamps if current_time - ts < MESSAGE_LIMIT]
 
-    if count > RATE_LIMIT_COUNT:
-        # Hard rate limit
-        rate_limited_users[key] = current_time + RATE_LIMIT_TTL
-        return True # Ignore and hard limit
+        # Add current message timestamp
+        timestamps.append(current_time)
+        user_message_counts[key] = timestamps
 
-    if count > 1:
-        return True # Ignore subsequent messages
+        count = len(timestamps)
 
-    return False # Process this message
+        if count > RATE_LIMIT_COUNT:
+            # Hard rate limit
+            rate_limited_users[key] = current_time + RATE_LIMIT_TTL
+            return True  # Ignore and hard limit
+
+        if count > 1:
+            return True  # Ignore subsequent messages
+
+        return False  # Process this message
 
 # DATABASE FUNCTIONS
 async def init_database():
