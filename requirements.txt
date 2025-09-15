@@ -1,13 +1,11 @@
 cryptg
-tgcrypto
 uvloop
 valkey
 psutil
 asyncpg
 aiohttp
-telethon
 requests
+tgcrypto
+telethon
 google-genai
 python-telegram-bot
-
-# 3
