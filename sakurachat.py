@@ -67,6 +67,7 @@ help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_message_counts: Dict[str, list] = {}
 rate_limited_users: Dict[str, float] = {}
+rate_limit_locks: Dict[str, asyncio.Lock] = {}
 user_last_response_time: Dict[int, float] = {}
 conversation_history: Dict[int, list] = {}
 db_pool = None
@@ -992,7 +993,6 @@ async def get_help_expanded_state(user_id: int) -> bool:
 async def is_rate_limited(user_id: int, chat_id: int) -> bool:
     """
     Checks if a user is rate-limited based on a per-user, per-chat basis.
-
     - Allows 1 message per second.
     - Ignores messages 2-5 within the same second without a hard limit.
     - Hard rate-limits (60s) if more than 5 messages are sent in one second.
@@ -1035,34 +1035,41 @@ async def is_rate_limited(user_id: int, chat_id: int) -> bool:
 
     # In-memory fallback logic
     key = f"{user_id}:{chat_id}"
-    current_time = time.time()
 
-    # Check for hard limit
-    if key in rate_limited_users and current_time < rate_limited_users[key]:
-        return True
-    elif key in rate_limited_users:
-        # Clean up expired hard limit
-        del rate_limited_users[key]
+    # Get or create a lock for the user-chat combo to handle concurrency
+    if key not in rate_limit_locks:
+        rate_limit_locks[key] = asyncio.Lock()
+    lock = rate_limit_locks[key]
 
-    # Get message timestamps for the user-chat combo
-    timestamps = user_message_counts.get(key, [])
+    async with lock:
+        current_time = time.time()
 
-    # Filter out timestamps older than our window (1 second)
-    timestamps = [ts for ts in timestamps if current_time - ts < MESSAGE_LIMIT]
+        # Check for hard limit
+        if key in rate_limited_users and current_time < rate_limited_users[key]:
+            return True
+        elif key in rate_limited_users:
+            # Clean up expired hard limit
+            del rate_limited_users[key]
 
-    # Add current message timestamp
-    timestamps.append(current_time)
-    user_message_counts[key] = timestamps
+        # Get message timestamps for the user-chat combo
+        timestamps = user_message_counts.get(key, [])
 
-    count = len(timestamps)
+        # Filter out timestamps older than our window (1 second)
+        timestamps = [ts for ts in timestamps if current_time - ts < MESSAGE_LIMIT]
 
-    if count > RATE_LIMIT_COUNT:
-        # Hard rate limit
-        rate_limited_users[key] = current_time + RATE_LIMIT_TTL
-        return True # Ignore and hard limit
+        # Add current message timestamp
+        timestamps.append(current_time)
+        user_message_counts[key] = timestamps
 
-    if count > 1:
-        return True # Ignore subsequent messages
+        count = len(timestamps)
+
+        if count > RATE_LIMIT_COUNT:
+            # Hard rate limit
+            rate_limited_users[key] = current_time + RATE_LIMIT_TTL
+            return True # Ignore and hard limit
+
+        if count > 1:
+            return True # Ignore subsequent messages
 
     return False # Process this message
 
