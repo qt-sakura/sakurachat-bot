@@ -53,6 +53,7 @@ GROUP_LINK = "https://t.me/SoulMeetsHQ"
 SESSION_TTL = 3600
 CACHE_TTL = 300
 RATE_LIMIT_TTL = 60
+RATE_LIMIT_COUNT = 5
 MESSAGE_LIMIT = 1.0
 BROADCAST_DELAY = 0.03
 CHAT_LENGTH = 20
@@ -64,6 +65,8 @@ user_ids: Set[int] = set()
 group_ids: Set[int] = set()
 help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
+user_message_counts: Dict[str, list] = {}
+rate_limited_users: Dict[str, float] = {}
 user_last_response_time: Dict[int, float] = {}
 conversation_history: Dict[int, list] = {}
 db_pool = None
@@ -986,54 +989,82 @@ async def get_help_expanded_state(user_id: int) -> bool:
     return help_expanded.get(user_id, False)
 
 # RATE LIMITING FUNCTIONS
-async def is_rate_limited_valkey(user_id: int, limit: int = 5) -> bool:
-    """Check if user is rate limited using Valkey with memory fallback"""
-    if not valkey_client:
-        # Fallback to memory-based rate limiting if Valkey is down
-        current_time = time.time()
-        last_response = user_last_response_time.get(user_id, 0)
-        return current_time - last_response < MESSAGE_LIMIT
+async def is_rate_limited(user_id: int, chat_id: int) -> bool:
+    """
+    Checks if a user is rate-limited based on a per-user, per-chat basis.
 
-    try:
-        key = f"rate_limit:{user_id}"
+    - Allows 1 message per second.
+    - Ignores messages 2-5 within the same second without a hard limit.
+    - Hard rate-limits (60s) if more than 5 messages are sent in one second.
+    """
+    # Use Valkey if available
+    if valkey_client:
+        try:
+            hard_limit_key = f"hard_rate_limit:{user_id}:{chat_id}"
+            if await valkey_client.exists(hard_limit_key):
+                return True
 
-        # Use a pipeline to atomically increment the counter and check the TTL
-        pipe = valkey_client.pipeline()
-        pipe.incr(key)
-        pipe.ttl(key)
-        results = await pipe.execute()
+            message_count_key = f"message_count:{user_id}:{chat_id}"
 
-        current_count = results[0]
-        ttl = results[1]
+            pipe = valkey_client.pipeline()
+            pipe.incr(message_count_key)
+            pipe.ttl(message_count_key)
+            results = await pipe.execute()
 
-        # If the key was just created by INCR, it has a TTL of -1 (no expiry).
-        # This also handles fixing keys that were stuck without a TTL from the old bug.
-        if ttl == -1:
-            await valkey_client.expire(key, RATE_LIMIT_TTL)
+            count = results[0]
+            ttl = results[1]
 
-        # Allow 5 messages per user. Block on the 6th.
-        return current_count > limit
+            if ttl == -1:
+                # Key was just created, set expiry
+                await valkey_client.expire(message_count_key, int(MESSAGE_LIMIT))
 
-    except Exception as e:
-        logger.error(f"❌ Rate limit check failed for user {user_id}: {e}")
-        # Fallback to memory on error
-        current_time = time.time()
-        last_response = user_last_response_time.get(user_id, 0)
-        return current_time - last_response < MESSAGE_LIMIT
+            if count > RATE_LIMIT_COUNT:
+                # Hard rate limit
+                await valkey_client.setex(hard_limit_key, RATE_LIMIT_TTL, "1")
+                return True # Ignore and hard limit
 
-async def reset_rate_limit(user_id: int):
-    """Reset rate limit for user"""
-    if not valkey_client:
-        return False
+            if count > 1:
+                return True # Ignore subsequent messages
 
-    try:
-        key = f"rate_limit:{user_id}"
-        await valkey_client.delete(key)
-        logger.debug(f"🔄 Rate limit reset for user {user_id}")
+            return False # Process this message
+
+        except Exception as e:
+            logger.error(f"❌ Valkey rate limit check failed for user {user_id}:{chat_id}: {e}. Falling back to memory.")
+            # Fallback to memory if Valkey fails
+            pass
+
+    # In-memory fallback logic
+    key = f"{user_id}:{chat_id}"
+    current_time = time.time()
+
+    # Check for hard limit
+    if key in rate_limited_users and current_time < rate_limited_users[key]:
         return True
-    except Exception as e:
-        logger.error(f"❌ Failed to reset rate limit for user {user_id}: {e}")
-        return False
+    elif key in rate_limited_users:
+        # Clean up expired hard limit
+        del rate_limited_users[key]
+
+    # Get message timestamps for the user-chat combo
+    timestamps = user_message_counts.get(key, [])
+
+    # Filter out timestamps older than our window (1 second)
+    timestamps = [ts for ts in timestamps if current_time - ts < MESSAGE_LIMIT]
+
+    # Add current message timestamp
+    timestamps.append(current_time)
+    user_message_counts[key] = timestamps
+
+    count = len(timestamps)
+
+    if count > RATE_LIMIT_COUNT:
+        # Hard rate limit
+        rate_limited_users[key] = current_time + RATE_LIMIT_TTL
+        return True # Ignore and hard limit
+
+    if count > 1:
+        return True # Ignore subsequent messages
+
+    return False # Process this message
 
 # DATABASE FUNCTIONS
 async def init_database():
@@ -2698,7 +2729,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
                 log_with_user_info("INFO", "✅ Responding to group message (mentioned/replied)", user_info)
 
         # Check rate limiting (using Valkey with memory fallback)
-        if await is_rate_limited_valkey(user_id):
+        if await is_rate_limited(user_id, user_info["chat_id"]):
             log_with_user_info("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
 
