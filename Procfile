@@ -1,1 +1,1 @@
-start: python Sakura/main.py
+start: python sakurachat.py
