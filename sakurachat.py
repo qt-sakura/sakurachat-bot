@@ -63,10 +63,12 @@ OLD_CHAT = 3600
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
 group_ids: Set[int] = set()
+help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_message_counts: Dict[str, list] = {}
 rate_limited_users: Dict[str, float] = {}
 user_last_response_time: Dict[int, float] = {}
+conversation_history: Dict[int, list] = {}
 db_pool = None
 cleanup_task = None
 valkey_client: AsyncValkey = None
@@ -962,10 +964,12 @@ async def get_user_state(user_id: int) -> dict:
         logger.error(f"❌ Failed to get user state for user {user_id}: {e}")
         return {}
 
-async def update_help_expanded_state(user_id: int, expanded: bool, context: ContextTypes.DEFAULT_TYPE):
-    """Update help expanded state in both context and Valkey"""
-    # Update context
-    context.user_data['help_expanded'] = expanded
+async def update_help_expanded_state(user_id: int, expanded: bool):
+    """Update help expanded state in both memory and Valkey"""
+    global help_expanded
+
+    # Update memory
+    help_expanded[user_id] = expanded
 
     # Update Valkey
     if valkey_client:
@@ -973,17 +977,16 @@ async def update_help_expanded_state(user_id: int, expanded: bool, context: Cont
         state['help_expanded'] = expanded
         await save_user_state(user_id, state)
 
-async def get_help_expanded_state(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Get help expanded state from Valkey with context fallback"""
+async def get_help_expanded_state(user_id: int) -> bool:
+    """Get help expanded state from Valkey with memory fallback"""
     # Try Valkey first
     if valkey_client:
         state = await get_user_state(user_id)
         if 'help_expanded' in state:
-            context.user_data['help_expanded'] = state['help_expanded']
             return state['help_expanded']
 
     # Fallback to memory
-    return context.user_data.get('help_expanded', False)
+    return help_expanded.get(user_id, False)
 
 # RATE LIMITING FUNCTIONS
 async def is_rate_limited(user_id: int, chat_id: int) -> bool:
@@ -1479,34 +1482,49 @@ def get_user_mention(user) -> str:
 
 
 # CONVERSATION MEMORY FUNCTIONS
-async def add_to_conversation_history(user_id: int, message: str, context: ContextTypes.DEFAULT_TYPE, is_user: bool = True):
-    """Add message to user's conversation history (Valkey + context.user_data fallback)"""
+async def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
+    """Add message to user's conversation history (Valkey + memory fallback)"""
+    global conversation_history
+
     role = "user" if is_user else "assistant"
     new_message = {"role": role, "content": message}
 
-    # Initialize history in context if not present
-    history = context.user_data.setdefault('conversation_history', [])
-
-    history.append(new_message)
-
-    # Keep only last CHAT_LENGTH messages
-    if len(history) > CHAT_LENGTH:
-        history = history[-CHAT_LENGTH:]
-
-    context.user_data['conversation_history'] = history
-
-    # Try to save to Valkey as primary
+    # Try Valkey first
     if valkey_client:
         try:
             key = f"conversation:{user_id}"
+            existing = await valkey_client.get(key)
+
+            if existing:
+                history = json.loads(existing)
+            else:
+                history = []
+
+            history.append(new_message)
+
+            # Keep only last CHAT_LENGTH messages
+            if len(history) > CHAT_LENGTH:
+                history = history[-CHAT_LENGTH:]
+
             await valkey_client.setex(key, SESSION_TTL, json.dumps(history))
             logger.debug(f"💬 Conversation updated in Valkey for user {user_id}")
+            return
 
         except Exception as e:
             logger.error(f"❌ Failed to update conversation in Valkey for user {user_id}: {e}")
 
-async def get_conversation_context(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> str:
-    """Get formatted conversation context for the user (Valkey + context.user_data fallback)"""
+    # Fallback to memory
+    if user_id not in conversation_history:
+        conversation_history[user_id] = []
+
+    conversation_history[user_id].append(new_message)
+
+    # Keep only last CHAT_LENGTH messages
+    if len(conversation_history[user_id]) > CHAT_LENGTH:
+        conversation_history[user_id] = conversation_history[user_id][-CHAT_LENGTH:]
+
+async def get_conversation_context(user_id: int) -> str:
+    """Get formatted conversation context for the user (Valkey + memory fallback)"""
     history = []
 
     # Try Valkey first
@@ -1516,14 +1534,12 @@ async def get_conversation_context(user_id: int, context: ContextTypes.DEFAULT_T
             existing = await valkey_client.get(key)
             if existing:
                 history = json.loads(existing)
-                # Also load into context's user_data in case of subsequent Valkey failures
-                context.user_data['conversation_history'] = history
         except Exception as e:
             logger.error(f"❌ Failed to get conversation from Valkey for user {user_id}: {e}")
 
     # Fallback to memory
-    if not history:
-        history = context.user_data.get('conversation_history', [])
+    if not history and user_id in conversation_history:
+        history = conversation_history[user_id]
 
     if not history:
         return ""
@@ -1540,33 +1556,44 @@ async def get_conversation_context(user_id: int, context: ContextTypes.DEFAULT_T
 
 async def cleanup_old_conversations():
     """Clean up old conversation histories and response times periodically"""
-    global user_last_response_time
+    global conversation_history, user_last_response_time
 
     logger.info("🧹 Conversation cleanup task started")
 
     while True:
         try:
-            # This function can't clean context.user_data, only Valkey can be cleaned
-            # or the persistence layer would handle it.
-            # For now, we only clean the user_last_response_time dict.
             current_time = time.time()
-            expired_users = [
-                user_id for user_id, last_time in user_last_response_time.items()
-                if current_time - last_time > OLD_CHAT
-            ]
+            conversations_cleaned = 0
 
+            # Find expired conversations
+            expired_users = []
+            for user_id in list(conversation_history.keys()):
+                last_response_time = user_last_response_time.get(user_id, 0)
+                if current_time - last_response_time > OLD_CHAT:
+                    expired_users.append(user_id)
+
+            # Remove expired conversations
             for user_id in expired_users:
-                del user_last_response_time[user_id]
+                if user_id in conversation_history:
+                    del conversation_history[user_id]
+                    conversations_cleaned += 1
+                if user_id in user_last_response_time:
+                    del user_last_response_time[user_id]
 
-            if expired_users:
-                logger.info(f"🧹 Cleaned {len(expired_users)} old user response times")
+            # Log cleanup results
+            if conversations_cleaned > 0:
+                logger.info(f"🧹 Cleaned {conversations_cleaned} old conversations")
+
+            logger.debug(f"📊 Active conversations: {len(conversation_history)}")
 
         except asyncio.CancelledError:
+            # Handle graceful shutdown
             logger.info("🧹 Cleanup task cancelled - shutting down gracefully")
             break
         except Exception as e:
             logger.error(f"❌ Error in conversation cleanup: {e}")
 
+        # Wait for next cleanup cycle (with cancellation support)
         try:
             await asyncio.sleep(CHAT_CLEANUP)
         except asyncio.CancelledError:
@@ -1575,7 +1602,7 @@ async def cleanup_old_conversations():
 
 
 # AI RESPONSE FUNCTIONS
-async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, context: ContextTypes.DEFAULT_TYPE = None) -> str:
+async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context and caching"""
     if user_info:
         log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
@@ -1586,19 +1613,19 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         return get_fallback_response()
 
     try:
-        # Get conversation context if user_id and context provided
-        conv_context = ""
-        if user_id and context:
-            conv_context = await get_conversation_context(user_id, context)
-            if conv_context:
-                conv_context = f"\n\nPrevious conversation:\n{conv_context}\n"
+        # Get conversation context if user_id provided
+        context = ""
+        if user_id:
+            context = await get_conversation_context(user_id)
+            if context:
+                context = f"\n\nPrevious conversation:\n{context}\n"
 
         # Build prompt with context
-        prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{conv_context}\nCurrent user message: {user_message}\n\nSakura's response:"
+        prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
 
         # Check cache for similar short messages (without personal context)
         cache_key = None
-        if len(user_message) <= 50 and not conv_context:  # Only cache short, context-free messages
+        if len(user_message) <= 50 and not context:  # Only cache short, context-free messages
             import hashlib
             cache_key = f"gemini_response:{hashlib.md5(user_message.lower().encode()).hexdigest()}"
             cached_response = await cache_get(cache_key)
@@ -1615,13 +1642,13 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         ai_response = response.text.strip() if response.text else get_fallback_response()
 
         # Cache the response if it was a short, context-free message
-        if cache_key and len(user_message) <= 50 and not conv_context:
+        if cache_key and len(user_message) <= 50 and not context:
             await cache_set(cache_key, ai_response, CACHE_TTL)
 
         # Add messages to conversation history
-        if user_id and context:
-            await add_to_conversation_history(user_id, user_message, context, is_user=True)
-            await add_to_conversation_history(user_id, ai_response, context, is_user=False)
+        if user_id:
+            await add_to_conversation_history(user_id, user_message, is_user=True)
+            await add_to_conversation_history(user_id, ai_response, is_user=False)
 
         if user_info:
             log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
@@ -1636,7 +1663,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         return get_error_response()
 
 
-async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, context: ContextTypes.DEFAULT_TYPE = None) -> str:
+async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze image using Gemini 2.5 Flash with conversation context"""
     if user_info:
         log_with_user_info("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
@@ -1647,17 +1674,17 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
         return "Samjh nahi paa rahi image kya hai 😔"
 
     try:
-        # Get conversation context if user_id and context provided
-        conv_context = ""
-        if user_id and context:
-            conv_context = await get_conversation_context(user_id, context)
-            if conv_context:
-                conv_context = f"\n\nPrevious conversation:\n{conv_context}\n"
+        # Get conversation context if user_id provided
+        context = ""
+        if user_id:
+            context = await get_conversation_context(user_id)
+            if context:
+                context = f"\n\nPrevious conversation:\n{context}\n"
 
         # Build image analysis prompt
         image_prompt = f"""{SAKURA_PROMPT}
 
-User name: {user_name}{conv_context}
+User name: {user_name}{context}
 
 User has sent an image. Caption: "{caption if caption else 'No caption'}"
 
@@ -1687,10 +1714,10 @@ Sakura's response:"""
         ai_response = response.text.strip() if response.text else "Kya cute image hai! 😍"
 
         # Add messages to conversation history
-        if user_id and context:
+        if user_id:
             image_description = f"[Image: {caption}]" if caption else "[Image sent]"
-            await add_to_conversation_history(user_id, image_description, context, is_user=True)
-            await add_to_conversation_history(user_id, ai_response, context, is_user=False)
+            await add_to_conversation_history(user_id, image_description, is_user=True)
+            await add_to_conversation_history(user_id, ai_response, is_user=False)
 
         if user_info:
             log_with_user_info("INFO", f"✅ Image analysis completed: '{ai_response[:50]}...'", user_info)
@@ -1739,7 +1766,7 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
 
             # Analyze the referenced poll
             response = await analyze_poll_with_gemini(
-                poll_question, poll_options, user_name, user_info, user_info["user_id"], context
+                poll_question, poll_options, user_name, user_info, user_info["user_id"]
             )
 
             # Send response (no effects for Gemini responses)
@@ -1794,7 +1821,7 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
 
             # Analyze the referenced image
             response = await analyze_image_with_gemini(
-                image_bytes, caption, user_name, user_info, user_info["user_id"], context
+                image_bytes, caption, user_name, user_info, user_info["user_id"]
             )
 
             # Send response (no effects for Gemini responses)
@@ -1812,8 +1839,9 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
             return True
 
     # Priority 2: Look for recent images in conversation history (for private chats mainly)
-    history = context.user_data.get('conversation_history', [])
-    if history:
+    if user_info["user_id"] in conversation_history:
+        history = conversation_history[user_info["user_id"]]
+
         # Find the most recent image reference
         for message in reversed(history):
             if message["role"] == "user" and "[Image:" in message["content"]:
@@ -1828,7 +1856,7 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
     return False
 
 
-async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, context: ContextTypes.DEFAULT_TYPE = None) -> str:
+async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze poll using Gemini 2.5 Flash to suggest the correct answer"""
     if user_info:
         log_with_user_info("DEBUG", f"📊 Analyzing poll with Gemini: '{poll_question[:50]}...'", user_info)
@@ -1839,12 +1867,12 @@ async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_
         return "Poll samjh nahi paa rahi 😔"
 
     try:
-        # Get conversation context if user_id and context provided
-        conv_context = ""
-        if user_id and context:
-            conv_context = await get_conversation_context(user_id, context)
-            if conv_context:
-                conv_context = f"\n\nPrevious conversation:\n{conv_context}\n"
+        # Get conversation context if user_id provided
+        context = ""
+        if user_id:
+            context = await get_conversation_context(user_id)
+            if context:
+                context = f"\n\nPrevious conversation:\n{context}\n"
 
         # Format poll options
         options_text = "\n".join([f"{i+1}. {option}" for i, option in enumerate(poll_options)])
@@ -1852,7 +1880,7 @@ async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_
         # Build poll analysis prompt
         poll_prompt = f"""{SAKURA_PROMPT}
 
-User name: {user_name}{conv_context}
+User name: {user_name}{context}
 
 User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
 
@@ -1873,10 +1901,10 @@ Sakura's response:"""
         ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
 
         # Add messages to conversation history
-        if user_id and context:
+        if user_id:
             poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
-            await add_to_conversation_history(user_id, poll_description, context, is_user=True)
-            await add_to_conversation_history(user_id, ai_response, context, is_user=False)
+            await add_to_conversation_history(user_id, poll_description, is_user=True)
+            await add_to_conversation_history(user_id, ai_response, is_user=False)
 
         if user_info:
             log_with_user_info("INFO", f"✅ Poll analysis completed: '{ai_response[:50]}...'", user_info)
@@ -2123,10 +2151,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         # Step 3: Prepare help content
         user_id = update.effective_user.id
-        is_expanded = await get_help_expanded_state(user_id, context)
-        keyboard = create_help_keyboard(user_id, is_expanded)
+        keyboard = create_help_keyboard(user_id, False)
         user_mention = get_user_mention(update.effective_user)
-        help_text = get_help_text(user_mention, is_expanded)
+        help_text = get_help_text(user_mention, False)
 
         # Step 4: Send help message with random image
         random_image = random.choice(SAKURA_IMAGES)
@@ -2271,7 +2298,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
             # Send a hi message from Sakura
             user_name = update.effective_user.first_name or ""
-            hi_response = await get_gemini_response("Hi sakura", user_name, user_info, update.effective_user.id, context)
+            hi_response = await get_gemini_response("Hi sakura", user_name, user_info, update.effective_user.id)
 
             # Send with effects if in private chat
             if update.effective_chat.type == "private":
@@ -2329,8 +2356,8 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await query.answer("This button isn't for you 💔", show_alert=True)
             return
 
-        is_expanded = await get_help_expanded_state(user_id, context)
-        await update_help_expanded_state(user_id, not is_expanded, context)
+        is_expanded = await get_help_expanded_state(user_id)
+        await update_help_expanded_state(user_id, not is_expanded)
 
         # Answer callback with appropriate message
         if not is_expanded:
@@ -2586,7 +2613,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_name = update.effective_user.first_name or ""
 
     # Get response from Gemini
-    response = await get_gemini_response(user_message, user_name, user_info, update.effective_user.id, context)
+    response = await get_gemini_response(user_message, user_name, user_info, update.effective_user.id)
 
     log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
 
@@ -2619,7 +2646,7 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
         user_name = update.effective_user.first_name or ""
         caption = update.message.caption or ""
 
-        response = await analyze_image_with_gemini(image_bytes, caption, user_name, user_info, update.effective_user.id, context)
+        response = await analyze_image_with_gemini(image_bytes, caption, user_name, user_info, update.effective_user.id)
 
         log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
 
@@ -2650,7 +2677,7 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Analyze poll with Gemini 2.5 Flash
         user_name = update.effective_user.first_name or ""
 
-        response = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, update.effective_user.id, context)
+        response = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, update.effective_user.id)
 
         log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
 
@@ -3094,7 +3121,7 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
             'groups_count': len(group_ids),
             'total_purchases': 0,
             'total_revenue': 0,
-            'active_conversations': 0 # This is tricky without access to all contexts
+            'active_conversations': len(conversation_history)
         }
 
         if db_pool:
@@ -3137,6 +3164,7 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
 ├ Total Users: <b>{db_stats['users_count']}</b>
 ├ Total Groups: <b>{db_stats['groups_count']}</b>
 ├ Recent Users (24h): <b>{db_stats.get('recent_users', 'N/A')}</b>
+├ Active Conversations: <b>{db_stats['active_conversations']}</b>
 ├ Total Purchases: <b>{db_stats['total_purchases']}</b>
 ├ Total Revenue: <b>{db_stats['total_revenue']} ⭐</b>
 └ Recent Purchases (24h): <b>{db_stats.get('recent_purchases', 'N/A')}</b>
