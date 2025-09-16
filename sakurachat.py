@@ -1,4 +1,3 @@
-
 import os
 import time
 import json
@@ -1635,7 +1634,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
                     log_with_user_info("INFO", f"📦 Using cached response for message", user_info)
                 return cached_response
 
-        response = gemini_client.models.generate_content(
+        response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
         )
@@ -1699,7 +1698,7 @@ Sakura's response:"""
         # Convert bytes to base64 string
         image_data = base64.b64encode(image_bytes).decode('utf-8')
 
-        response = gemini_client.models.generate_content(
+        response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
                 image_prompt,
@@ -1894,7 +1893,7 @@ Analyze this poll question and respond in Sakura's style about which option you 
 
 Sakura's response:"""
 
-        response = gemini_client.models.generate_content(
+        response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=poll_prompt
         )
