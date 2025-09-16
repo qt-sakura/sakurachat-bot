@@ -8,4 +8,4 @@ requests
 tgcrypto
 telethon
 google-genai
-python-telegram-bot==22.4
+python-telegram-bot
