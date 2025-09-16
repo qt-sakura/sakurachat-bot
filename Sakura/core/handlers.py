@@ -2,7 +2,7 @@ import random
 from telegram import Update, ChatMember
 from telegram.ext import ContextTypes
 
-from ..utils.messages import log_with_user_info, extract_user_info
+from ..utils.messages import logger, log_with_user_info, extract_user_info
 from ..utils.actions import send_sticker_action, send_typing_action
 from ..utils.helpers import (
     should_respond_in_group,
