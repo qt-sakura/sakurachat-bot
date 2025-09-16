@@ -3483,7 +3483,7 @@ def run_bot() -> None:
     logger.info("🚀 Initializing Sakura Bot...")
 
     # Create application
-    application = Application.builder().token(BOT_TOKEN).build()
+    application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
 
     # Setup handlers
     setup_handlers(application)
