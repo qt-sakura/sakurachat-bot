@@ -14,27 +14,26 @@ from ..database.cache import cache_get, cache_set
 from ..utils.actions import send_typing_action
 
 logger = logging.getLogger("SAKURA 🌸")
-gemini_model = None
+gemini_client = None
 
-def initialize_gemini_model():
-    """Initialize the Gemini model"""
-    global gemini_model
+def initialize_gemini_client():
+    """Initialize the Gemini client"""
+    global gemini_client
     if not GEMINI_API_KEY:
         logger.error("❌ GEMINI_API_KEY not found in environment variables")
         return
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        gemini_model = genai.GenerativeModel('gemini-2.5-flash')
-        logger.info("✅ Gemini model initialized successfully")
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        logger.info("✅ Gemini client initialized successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Gemini model: {e}")
+        logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: dict = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context and caching"""
     if user_info:
         log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
 
-    if not gemini_model:
+    if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available, using fallback response", user_info)
         return get_fallback_response()
@@ -56,7 +55,9 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
                     log_with_user_info("INFO", f"📦 Using cached response for message", user_info)
                 return cached_response
 
-        response = await gemini_model.generate_content_async(prompt)
+        response = await gemini_client.aio.models.generate_content(
+            model='gemini-2.5-flash', contents=prompt
+        )
         ai_response = response.text.strip() if response.text else get_fallback_response()
 
         if cache_key:
@@ -83,7 +84,7 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
     if user_info:
         log_with_user_info("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
 
-    if not gemini_model:
+    if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available for image analysis", user_info)
         return "Samjh nahi paa rahi image kya hai 😔"
@@ -110,7 +111,9 @@ Sakura's response:"""
             "data": image_bytes
         }
 
-        response = await gemini_model.generate_content_async([image_prompt, image_part])
+        response = await gemini_client.aio.models.generate_content(
+            model='gemini-2.5-flash', contents=[image_prompt, image_part]
+        )
         ai_response = response.text.strip() if response.text else "Kya cute image hai! 😍"
 
         if user_id:
@@ -212,7 +215,7 @@ async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_
     if user_info:
         log_with_user_info("DEBUG", f"📊 Analyzing poll with Gemini: '{poll_question[:50]}...'", user_info)
 
-    if not gemini_model:
+    if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available for poll analysis", user_info)
         return "Poll samjh nahi paa rahi 😔"
@@ -240,7 +243,9 @@ Analyze this poll question and respond in Sakura's style about which option you 
 
 Sakura's response:"""
 
-        response = await gemini_model.generate_content_async(poll_prompt)
+        response = await gemini_client.aio.models.generate_content(
+            model='gemini-2.5-flash', contents=poll_prompt
+        )
         ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
 
         if user_id:
@@ -260,5 +265,5 @@ Sakura's response:"""
             logger.error(f"Poll analysis error: {e}")
         return "Poll analyze nahi kar paa rahi 😕"
 
-# Initialize the model when the module is loaded
-initialize_gemini_model()
+# Initialize the client when the module is loaded
+initialize_gemini_client()
