@@ -1625,9 +1625,9 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
 
         # Check cache for similar short messages (without personal context)
         cache_key = None
-        if len(user_message) <= 50 and not context:  # Only cache short, context-free messages
+        if len(user_message) <= 50 and not context and user_id:  # Only cache short, context-free messages
             import hashlib
-            cache_key = f"gemini_response:{hashlib.md5(user_message.lower().encode()).hexdigest()}"
+            cache_key = f"gemini_response:{user_id}:{hashlib.md5(user_message.lower().encode()).hexdigest()}"
             cached_response = await cache_get(cache_key)
             if cached_response:
                 if user_info:
@@ -1642,7 +1642,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         ai_response = response.text.strip() if response.text else get_fallback_response()
 
         # Cache the response if it was a short, context-free message
-        if cache_key and len(user_message) <= 50 and not context:
+        if cache_key:
             await cache_set(cache_key, ai_response, CACHE_TTL)
 
         # Add messages to conversation history
