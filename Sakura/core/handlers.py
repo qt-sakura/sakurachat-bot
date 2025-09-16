@@ -227,19 +227,22 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle errors"""
-    log_with_user_info("ERROR", f"Exception while handling an update: {context.error}", extract_user_info(update.message))
+    """Log the error and send a message to the user."""
+    logger.error("Exception while handling an update:", exc_info=context.error)
 
-    # Try to extract user info if update has a message
+    # Try to extract user info for more detailed logging
+    user_info = {}
+    message = None
     if hasattr(update, 'message') and update.message:
+        message = update.message
+    elif hasattr(update, 'callback_query') and update.callback_query:
+        message = update.callback_query.message
+
+    if message:
         try:
-            user_info = extract_user_info(update.message)
-            log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
-        except:
-            log_with_user_info("ERROR", f"Could not extract user info for error: {context.error}", {})
-    elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
-        try:
-            user_info = extract_user_info(update.callback_query.message)
-            log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
-        except:
-            log_with_user_info("ERROR", f"Could not extract user info for callback error: {context.error}", {})
+            user_info = extract_user_info(message)
+            log_with_user_info("ERROR", f"An exception was raised while handling an update: {context.error}", user_info)
+        except Exception as e:
+            logger.error(f"Could not extract user info for error logging: {e}")
+    else:
+        logger.error(f"An exception was raised for an update without a message object: {context.error}")
