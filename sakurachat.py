@@ -7,6 +7,7 @@ import psutil
 import valkey
 import asyncio
 import aiohttp
+from aiohttp import web
 import logging
 import asyncpg
 import datetime
@@ -3564,7 +3565,7 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-def run_bot() -> None:
+async def run_bot() -> None:
     """Run the bot"""
     if not validate_config():
         return
@@ -3626,44 +3627,40 @@ def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot with polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    # Run the bot with polling asynchronously
+    async with application:
+        await application.start()
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+        await asyncio.Future()  # Keep the bot running
 
 
 # HTTP SERVER FOR DEPLOYMENT
 # A dummy HTTP handler for keep-alive purposes on deployment platforms
-class DummyHandler(BaseHTTPRequestHandler):
+async def http_get_handler(request):
     """Simple HTTP handler for keep-alive server"""
+    return web.Response(text="Sakura bot is alive!")
 
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Sakura bot is alive!")
-
-    def do_HEAD(self):
-        self.send_response(200)
-        self.end_headers()
-
-    def log_message(self, format, *args):
-        # Suppress HTTP server logs
-        pass
-
-
-# Starts the dummy HTTP server
-def start_dummy_server() -> None:
-    """Start dummy HTTP server for deployment platforms"""
+async def start_dummy_server_async():
+    """Start dummy HTTP server for deployment platforms using aiohttp"""
     port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    app = web.Application()
+    app.router.add_get('/', http_get_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
     logger.info(f"🌐 Dummy server listening on port {port}")
-    server.serve_forever()
+
+    # Wait indefinitely, or until the task is cancelled
+    await asyncio.Event().wait()
 
 
 # MAIN FUNCTION
 # The main function to run the bot
-def main() -> None:
+async def main() -> None:
     """Main function"""
     try:
-        # Install uvloop for better performance - ADD THESE 6 LINES
+        # Install uvloop for better performance
         try:
             uvloop.install()
             logger.info("🚀 uvloop installed successfully")
@@ -3671,15 +3668,22 @@ def main() -> None:
             logger.warning("⚠️ uvloop not available")
         except Exception as e:
             logger.warning(f"⚠️ uvloop setup failed: {e}")
-        # END OF UVLOOP SETUP
 
         logger.info("🌸 Sakura Bot starting up...")
 
-        # Start dummy server in background thread
-        threading.Thread(target=start_dummy_server, daemon=True).start()
+        # Start dummy server as an asyncio task
+        server_task = asyncio.create_task(start_dummy_server_async())
 
         # Run the bot
-        run_bot()
+        await run_bot()
+
+        # This part will likely not be reached if run_bot runs forever,
+        # but it's good practice for graceful shutdown.
+        server_task.cancel()
+        try:
+            await server_task
+        except asyncio.CancelledError:
+            logger.info("Dummy server task cancelled.")
 
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
@@ -3688,4 +3692,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
