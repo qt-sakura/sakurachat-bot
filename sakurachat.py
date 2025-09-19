@@ -3564,7 +3564,7 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-def run_bot() -> None:
+async def run_bot() -> None:
     """Run the bot"""
     if not validate_config():
         return
@@ -3626,8 +3626,14 @@ def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot with polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    # Run the bot asynchronously
+    async with application:
+        await application.start()
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+        try:
+            await asyncio.Event().wait()
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            await application.updater.stop()
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -3660,10 +3666,10 @@ def start_dummy_server() -> None:
 
 # MAIN FUNCTION
 # The main function to run the bot
-def main() -> None:
+async def main() -> None:
     """Main function"""
     try:
-        # Install uvloop for better performance - ADD THESE 6 LINES
+        # Install uvloop for better performance
         try:
             uvloop.install()
             logger.info("🚀 uvloop installed successfully")
@@ -3679,13 +3685,14 @@ def main() -> None:
         threading.Thread(target=start_dummy_server, daemon=True).start()
 
         # Run the bot
-        run_bot()
+        await run_bot()
 
-    except KeyboardInterrupt:
-        logger.info("🛑 Bot stopped by user")
     except Exception as e:
         logger.error(f"💥 Fatal error: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
