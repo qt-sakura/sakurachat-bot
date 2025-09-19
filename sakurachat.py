@@ -3563,6 +3563,73 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
+# Runs the bot
+def run_bot() -> None:
+    """Run the bot"""
+    if not validate_config():
+        return
+
+    logger.info("🚀 Initializing Sakura Bot...")
+
+    # Create application
+    application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
+
+    # Setup handlers
+    setup_handlers(application)
+
+    # Setup bot commands and database using post_init
+    async def post_init(app):
+        global cleanup_task
+
+        # Initialize Valkey
+        valkey_success = await init_valkey()
+        if not valkey_success:
+            logger.warning("⚠️ Valkey initialization failed. Bot will continue with memory fallback.")
+
+        # Initialize database
+        db_success = await init_database()
+        if not db_success:
+            logger.error("❌ Database initialization failed. Bot will continue without persistence.")
+
+        # Start Telethon effects client
+        await start_effects_client()
+
+        await setup_bot_commands(app)
+
+        # Start conversation cleanup task and store reference
+        cleanup_task = asyncio.create_task(cleanup_old_conversations())
+
+        logger.info("🌸 Sakura Bot initialization completed!")
+
+    # Setup shutdown handler
+    async def post_shutdown(app):
+        global cleanup_task
+
+        # Cancel cleanup task gracefully
+        if cleanup_task and not cleanup_task.done():
+            logger.info("🛑 Cancelling cleanup task...")
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                logger.info("✅ Cleanup task cancelled successfully")
+            except Exception as e:
+                logger.error(f"❌ Error cancelling cleanup task: {e}")
+
+        await close_database()
+        await close_valkey()
+        await stop_effects_client()
+        logger.info("🌸 Sakura Bot shutdown completed!")
+
+    application.post_init = post_init
+    application.post_shutdown = post_shutdown
+
+    logger.info("🌸 Sakura Bot is starting...")
+
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+
 # HTTP SERVER FOR DEPLOYMENT
 # A dummy HTTP handler for keep-alive purposes on deployment platforms
 class DummyHandler(BaseHTTPRequestHandler):
@@ -3593,77 +3660,32 @@ def start_dummy_server() -> None:
 
 # MAIN FUNCTION
 # The main function to run the bot
-async def main() -> None:
-    """Main function to initialize and run the bot."""
-    # Install uvloop for better performance
+def main() -> None:
+    """Main function"""
     try:
-        uvloop.install()
-        logger.info("🚀 uvloop installed successfully")
-    except (ImportError, Exception) as e:
-        logger.warning(f"⚠️ uvloop not available or setup failed: {e}")
+        # Install uvloop for better performance - ADD THESE 6 LINES
+        try:
+            uvloop.install()
+            logger.info("🚀 uvloop installed successfully")
+        except ImportError:
+            logger.warning("⚠️ uvloop not available")
+        except Exception as e:
+            logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
 
-    # Validate configuration before proceeding
-    if not validate_config():
-        return
+        logger.info("🌸 Sakura Bot starting up...")
 
-    logger.info("🚀 Initializing Sakura Bot...")
+        # Start dummy server in background thread
+        threading.Thread(target=start_dummy_server, daemon=True).start()
 
-    # Create the application
-    application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
-
-    # Setup all handlers
-    setup_handlers(application)
-
-    # Define post-initialization logic
-    async def post_init(app: Application) -> None:
-        global cleanup_task
-        # Initialize backend services
-        if not await init_valkey():
-            logger.warning("⚠️ Valkey initialization failed. Using memory fallback.")
-        if not await init_database():
-            logger.error("❌ Database initialization failed. Continuing without persistence.")
-
-        await start_effects_client()
-        await setup_bot_commands(app)
-
-        # Start background tasks
-        cleanup_task = asyncio.create_task(cleanup_old_conversations())
-        logger.info("🌸 Sakura Bot initialization completed!")
-
-    # Define post-shutdown logic
-    async def post_shutdown(app: Application) -> None:
-        global cleanup_task
-        # Gracefully stop background tasks
-        if cleanup_task and not cleanup_task.done():
-            cleanup_task.cancel()
-            try:
-                await cleanup_task
-            except asyncio.CancelledError:
-                pass  # Expected behavior
-
-        # Close connections
-        await close_database()
-        await close_valkey()
-        await stop_effects_client()
-        logger.info("🌸 Sakura Bot shutdown completed!")
-
-    # Assign post-init and post-shutdown hooks
-    application.post_init = post_init
-    application.post_shutdown = post_shutdown
-
-    # Start dummy HTTP server for keep-alive
-    threading.Thread(target=start_dummy_server, daemon=True).start()
-
-    logger.info("🌸 Sakura Bot is starting...")
-
-    try:
         # Run the bot
-        await application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("🛑 Bot stopped by user.")
+        run_bot()
+
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
     except Exception as e:
-        logger.error(f"💥 Fatal error in bot execution: {e}", exc_info=True)
+        logger.error(f"💥 Fatal error: {e}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
