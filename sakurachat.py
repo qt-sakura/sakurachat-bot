@@ -3564,7 +3564,7 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-def run_bot() -> None:
+async def run_bot() -> None:
     """Run the bot"""
     if not validate_config():
         return
@@ -3626,8 +3626,26 @@ def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot with polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    # Run the bot asynchronously
+    try:
+        await application.initialize()
+        if application.post_init:
+            await application.post_init(application)
+        await application.start()
+        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+        # Keep the bot running until it's stopped
+        await asyncio.Event().wait()
+    except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
+        logger.info("🛑 Bot is shutting down...")
+    finally:
+        if application.updater.running:
+            await application.updater.stop()
+        if application.running:
+            await application.stop()
+        await application.shutdown()
+        if application.post_shutdown:
+            await application.post_shutdown(application)
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -3660,7 +3678,7 @@ def start_dummy_server() -> None:
 
 # MAIN FUNCTION
 # The main function to run the bot
-def main() -> None:
+async def main() -> None:
     """Main function"""
     try:
         # Install uvloop for better performance - ADD THESE 6 LINES
@@ -3679,7 +3697,7 @@ def main() -> None:
         threading.Thread(target=start_dummy_server, daemon=True).start()
 
         # Run the bot
-        run_bot()
+        await run_bot()
 
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
@@ -3688,4 +3706,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("🛑 Bot stopped by user")
+    except Exception as e:
+        logger.error(f"💥 Fatal error in main: {e}", exc_info=True)
