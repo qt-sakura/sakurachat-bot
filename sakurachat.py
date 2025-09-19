@@ -33,7 +33,7 @@ from telegram.ext import (
 )
 from google import genai
 from typing import Dict, Set, Optional
-from telegram.error import TelegramError, Forbidden, BadRequest
+from telegram.error import TelegramError, Forbidden, BadRequest, Conflict
 from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
@@ -3636,6 +3636,8 @@ async def run_bot() -> None:
 
         # Keep the bot running until it's stopped
         await asyncio.Event().wait()
+    except Conflict:
+        logger.error("❌ Another instance of the bot is already running. Please stop the other instance and try again.")
     except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
         logger.info("🛑 Bot is shutting down...")
     finally:
