@@ -3664,30 +3664,28 @@ def start_dummy_server() -> None:
 # The main function to run the bot
 async def main() -> None:
     """Main function"""
+    logger.info("🌸 Sakura Bot starting up...")
+
+    # Start dummy server in background thread
+    threading.Thread(target=start_dummy_server, daemon=True).start()
+
+    # Run the bot
+    await run_bot()
+
+
+if __name__ == "__main__":
+    # Install uvloop for better performance
     try:
-        # Install uvloop for better performance - ADD THESE 6 LINES
-        try:
-            uvloop.install()
-            logger.info("🚀 uvloop installed successfully")
-        except ImportError:
-            logger.warning("⚠️ uvloop not available")
-        except Exception as e:
-            logger.warning(f"⚠️ uvloop setup failed: {e}")
-        # END OF UVLOOP SETUP
+        uvloop.install()
+        logger.info("🚀 uvloop installed successfully")
+    except ImportError:
+        logger.warning("⚠️ uvloop not available")
+    except Exception as e:
+        logger.warning(f"⚠️ uvloop setup failed: {e}")
 
-        logger.info("🌸 Sakura Bot starting up...")
-
-        # Start dummy server in background thread
-        threading.Thread(target=start_dummy_server, daemon=True).start()
-
-        # Run the bot
-        await run_bot()
-
+    try:
+        asyncio.run(main())
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("🛑 Bot stopped by user")
     except Exception as e:
         logger.error(f"💥 Fatal error: {e}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
