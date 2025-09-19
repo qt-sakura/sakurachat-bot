@@ -544,6 +544,7 @@ Every message must feel like a whisper you wait to hear again 🌙
 # LOGGING SETUP
 # Color codes for logging
 class Colors:
+    # ANSI color codes for colorful logging
     BLUE = '\033[94m'      # INFO/WARNING
     GREEN = '\033[92m'     # DEBUG
     YELLOW = '\033[93m'    # INFO
@@ -551,9 +552,11 @@ class Colors:
     RESET = '\033[0m'      # Reset color
     BOLD = '\033[1m'       # Bold text
 
+# Custom formatter for colored logs
 class ColoredFormatter(logging.Formatter):
     """Custom formatter to add colors to entire log messages"""
 
+    # Color mapping for log levels
     COLORS = {
         'DEBUG': Colors.GREEN,
         'INFO': Colors.YELLOW,
@@ -561,6 +564,7 @@ class ColoredFormatter(logging.Formatter):
         'ERROR': Colors.RED,
     }
 
+    # Formats the log record with appropriate colors
     def format(self, record):
         # Get the original formatted message
         original_format = super().format(record)
@@ -575,6 +579,7 @@ class ColoredFormatter(logging.Formatter):
 
 # Configure logging with colors
 def setup_colored_logging():
+    # Sets up a colored logger for the bot
     """Setup colored logging configuration"""
     logger = logging.getLogger("SAKURA 🌸")
     logger.setLevel(logging.INFO)
@@ -615,6 +620,7 @@ except Exception as e:
     logger.error(f"❌ Failed to initialize Telethon effects client: {e}")
 
 # TELETHON EFFECTS FUNCTIONS
+# Sends a message with a random effect using Telethon
 async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
     """Send message with random effect using Telethon"""
     if not effects_client:
@@ -647,6 +653,7 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
         logger.error(f"❌ Effect error for {chat_id}: {e}")
         return False
 
+# Sends an animated emoji reaction to a message
 async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> bool:
     """Send animated emoji reaction using direct API call"""
     try:
@@ -671,6 +678,7 @@ async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> b
         logger.error(f"❌ Animated reaction error for {chat_id}: {e}")
         return False
 
+# Adds a reaction to a message using PTB's method as a fallback
 async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any]):
     """Fallback PTB reaction without animation"""
     try:
@@ -706,6 +714,7 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
     except Exception as e:
         log_with_user_info("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
 
+# Sends a photo with a random effect
 async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
     """Send photo message with random effect using direct API"""
     if not effects_client:
@@ -770,6 +779,7 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
         logger.error(f"❌ Photo effect error for {chat_id}: {e}")
         return False
 
+# Starts the Telethon client for sending effects
 async def start_effects_client():
     """Start Telethon effects client"""
     global effects_client
@@ -781,6 +791,7 @@ async def start_effects_client():
             logger.error(f"❌ Failed to start Telethon effects client: {e}")
             effects_client = None
 
+# Stops the Telethon client
 async def stop_effects_client():
     """Stop Telethon effects client"""
     global effects_client
@@ -801,6 +812,7 @@ except Exception as e:
     logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
 # VALKEY FUNCTIONS
+# Initializes the Valkey (in-memory data store) connection
 async def init_valkey():
     """Initialize Valkey connection"""
     global valkey_client
@@ -825,6 +837,7 @@ async def init_valkey():
         valkey_client = None
         return False
 
+# Closes the Valkey connection
 async def close_valkey():
     """Close Valkey connection"""
     global valkey_client
@@ -837,6 +850,7 @@ async def close_valkey():
             logger.error(f"❌ Error closing Valkey connection: {e}")
 
 # SESSION STORAGE FUNCTIONS
+# Saves a user's session data to Valkey
 async def save_user_session(user_id: int, session_data: dict):
     """Save user session data to Valkey"""
     if not valkey_client:
@@ -855,6 +869,7 @@ async def save_user_session(user_id: int, session_data: dict):
         logger.error(f"❌ Failed to save session for user {user_id}: {e}")
         return False
 
+# Retrieves a user's session data from Valkey
 async def get_user_session(user_id: int) -> dict:
     """Get user session data from Valkey"""
     if not valkey_client:
@@ -870,6 +885,7 @@ async def get_user_session(user_id: int) -> dict:
         logger.error(f"❌ Failed to get session for user {user_id}: {e}")
         return {}
 
+# Deletes a user's session from Valkey
 async def delete_user_session(user_id: int):
     """Delete user session from Valkey"""
     if not valkey_client:
@@ -885,6 +901,7 @@ async def delete_user_session(user_id: int):
         return False
 
 # CACHING FUNCTIONS
+# Sets a value in the Valkey cache
 async def cache_set(key: str, value: any, ttl: int = CACHE_TTL):
     """Set cache value in Valkey"""
     if not valkey_client:
@@ -900,6 +917,7 @@ async def cache_set(key: str, value: any, ttl: int = CACHE_TTL):
         logger.error(f"❌ Failed to set cache for key {key}: {e}")
         return False
 
+# Retrieves a value from the Valkey cache
 async def cache_get(key: str) -> any:
     """Get cache value from Valkey"""
     if not valkey_client:
@@ -917,6 +935,7 @@ async def cache_get(key: str) -> any:
         logger.error(f"❌ Failed to get cache for key {key}: {e}")
         return None
 
+# Deletes a value from the Valkey cache
 async def cache_delete(key: str):
     """Delete cache value from Valkey"""
     if not valkey_client:
@@ -931,6 +950,7 @@ async def cache_delete(key: str):
         return False
 
 # USER STATE MANAGEMENT
+# Saves the state of a user (e.g., help menu expanded) to Valkey
 async def save_user_state(user_id: int, state_data: dict):
     """Save user state (help_expanded, broadcast_mode, etc.) to Valkey"""
     if not valkey_client:
@@ -949,6 +969,7 @@ async def save_user_state(user_id: int, state_data: dict):
         logger.error(f"❌ Failed to save user state for user {user_id}: {e}")
         return False
 
+# Retrieves the state of a user from Valkey
 async def get_user_state(user_id: int) -> dict:
     """Get user state from Valkey"""
     if not valkey_client:
@@ -964,6 +985,7 @@ async def get_user_state(user_id: int) -> dict:
         logger.error(f"❌ Failed to get user state for user {user_id}: {e}")
         return {}
 
+# Updates the "help expanded" state for a user
 async def update_help_expanded_state(user_id: int, expanded: bool):
     """Update help expanded state in both memory and Valkey"""
     global help_expanded
@@ -977,6 +999,7 @@ async def update_help_expanded_state(user_id: int, expanded: bool):
         state['help_expanded'] = expanded
         await save_user_state(user_id, state)
 
+# Retrieves the "help expanded" state for a user
 async def get_help_expanded_state(user_id: int) -> bool:
     """Get help expanded state from Valkey with memory fallback"""
     # Try Valkey first
@@ -989,6 +1012,7 @@ async def get_help_expanded_state(user_id: int) -> bool:
     return help_expanded.get(user_id, False)
 
 # RATE LIMITING FUNCTIONS
+# Checks if a user has been rate-limited
 async def is_rate_limited(user_id: int, chat_id: int) -> bool:
     """
     Checks if a user is rate-limited based on a per-user, per-chat basis.
@@ -1067,6 +1091,7 @@ async def is_rate_limited(user_id: int, chat_id: int) -> bool:
     return False # Process this message
 
 # DATABASE FUNCTIONS
+# Initializes the database connection and creates tables if they don't exist
 async def init_database():
     """Initialize database connection and create tables"""
     global db_pool
@@ -1140,6 +1165,7 @@ async def init_database():
         logger.error(f"❌ Database initialization failed: {e}")
         return False
 
+# Loads user and group IDs from the database into memory
 async def load_data_from_database():
     """Load user IDs and group IDs from database into memory"""
     global user_ids, group_ids
@@ -1163,6 +1189,7 @@ async def load_data_from_database():
     except Exception as e:
         logger.error(f"❌ Failed to load data from database: {e}")
 
+# Asynchronously saves user data to the database
 def save_user_to_database_async(user_id: int, username: str = None, first_name: str = None, last_name: str = None):
     """Save user to database asynchronously (fire and forget)"""
     if not db_pool:
@@ -1190,6 +1217,7 @@ def save_user_to_database_async(user_id: int, username: str = None, first_name: 
     # Schedule the save operation without waiting
     asyncio.create_task(save_user())
 
+# Asynchronously saves group data to the database
 def save_group_to_database_async(group_id: int, title: str = None, username: str = None, chat_type: str = None):
     """Save group to database asynchronously (fire and forget)"""
     if not db_pool:
@@ -1217,6 +1245,7 @@ def save_group_to_database_async(group_id: int, title: str = None, username: str
     # Schedule the save operation without waiting
     asyncio.create_task(save_group())
 
+# Retrieves all user IDs from the database
 async def get_users_from_database():
     """Get all user IDs from database"""
     if not db_pool:
@@ -1230,6 +1259,7 @@ async def get_users_from_database():
         logger.error(f"❌ Failed to get users from database: {e}")
         return list(user_ids)  # Fallback to memory
 
+# Retrieves all group IDs from the database
 async def get_groups_from_database():
     """Get all group IDs from database"""
     if not db_pool:
@@ -1243,6 +1273,7 @@ async def get_groups_from_database():
         logger.error(f"❌ Failed to get groups from database: {e}")
         return list(group_ids)  # Fallback to memory
 
+# Asynchronously saves purchase data to the database
 def save_purchase_to_database_async(user_id: int, username: str = None, first_name: str = None, last_name: str = None, amount: int = 0, charge_id: str = None):
     """Save purchase to database asynchronously (fire and forget)"""
     if not db_pool:
@@ -1265,6 +1296,7 @@ def save_purchase_to_database_async(user_id: int, username: str = None, first_na
     # Schedule the save operation without waiting
     asyncio.create_task(save_purchase())
 
+# Retrieves all purchase records from the database
 async def get_all_purchases():
     """Get all purchases from database ordered by amount descending"""
     if not db_pool:
@@ -1283,6 +1315,7 @@ async def get_all_purchases():
         logger.error(f"❌ Failed to get purchases from database: {e}")
         return []
 
+# Closes the database connection pool
 async def close_database():
     """Close database connection pool"""
     global db_pool
@@ -1292,6 +1325,7 @@ async def close_database():
         logger.info("✅ Database connection pool closed")
 
 
+# Removes a user from the database
 async def remove_user_from_database(user_id: int):
     """Remove a user from the database and memory."""
     global user_ids
@@ -1310,6 +1344,7 @@ async def remove_user_from_database(user_id: int):
         logger.error(f"❌ Failed to remove user {user_id} from database: {e}")
 
 
+# Removes a group from the database
 async def remove_group_from_database(group_id: int):
     """Remove a group from the database and memory."""
     global group_ids
@@ -1329,6 +1364,7 @@ async def remove_group_from_database(group_id: int):
 
 
 # UTILITY FUNCTIONS
+# Extracts user and chat information from a message
 def extract_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
     logger.debug("🔍 Extracting user information from message")
@@ -1353,6 +1389,7 @@ def extract_user_info(msg: Message) -> Dict[str, any]:
     return info
 
 
+# Logs a message with detailed user information
 def log_with_user_info(level: str, message: str, user_info: Dict[str, any]) -> None:
     """Log message with user information"""
     user_detail = (
@@ -1375,16 +1412,19 @@ def log_with_user_info(level: str, message: str, user_info: Dict[str, any]) -> N
         logger.info(full_message)
 
 
+# Returns a random fallback response
 def get_fallback_response() -> str:
     """Get a random fallback response when API fails"""
     return random.choice(RESPONSES)
 
 
+# Returns a random error response
 def get_error_response() -> str:
     """Get a random error response when something goes wrong"""
     return random.choice(ERROR)
 
 
+# Validates the bot's configuration
 def validate_config() -> bool:
     """Validate bot configuration"""
     if not BOT_TOKEN:
@@ -1408,6 +1448,7 @@ def validate_config() -> bool:
     return True
 
 
+# Updates the last response time for a user in Valkey
 async def update_user_response_time_valkey(user_id: int) -> None:
     """Update the last response time for user in Valkey"""
     if valkey_client:
@@ -1422,6 +1463,7 @@ async def update_user_response_time_valkey(user_id: int) -> None:
     user_last_response_time[user_id] = time.time()
 
 
+# Determines if the bot should respond to a message in a group chat
 def should_respond_in_group(update: Update, bot_id: int) -> bool:
     """Determine if bot should respond in group chat"""
     user_message = update.message.text or update.message.caption or ""
@@ -1438,6 +1480,7 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
     return False
 
 
+# Tracks user and chat IDs for broadcasting purposes
 def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
     """Track user and chat IDs for broadcasting (fast memory + async database)"""
     user_id = user_info["user_id"]
@@ -1475,6 +1518,7 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
             log_with_user_info("INFO", f"📢 New group tracked for broadcasting", user_info)
 
 
+# Creates a user mention in HTML format
 def get_user_mention(user) -> str:
     """Create user mention for HTML parsing using first name"""
     first_name = user.first_name or "Friend"
@@ -1482,6 +1526,7 @@ def get_user_mention(user) -> str:
 
 
 # CONVERSATION MEMORY FUNCTIONS
+# Adds a message to the user's conversation history
 async def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
     """Add message to user's conversation history (Valkey + memory fallback)"""
     global conversation_history
@@ -1523,6 +1568,7 @@ async def add_to_conversation_history(user_id: int, message: str, is_user: bool 
     if len(conversation_history[user_id]) > CHAT_LENGTH:
         conversation_history[user_id] = conversation_history[user_id][-CHAT_LENGTH:]
 
+# Retrieves the conversation context for a user
 async def get_conversation_context(user_id: int) -> str:
     """Get formatted conversation context for the user (Valkey + memory fallback)"""
     history = []
@@ -1554,6 +1600,7 @@ async def get_conversation_context(user_id: int) -> str:
     return "\n".join(context_lines)
 
 
+# Periodically cleans up old conversation histories
 async def cleanup_old_conversations():
     """Clean up old conversation histories and response times periodically"""
     global conversation_history, user_last_response_time
@@ -1602,6 +1649,7 @@ async def cleanup_old_conversations():
 
 
 # AI RESPONSE FUNCTIONS
+# Gets a response from the Gemini API
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context and caching"""
     if user_info:
@@ -1663,6 +1711,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         return get_error_response()
 
 
+# Analyzes an image using the Gemini API
 async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze image using Gemini 2.5 Flash with conversation context"""
     if user_info:
@@ -1732,6 +1781,7 @@ Sakura's response:"""
         return "Image analyze nahi kar paa rahi 😕"
 
 
+# Analyzes a poll that was referenced in a message
 async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent poll and handle it"""
     # Check if message contains requests for poll analysis
@@ -1786,6 +1836,7 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
     return False
 
 
+# Analyzes an image that was referenced in a message
 async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent image and handle it"""
     # Check if message contains requests for image analysis
@@ -1856,6 +1907,7 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
     return False
 
 
+# Analyzes a poll using the Gemini API
 async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze poll using Gemini 2.5 Flash to suggest the correct answer"""
     if user_info:
@@ -1920,18 +1972,21 @@ Sakura's response:"""
 
 
 # CHAT ACTION FUNCTIONS
+# Sends the "typing" action in a chat
 async def send_typing_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send typing action to show bot is processing"""
     log_with_user_info("DEBUG", "⌨️ Sending typing action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
 
+# Sends the "uploading photo" action in a chat
 async def send_photo_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send upload photo action"""
     log_with_user_info("DEBUG", "📷 Sending photo upload action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
 
 
+# Sends the "choosing sticker" action in a chat
 async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send choosing sticker action"""
     log_with_user_info("DEBUG", "🎭 Sending sticker choosing action", user_info)
@@ -1939,6 +1994,7 @@ async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, 
 
 
 # KEYBOARD CREATION FUNCTIONS
+# Creates the initial keyboard for the /start command
 def create_initial_start_keyboard() -> InlineKeyboardMarkup:
     """Create initial start keyboard with Info and Hi buttons"""
     keyboard = [
@@ -1950,6 +2006,7 @@ def create_initial_start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+# Creates the keyboard for the "info" section of the /start command
 def create_info_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
     """Create inline keyboard for start info (original start buttons)"""
     keyboard = [
@@ -1965,16 +2022,19 @@ def create_info_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+# Gets the initial caption for the /start command
 def get_initial_start_caption(user_mention: str) -> str:
     """Get initial caption text for start command with user mention"""
     return START_MESSAGES["initial_caption"].format(user_mention=user_mention)
 
 
+# Gets the caption for the "info" section of the /start command
 def get_info_start_caption(user_mention: str) -> str:
     """Get info caption text for start command with user mention"""
     return START_MESSAGES["info_caption"].format(user_mention=user_mention)
 
 
+# Creates the keyboard for the /help command
 def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboardMarkup:
     """Create help command keyboard"""
     if expanded:
@@ -1986,6 +2046,7 @@ def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboard
     return InlineKeyboardMarkup(keyboard)
 
 
+# Gets the text for the /help command
 def get_help_text(user_mention: str, expanded: bool = False) -> str:
     """Get help text based on expansion state with user mention"""
     if expanded:
@@ -1994,6 +2055,7 @@ def get_help_text(user_mention: str, expanded: bool = False) -> str:
         return HELP_MESSAGES["minimal"].format(user_mention=user_mention)
 
 
+# Creates the keyboard for the /broadcast command
 def create_broadcast_keyboard() -> InlineKeyboardMarkup:
     """Create broadcast target selection keyboard"""
     keyboard = [
@@ -2011,6 +2073,7 @@ def create_broadcast_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+# Gets the text for the /broadcast command
 def get_broadcast_text() -> str:
     """Get broadcast command text"""
     return BROADCAST_MESSAGES["select_target"].format(
@@ -2020,6 +2083,7 @@ def get_broadcast_text() -> str:
 
 
 # COMMAND HANDLERS
+# Handles the /start command
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command with two-step inline buttons and effects in private chat"""
     try:
@@ -2114,6 +2178,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text(get_error_response())
 
 
+# Handles the /help command
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command with random image and effects in private chat"""
     try:
@@ -2198,6 +2263,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(get_error_response())
 
 
+# Handles the /broadcast command (owner only)
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast command (owner only)"""
     user_info = extract_user_info(update.message)
@@ -2228,6 +2294,7 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     log_with_user_info("INFO", "✅ Broadcast selection menu sent", user_info)
 
 
+# Handles the /ping command
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle ping command for everyone"""
     user_info = extract_user_info(update.message)
@@ -2253,6 +2320,7 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 # CALLBACK HANDLERS
+# Handles callbacks from the /start command keyboard
 async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle start command inline button callbacks"""
     query = update.callback_query
@@ -2331,6 +2399,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             pass
 
 
+# Handles callbacks from the /help command keyboard
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help expand/minimize callbacks"""
     query = update.callback_query
@@ -2388,6 +2457,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             pass
 
 
+# Handles callbacks from the /broadcast command keyboard
 async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast target selection and get flowers again button"""
     query = update.callback_query
@@ -2462,6 +2532,7 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # BROADCAST FUNCTIONS
+# Executes the broadcast to the selected target (users or groups)
 async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
     """Execute broadcast with the current message - uses forward_message for forwarded messages, copy_message for regular messages
     Compatible with python-telegram-bot==22.3"""
@@ -2566,6 +2637,7 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
 
 
 # MESSAGE HANDLERS
+# Handles incoming sticker messages
 async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle sticker messages"""
     user_info = extract_user_info(update.message)
@@ -2593,6 +2665,7 @@ async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_T
         log_with_user_info("INFO", "✅ Sent sticker response", user_info)
 
 
+# Handles incoming text messages
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text and media messages with AI response and effects in private chat"""
     user_info = extract_user_info(update.message)
@@ -2623,6 +2696,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
 
+# Handles incoming image messages
 async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle image messages with AI analysis using Gemini 2.5 Flash"""
     user_info = extract_user_info(update.message)
@@ -2660,6 +2734,7 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(get_error_response())
 
 
+# Handles incoming poll messages
 async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle poll messages with AI analysis using Gemini 2.5 Flash"""
     user_info = extract_user_info(update.message)
@@ -2691,6 +2766,7 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(get_error_response())
 
 
+# The main message handler for all incoming messages
 async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all types of messages (text, stickers, voice, photos, etc.)"""
     try:
@@ -2754,6 +2830,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(get_error_response())
 
 
+# Handles chat member updates (e.g., when the bot is blocked or removed from a group)
 async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle when a user blocks the bot or the bot is removed from a group."""
     result = update.my_chat_member
@@ -2773,6 +2850,7 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 
 
 # ERROR HANDLER
+# The main error handler for the bot
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
@@ -2793,6 +2871,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # STAR PAYMENT FUNCTIONS
+# Handles the /buy command to send a payment invoice
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send an invoice for sakura flowers."""
     try:
@@ -2893,6 +2972,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         log_with_user_info("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
 
+# Handles the /buyers command to show top supporters
 async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show all flower buyers with their donation amounts."""
     try:
@@ -3059,6 +3139,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ Something went wrong getting the buyers list. Try again later! 🔧")
 
 
+# Handles the /stats command (owner only)
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Hidden owner command to show bot statistics with refresh functionality"""
     try:
@@ -3082,6 +3163,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("❌ Something went wrong getting bot statistics!")
 
 
+# Sends the statistics message
 async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refresh: bool = False) -> None:
     """Send or update stats message with current data"""
     try:
@@ -3194,6 +3276,7 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
             await context.bot.send_message(chat_id, "❌ Error generating statistics!")
 
 
+# Handles the refresh callback for the /stats command
 async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle stats refresh button callback"""
     query = update.callback_query
@@ -3243,6 +3326,7 @@ async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
             pass
 
 
+# Retrieves user information from the database by user ID or username
 async def get_user_info_by_identifier(identifier: str) -> tuple:
     """Get user info by user ID or username from database"""
     if not db_pool:
@@ -3275,6 +3359,7 @@ async def get_user_info_by_identifier(identifier: str) -> tuple:
         return None, None
 
 
+# Handles the pre-checkout query for payments
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Answer the PreCheckoutQuery."""
     query = update.pre_checkout_query
@@ -3288,6 +3373,7 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"💳 Pre-checkout approved for user {query.from_user.id}")
 
 
+# Handles successful payments
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle successful payment - refund if 10 stars or less, otherwise process normally."""
     payment = update.message.successful_payment
@@ -3426,6 +3512,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
 
 
 # BOT SETUP FUNCTIONS
+# Sets up the bot's commands
 async def setup_bot_commands(application: Application) -> None:
     """Setup bot commands menu"""
     try:
@@ -3436,6 +3523,7 @@ async def setup_bot_commands(application: Application) -> None:
         logger.error(f"Failed to set bot commands: {e}")
 
 
+# Sets up all the handlers for the bot
 def setup_handlers(application: Application) -> None:
     """Setup all command and message handlers"""
     logger.info("🔧 Setting up bot handlers...")
@@ -3475,6 +3563,7 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
+# Runs the bot
 def run_bot() -> None:
     """Run the bot"""
     if not validate_config():
@@ -3542,6 +3631,7 @@ def run_bot() -> None:
 
 
 # HTTP SERVER FOR DEPLOYMENT
+# A dummy HTTP handler for keep-alive purposes on deployment platforms
 class DummyHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler for keep-alive server"""
 
@@ -3559,6 +3649,7 @@ class DummyHandler(BaseHTTPRequestHandler):
         pass
 
 
+# Starts the dummy HTTP server
 def start_dummy_server() -> None:
     """Start dummy HTTP server for deployment platforms"""
     port = int(os.environ.get("PORT", 10000))
@@ -3568,6 +3659,7 @@ def start_dummy_server() -> None:
 
 
 # MAIN FUNCTION
+# The main function to run the bot
 def main() -> None:
     """Main function"""
     try:
