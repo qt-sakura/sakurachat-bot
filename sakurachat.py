@@ -33,7 +33,7 @@ from telegram.ext import (
 )
 from google import genai
 from typing import Dict, Set, Optional
-from telegram.error import TelegramError, Forbidden, BadRequest, Conflict
+from telegram.error import TelegramError, Forbidden, BadRequest
 from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
@@ -3564,7 +3564,7 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-async def run_bot() -> None:
+def run_bot() -> None:
     """Run the bot"""
     if not validate_config():
         return
@@ -3626,28 +3626,8 @@ async def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot asynchronously
-    try:
-        await application.initialize()
-        if application.post_init:
-            await application.post_init(application)
-        await application.start()
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-
-        # Keep the bot running until it's stopped
-        await asyncio.Event().wait()
-    except Conflict:
-        logger.error("❌ Another instance of the bot is already running. Please stop the other instance and try again.")
-    except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
-        logger.info("🛑 Bot is shutting down...")
-    finally:
-        if application.updater.running:
-            await application.updater.stop()
-        if application.running:
-            await application.stop()
-        await application.shutdown()
-        if application.post_shutdown:
-            await application.post_shutdown(application)
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -3680,7 +3660,7 @@ def start_dummy_server() -> None:
 
 # MAIN FUNCTION
 # The main function to run the bot
-async def main() -> None:
+def main() -> None:
     """Main function"""
     try:
         # Install uvloop for better performance - ADD THESE 6 LINES
@@ -3699,7 +3679,7 @@ async def main() -> None:
         threading.Thread(target=start_dummy_server, daemon=True).start()
 
         # Run the bot
-        await run_bot()
+        run_bot()
 
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
@@ -3708,9 +3688,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("🛑 Bot stopped by user")
-    except Exception as e:
-        logger.error(f"💥 Fatal error in main: {e}", exc_info=True)
+    main()
