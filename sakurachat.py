@@ -11,7 +11,6 @@ import logging
 import asyncpg
 import datetime
 import threading
-import traceback
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -2853,28 +2852,22 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 # ERROR HANDLER
 # The main error handler for the bot
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle errors and log them with traceback"""
-    # Log the error with traceback
-    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
-    tb_string = "".join(tb_list)
-    logger.error(f"Exception while handling an update: {context.error}\n{tb_string}")
+    """Handle errors"""
+    logger.error(f"Exception while handling an update: {context.error}")
 
-    # Try to extract user info for more detailed logging
-    user_info = {}
+    # Try to extract user info if update has a message
     if hasattr(update, 'message') and update.message:
         try:
             user_info = extract_user_info(update.message)
-        except Exception as e:
-            logger.error(f"Could not extract user info for error: {e}")
+            log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for error: {context.error}")
     elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
         try:
             user_info = extract_user_info(update.callback_query.message)
-        except Exception as e:
-            logger.error(f"Could not extract user info for callback error: {e}")
-
-    # If user_info was extracted, log the error with user details
-    if user_info:
-        log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+            log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
 # STAR PAYMENT FUNCTIONS
@@ -3670,7 +3663,7 @@ def start_dummy_server() -> None:
 def main() -> None:
     """Main function"""
     try:
-        # Install uvloop for better performance
+        # Install uvloop for better performance - ADD THESE 6 LINES
         try:
             uvloop.install()
             logger.info("🚀 uvloop installed successfully")
@@ -3678,6 +3671,7 @@ def main() -> None:
             logger.warning("⚠️ uvloop not available")
         except Exception as e:
             logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
 
         logger.info("🌸 Sakura Bot starting up...")
 
@@ -3690,8 +3684,7 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
     except Exception as e:
-        # Log the fatal error with a full traceback
-        logger.error(f"💥 Fatal error in main: {e}\n{traceback.format_exc()}")
+        logger.error(f"💥 Fatal error: {e}")
 
 
 if __name__ == "__main__":
