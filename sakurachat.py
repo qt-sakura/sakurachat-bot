@@ -33,7 +33,7 @@ from telegram.ext import (
 )
 from google import genai
 from typing import Dict, Set, Optional
-from telegram.error import TelegramError, Forbidden, BadRequest
+from telegram.error import TelegramError, Forbidden, BadRequest, Conflict
 from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
@@ -2870,6 +2870,16 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
+def handle_startup_error(e: Exception) -> None:
+    """Gracefully handles errors during bot startup."""
+    if isinstance(e, Conflict):
+        logger.error("❌ A conflict error occurred. Make sure only one bot instance is running.")
+        logger.info("💡 Please stop any other running instances and try again.")
+    else:
+        logger.critical(f"💥 An unexpected critical error occurred during startup: {e}")
+    logger.info("Bot application will now exit.")
+
+
 # STAR PAYMENT FUNCTIONS
 # Handles the /buy command to send a payment invoice
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3627,7 +3637,10 @@ def run_bot() -> None:
     logger.info("🌸 Sakura Bot is starting...")
 
     # Run the bot with polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    try:
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    except Exception as e:
+        handle_startup_error(e)
 
 
 # HTTP SERVER FOR DEPLOYMENT
