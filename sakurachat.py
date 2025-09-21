@@ -33,7 +33,7 @@ from telegram.ext import (
 )
 from google import genai
 from typing import Dict, Set, Optional
-from telegram.error import TelegramError, Forbidden, BadRequest, Conflict
+from telegram.error import TelegramError, Forbidden, BadRequest
 from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
@@ -73,7 +73,6 @@ db_pool = None
 cleanup_task = None
 valkey_client: AsyncValkey = None
 payment_storage = {}
-shutdown_event = asyncio.Event()
 
 # Commands dictionary
 COMMANDS = [
@@ -2853,34 +2852,22 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 # ERROR HANDLER
 # The main error handler for the bot
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle errors gracefully."""
-    # Handle Conflict errors separately for graceful shutdown
-    if isinstance(context.error, Conflict):
-        logger.error("❌ Conflict error: Another instance of the bot is running.")
-        logger.info("💡 Please ensure only one instance of the bot is active to avoid conflicts.")
-        logger.info("Bot application will now exit gracefully.")
-        shutdown_event.set()  # Signal the main loop to exit
-        return
-
-    # Log other exceptions
+    """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
 
-    # Try to extract user info for detailed logging
-    user_info = None
+    # Try to extract user info if update has a message
     if hasattr(update, 'message') and update.message:
         try:
             user_info = extract_user_info(update.message)
-        except Exception as e:
-            logger.error(f"Could not extract user info for error logging: {e}")
+            log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for error: {context.error}")
     elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
         try:
             user_info = extract_user_info(update.callback_query.message)
-        except Exception as e:
-            logger.error(f"Could not extract user info for callback error logging: {e}")
-
-    # Log with user info if available
-    if user_info:
-        log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+            log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
 # STAR PAYMENT FUNCTIONS
@@ -3576,16 +3563,9 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
-# Handles critical startup errors
-def handle_startup_error(e: Exception) -> None:
-    """Gracefully handles critical errors during bot startup."""
-    logger.critical(f"💥 A critical error occurred during bot startup: {e}")
-    logger.info("Bot application will now exit.")
-
-
 # Runs the bot
-async def run_bot() -> None:
-    """Run the bot asynchronously"""
+def run_bot() -> None:
+    """Run the bot"""
     if not validate_config():
         return
 
@@ -3646,17 +3626,8 @@ async def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot asynchronously
-    try:
-        async with application:
-            await application.start()
-            await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-            logger.info("🌸 Sakura Bot is now running asynchronously.")
-            await shutdown_event.wait()  # Keep it running until shutdown event is set
-    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
-        logger.info("🛑 Bot run cancelled. Shutting down...")
-    except Exception as e:
-        handle_startup_error(e)
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -3689,10 +3660,10 @@ def start_dummy_server() -> None:
 
 # MAIN FUNCTION
 # The main function to run the bot
-async def main() -> None:
+def main() -> None:
     """Main function"""
     try:
-        # Install uvloop for better performance
+        # Install uvloop for better performance - ADD THESE 6 LINES
         try:
             uvloop.install()
             logger.info("🚀 uvloop installed successfully")
@@ -3700,6 +3671,7 @@ async def main() -> None:
             logger.warning("⚠️ uvloop not available")
         except Exception as e:
             logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
 
         logger.info("🌸 Sakura Bot starting up...")
 
@@ -3707,13 +3679,13 @@ async def main() -> None:
         threading.Thread(target=start_dummy_server, daemon=True).start()
 
         # Run the bot
-        await run_bot()
+        run_bot()
 
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("🛑 Main function interrupted. Bot is shutting down.")
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
     except Exception as e:
-        logger.error(f"💥 Fatal error in main: {e}")
+        logger.error(f"💥 Fatal error: {e}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
