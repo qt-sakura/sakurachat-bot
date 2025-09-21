@@ -3574,8 +3574,8 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-def run_bot() -> None:
-    """Run the bot"""
+async def run_bot() -> None:
+    """Run the bot asynchronously"""
     if not validate_config():
         return
 
@@ -3636,9 +3636,15 @@ def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot with polling
+    # Run the bot asynchronously
     try:
-        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+        async with application:
+            await application.start()
+            await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+            logger.info("🌸 Sakura Bot is now running asynchronously.")
+            await asyncio.Event().wait()  # Keep it running
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        logger.info("🛑 Bot run cancelled. Shutting down...")
     except Exception as e:
         handle_startup_error(e)
 
@@ -3673,10 +3679,10 @@ def start_dummy_server() -> None:
 
 # MAIN FUNCTION
 # The main function to run the bot
-def main() -> None:
+async def main() -> None:
     """Main function"""
     try:
-        # Install uvloop for better performance - ADD THESE 6 LINES
+        # Install uvloop for better performance
         try:
             uvloop.install()
             logger.info("🚀 uvloop installed successfully")
@@ -3684,7 +3690,6 @@ def main() -> None:
             logger.warning("⚠️ uvloop not available")
         except Exception as e:
             logger.warning(f"⚠️ uvloop setup failed: {e}")
-        # END OF UVLOOP SETUP
 
         logger.info("🌸 Sakura Bot starting up...")
 
@@ -3692,13 +3697,13 @@ def main() -> None:
         threading.Thread(target=start_dummy_server, daemon=True).start()
 
         # Run the bot
-        run_bot()
+        await run_bot()
 
-    except KeyboardInterrupt:
-        logger.info("🛑 Bot stopped by user")
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("🛑 Main function interrupted. Bot is shutting down.")
     except Exception as e:
-        logger.error(f"💥 Fatal error: {e}")
+        logger.error(f"💥 Fatal error in main: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
