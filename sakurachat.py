@@ -73,6 +73,7 @@ db_pool = None
 cleanup_task = None
 valkey_client: AsyncValkey = None
 payment_storage = {}
+shutdown_event = asyncio.Event()
 
 # Commands dictionary
 COMMANDS = [
@@ -2852,32 +2853,34 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 # ERROR HANDLER
 # The main error handler for the bot
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle errors"""
+    """Handle errors gracefully."""
+    # Handle Conflict errors separately for graceful shutdown
+    if isinstance(context.error, Conflict):
+        logger.error("❌ Conflict error: Another instance of the bot is running.")
+        logger.info("💡 Please ensure only one instance of the bot is active to avoid conflicts.")
+        logger.info("Bot application will now exit gracefully.")
+        shutdown_event.set()  # Signal the main loop to exit
+        return
+
+    # Log other exceptions
     logger.error(f"Exception while handling an update: {context.error}")
 
-    # Try to extract user info if update has a message
+    # Try to extract user info for detailed logging
+    user_info = None
     if hasattr(update, 'message') and update.message:
         try:
             user_info = extract_user_info(update.message)
-            log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
-        except:
-            logger.error(f"Could not extract user info for error: {context.error}")
+        except Exception as e:
+            logger.error(f"Could not extract user info for error logging: {e}")
     elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
         try:
             user_info = extract_user_info(update.callback_query.message)
-            log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
-        except:
-            logger.error(f"Could not extract user info for callback error: {context.error}")
+        except Exception as e:
+            logger.error(f"Could not extract user info for callback error logging: {e}")
 
-
-def handle_startup_error(e: Exception) -> None:
-    """Gracefully handles errors during bot startup."""
-    if isinstance(e, Conflict):
-        logger.error("❌ A conflict error occurred. Make sure only one bot instance is running.")
-        logger.info("💡 Please stop any other running instances and try again.")
-    else:
-        logger.critical(f"💥 An unexpected critical error occurred during startup: {e}")
-    logger.info("Bot application will now exit.")
+    # Log with user info if available
+    if user_info:
+        log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
 
 
 # STAR PAYMENT FUNCTIONS
@@ -3573,6 +3576,13 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
+# Handles critical startup errors
+def handle_startup_error(e: Exception) -> None:
+    """Gracefully handles critical errors during bot startup."""
+    logger.critical(f"💥 A critical error occurred during bot startup: {e}")
+    logger.info("Bot application will now exit.")
+
+
 # Runs the bot
 async def run_bot() -> None:
     """Run the bot asynchronously"""
@@ -3642,7 +3652,7 @@ async def run_bot() -> None:
             await application.start()
             await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
             logger.info("🌸 Sakura Bot is now running asynchronously.")
-            await asyncio.Event().wait()  # Keep it running
+            await shutdown_event.wait()  # Keep it running until shutdown event is set
     except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
         logger.info("🛑 Bot run cancelled. Shutting down...")
     except Exception as e:
