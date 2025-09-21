@@ -3564,8 +3564,8 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-def run_bot() -> None:
-    """Run the bot"""
+async def run_bot() -> None:
+    """Run the bot asynchronously"""
     if not validate_config():
         return
 
@@ -3626,8 +3626,22 @@ def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot with polling
-    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    # Handle potential bot instance conflicts gracefully
+    try:
+        # Run the bot with polling
+        await application.run_polling(
+            allowed_updates=Update.ALL_TYPES, 
+            drop_pending_updates=True,
+            stop_signals=None  # Let asyncio handle signals
+        )
+    except Exception as e:
+        # Handle Telegram bot instance conflicts gracefully
+        error_msg = str(e).lower()
+        if "conflict" in error_msg or "terminated by other" in error_msg:
+            logger.error("🔄 Bot instance conflict detected - another instance may be running")
+        else:
+            logger.error(f"❌ Bot execution error: {e}")
+        raise
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -3648,22 +3662,29 @@ class DummyHandler(BaseHTTPRequestHandler):
         # Suppress HTTP server logs
         pass
 
-
-# Starts the dummy HTTP server
-def start_dummy_server() -> None:
+async def start_dummy_server() -> None:
     """Start dummy HTTP server for deployment platforms"""
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), DummyHandler)
-    logger.info(f"🌐 Dummy server listening on port {port}")
-    server.serve_forever()
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def run_server():
+        port = int(os.environ.get("PORT", 10000))
+        server = HTTPServer(("0.0.0.0", port), DummyHandler)
+        logger.info(f"🌐 Dummy server listening on port {port}")
+        server.serve_forever()
+    
+    # Run server in thread pool to avoid blocking
+    loop = asyncio.get_event_loop()
+    executor = ThreadPoolExecutor(max_workers=1)
+    await loop.run_in_executor(executor, run_server)
 
 
 # MAIN FUNCTION
 # The main function to run the bot
-def main() -> None:
-    """Main function"""
+async def main() -> None:
+    """Main async function"""
     try:
-        # Install uvloop for better performance - ADD THESE 6 LINES
+        # Install uvloop for better performance
         try:
             uvloop.install()
             logger.info("🚀 uvloop installed successfully")
@@ -3671,21 +3692,35 @@ def main() -> None:
             logger.warning("⚠️ uvloop not available")
         except Exception as e:
             logger.warning(f"⚠️ uvloop setup failed: {e}")
-        # END OF UVLOOP SETUP
 
         logger.info("🌸 Sakura Bot starting up...")
 
-        # Start dummy server in background thread
-        threading.Thread(target=start_dummy_server, daemon=True).start()
+        # Start dummy server and bot concurrently
+        async with asyncio.TaskGroup() as tg:
+            # Start dummy server as background task
+            server_task = tg.create_task(start_dummy_server())
+            # Start bot
+            bot_task = tg.create_task(run_bot())
 
-        # Run the bot
-        run_bot()
-
-    except KeyboardInterrupt:
+    except* KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
-    except Exception as e:
-        logger.error(f"💥 Fatal error: {e}")
+    except* Exception as eg:
+        for e in eg.exceptions:
+            error_msg = str(e).lower()
+            if "conflict" in error_msg or "terminated by other" in error_msg:
+                logger.error("🔄 Bot instance conflict - another instance may be running")
+            else:
+                logger.error(f"💥 Fatal error: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot stopped by user")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "conflict" in error_msg or "terminated by other" in error_msg:
+            logger.error("🔄 Bot instance conflict detected")
+        else:
+            logger.error(f"💥 Fatal error: {e}")
