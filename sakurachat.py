@@ -3564,8 +3564,8 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-async def run_bot() -> None:
-    """Run the bot asynchronously"""
+def run_bot() -> None:
+    """Run the bot"""
     if not validate_config():
         return
 
@@ -3626,41 +3626,8 @@ async def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Handle potential bot instance conflicts gracefully
-    try:
-        # Initialize the application first
-        await application.initialize()
-        
-        # Start the application
-        await application.start()
-        
-        # Start polling
-        await application.updater.start_polling(
-            allowed_updates=Update.ALL_TYPES, 
-            drop_pending_updates=True
-        )
-        
-        # Keep running until stopped
-        await application.updater.idle()
-        
-    except Exception as e:
-        # Handle Telegram bot instance conflicts gracefully
-        error_msg = str(e).lower()
-        if "conflict" in error_msg or "terminated by other" in error_msg:
-            logger.error("🔄 Bot instance conflict detected - another instance may be running")
-        else:
-            logger.error(f"❌ Bot execution error: {e}")
-        raise
-    finally:
-        # Ensure proper cleanup
-        try:
-            if application.updater.running:
-                await application.updater.stop()
-            if application.running:
-                await application.stop()
-            await application.shutdown()
-        except Exception as cleanup_e:
-            logger.error(f"❌ Cleanup error (non-critical): {cleanup_e}")
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -3681,29 +3648,22 @@ class DummyHandler(BaseHTTPRequestHandler):
         # Suppress HTTP server logs
         pass
 
-async def start_dummy_server() -> None:
+
+# Starts the dummy HTTP server
+def start_dummy_server() -> None:
     """Start dummy HTTP server for deployment platforms"""
-    import asyncio
-    from concurrent.futures import ThreadPoolExecutor
-    
-    def run_server():
-        port = int(os.environ.get("PORT", 10000))
-        server = HTTPServer(("0.0.0.0", port), DummyHandler)
-        logger.info(f"🌐 Dummy server listening on port {port}")
-        server.serve_forever()
-    
-    # Run server in thread pool to avoid blocking
-    loop = asyncio.get_event_loop()
-    executor = ThreadPoolExecutor(max_workers=1)
-    await loop.run_in_executor(executor, run_server)
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    logger.info(f"🌐 Dummy server listening on port {port}")
+    server.serve_forever()
 
 
 # MAIN FUNCTION
 # The main function to run the bot
-async def main() -> None:
-    """Main async function"""
+def main() -> None:
+    """Main function"""
     try:
-        # Install uvloop for better performance
+        # Install uvloop for better performance - ADD THESE 6 LINES
         try:
             uvloop.install()
             logger.info("🚀 uvloop installed successfully")
@@ -3711,35 +3671,21 @@ async def main() -> None:
             logger.warning("⚠️ uvloop not available")
         except Exception as e:
             logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
 
         logger.info("🌸 Sakura Bot starting up...")
 
-        # Start dummy server and bot concurrently
-        async with asyncio.TaskGroup() as tg:
-            # Start dummy server as background task
-            server_task = tg.create_task(start_dummy_server())
-            # Start bot
-            bot_task = tg.create_task(run_bot())
+        # Start dummy server in background thread
+        threading.Thread(target=start_dummy_server, daemon=True).start()
 
-    except* KeyboardInterrupt:
-        logger.info("🛑 Bot stopped by user")
-    except* Exception as eg:
-        for e in eg.exceptions:
-            error_msg = str(e).lower()
-            if "conflict" in error_msg or "terminated by other" in error_msg:
-                logger.error("🔄 Bot instance conflict - another instance may be running")
-            else:
-                logger.error(f"💥 Fatal error: {e}")
+        # Run the bot
+        run_bot()
 
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
     except Exception as e:
-        error_msg = str(e).lower()
-        if "conflict" in error_msg or "terminated by other" in error_msg:
-            logger.error("🔄 Bot instance conflict detected")
-        else:
-            logger.error(f"💥 Fatal error: {e}")
+        logger.error(f"💥 Fatal error: {e}")
+
+
+if __name__ == "__main__":
+    main()
