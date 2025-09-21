@@ -3628,12 +3628,21 @@ async def run_bot() -> None:
 
     # Handle potential bot instance conflicts gracefully
     try:
-        # Run the bot with polling
-        await application.run_polling(
+        # Initialize the application first
+        await application.initialize()
+        
+        # Start the application
+        await application.start()
+        
+        # Start polling
+        await application.updater.start_polling(
             allowed_updates=Update.ALL_TYPES, 
-            drop_pending_updates=True,
-            stop_signals=None  # Let asyncio handle signals
+            drop_pending_updates=True
         )
+        
+        # Keep running until stopped
+        await application.updater.idle()
+        
     except Exception as e:
         # Handle Telegram bot instance conflicts gracefully
         error_msg = str(e).lower()
@@ -3642,6 +3651,16 @@ async def run_bot() -> None:
         else:
             logger.error(f"❌ Bot execution error: {e}")
         raise
+    finally:
+        # Ensure proper cleanup
+        try:
+            if application.updater.running:
+                await application.updater.stop()
+            if application.running:
+                await application.stop()
+            await application.shutdown()
+        except Exception as cleanup_e:
+            logger.error(f"❌ Cleanup error (non-critical): {cleanup_e}")
 
 
 # HTTP SERVER FOR DEPLOYMENT
