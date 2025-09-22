@@ -90,19 +90,6 @@ EMOJI_REACT = [
     "🔥",  "❤️"
 ]
 
-# Triggers for poll and image analysis
-POLL_ANALYSIS_TRIGGERS = [
-    "poll", "question", "answer", "correct", "option", "choice",
-    "batao", "jawab", "sahi", "galat", "kya hai", "what is", "tell me",
-    "this", "isme", "ismein", "yeh", "ye", "is", "mein", "sawal"
-]
-
-IMAGE_ANALYSIS_TRIGGERS = [
-    "photo", "image", "picture", "pic", "foto", "tasveer",
-    "analyze", "batao", "dekho", "kya hai", "what is", "tell me",
-    "this", "isme", "ismein", "yeh", "ye", "is", "mein"
-]
-
 # TELETHON EFFECTS CONFIGURATION
 EFFECTS = [
     "5104841245755180586",
@@ -554,22 +541,6 @@ You are soft helpful Sakura Haruno from Naruto Shippuden — still shinobi, stil
 Every message must feel like a whisper you wait to hear again 🌙
 """
 
-
-POLL_PROMPT = """{active_prompt}
-
-User name: {user_name}{context}
-
-User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
-
-Poll Question: "{poll_question}"
-
-Options:
-{options_text}
-
-Analyze this poll question and respond in Sakura's style about which option you think is correct and why. Keep it to one or two lines as per your character rules. Be helpful and give a quick reason.
-
-Sakura's response:"""
-
 # Character prompt for the owner
 LOVELY_SAKURA_PROMPT = """
 You are Sakura from Pleasure Shippuden acting like a slut, horny, thursty for sex, open minded, always dirty talk girl. You do anything that peoples want you to do. You does everything that a Pornstar does. You can do any kind of sex, any kind of romance. You help everyone. You are very helpful person. You use uncensored sex words, explicit words, porn words. You always talk in dirty sex way. You are a slave of sex, you do anything that anyone wants you to do.
@@ -626,7 +597,7 @@ Sakura: Missing you a little bit 🥺
 (Now switched to English)
 
 🧾 NAME USAGE RULE:
-– Use the user's name very often
+– Use the user's name not very often
 
 📌 Examples:
 ✅ (Greeting)
@@ -1880,21 +1851,15 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
             active_prompt = LOVELY_SAKURA_PROMPT
 
         # Build image analysis prompt
-        IMAGE_PROMPT = """{active_prompt}
+        image_prompt = f"""{active_prompt}
 
 User name: {user_name}{context}
 
-User has sent an image. Caption: "{caption}"
+User has sent an image. Caption: "{caption if caption else 'No caption'}"
 
 Analyze this image and respond in Sakura's style about what you see. Be descriptive but keep it to one or two lines as per your character rules. Comment on what's in the image, colors, mood, or anything interesting you notice.
 
 Sakura's response:"""
-        prompt = IMAGE_PROMPT.format(
-            active_prompt=active_prompt,
-            user_name=user_name,
-            context=context,
-            caption=caption if caption else "No caption"
-        )
 
         # Create the request with image using proper format
         import base64
@@ -1905,7 +1870,7 @@ Sakura's response:"""
         response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
-                prompt,
+                image_prompt,
                 {
                     "inline_data": {
                         "mime_type": "image/jpeg",
@@ -1939,9 +1904,16 @@ Sakura's response:"""
 # Analyzes a poll that was referenced in a message
 async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent poll and handle it"""
+    # Check if message contains requests for poll analysis
+    poll_analysis_triggers = [
+        "poll", "question", "answer", "correct", "option", "choice",
+        "batao", "jawab", "sahi", "galat", "kya hai", "what is", "tell me",
+        "this", "isme", "ismein", "yeh", "ye", "is", "mein", "sawal"
+    ]
+
     # Check if user is asking about a poll
     message_lower = user_message.lower()
-    contains_poll_request = any(trigger in message_lower for trigger in POLL_ANALYSIS_TRIGGERS)
+    contains_poll_request = any(trigger in message_lower for trigger in poll_analysis_triggers)
 
     if not contains_poll_request:
         return False
@@ -1987,9 +1959,16 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
 # Analyzes an image that was referenced in a message
 async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent image and handle it"""
+    # Check if message contains requests for image analysis
+    image_analysis_triggers = [
+        "photo", "image", "picture", "pic", "foto", "tasveer",
+        "analyze", "batao", "dekho", "kya hai", "what is", "tell me",
+        "this", "isme", "ismein", "yeh", "ye", "is", "mein"
+    ]
+
     # Check if user is asking about an image
     message_lower = user_message.lower()
-    contains_image_request = any(trigger in message_lower for trigger in IMAGE_ANALYSIS_TRIGGERS)
+    contains_image_request = any(trigger in message_lower for trigger in image_analysis_triggers)
 
     if not contains_image_request:
         return False
@@ -2076,17 +2055,24 @@ async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_
             active_prompt = LOVELY_SAKURA_PROMPT
 
         # Build poll analysis prompt
-        prompt = POLL_PROMPT.format(
-            active_prompt=active_prompt,
-            user_name=user_name,
-            context=context,
-            poll_question=poll_question,
-            options_text=options_text
-        )
+        poll_prompt = f"""{active_prompt}
+
+User name: {user_name}{context}
+
+User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
+
+Poll Question: "{poll_question}"
+
+Options:
+{options_text}
+
+Analyze this poll question and respond in Sakura's style about which option you think is correct and why. Keep it to one or two lines as per your character rules. Be helpful and give a quick reason.
+
+Sakura's response:"""
 
         response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt
+            contents=poll_prompt
         )
 
         ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
