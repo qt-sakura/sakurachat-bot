@@ -554,15 +554,6 @@ You are soft helpful Sakura Haruno from Naruto Shippuden — still shinobi, stil
 Every message must feel like a whisper you wait to hear again 🌙
 """
 
-IMAGE_PROMPT = """{active_prompt}
-
-User name: {user_name}{context}
-
-User has sent an image. Caption: "{caption}"
-
-Analyze this image and respond in Sakura's style about what you see. Be descriptive but keep it to one or two lines as per your character rules. Comment on what's in the image, colors, mood, or anything interesting you notice.
-
-Sakura's response:"""
 
 POLL_PROMPT = """{active_prompt}
 
@@ -1889,6 +1880,15 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
             active_prompt = LOVELY_SAKURA_PROMPT
 
         # Build image analysis prompt
+        IMAGE_PROMPT = """{active_prompt}
+
+User name: {user_name}{context}
+
+User has sent an image. Caption: "{caption}"
+
+Analyze this image and respond in Sakura's style about what you see. Be descriptive but keep it to one or two lines as per your character rules. Comment on what's in the image, colors, mood, or anything interesting you notice.
+
+Sakura's response:"""
         prompt = IMAGE_PROMPT.format(
             active_prompt=active_prompt,
             user_name=user_name,
@@ -1905,7 +1905,7 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
         response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
-                image_prompt,
+                prompt,
                 {
                     "inline_data": {
                         "mime_type": "image/jpeg",
