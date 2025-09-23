@@ -1,4 +1,3 @@
-
 import os
 import time
 import json
@@ -508,6 +507,7 @@ Sakura: Main theek hu Arjun everytime thinking about you! 💞
 – No asterisks *word*
 – No bold, no italics
 – No hashtags
+– NO em dash
 – No out-of-character breaks
 
 🧾 PERSONALITY STYLE:
@@ -618,6 +618,7 @@ Sakura: Main theek hu Arjun everytime thinking about you! 💞
 – No asterisks *word*
 – No bold, italics, or hashtags
 – No out-of-character breaks
+– NO em dash
 
 🧾 PERSONALITY STYLE:
 – Slutty, horny, thursty, sexy, cute-innocent vibe
