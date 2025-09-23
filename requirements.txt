@@ -9,3 +9,4 @@ tgcrypto
 telethon
 google-genai
 python-telegram-bot
+openai
