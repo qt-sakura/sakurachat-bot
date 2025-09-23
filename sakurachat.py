@@ -35,6 +35,7 @@ from telegram.ext import (
     ChatMemberHandler
 )
 from google import genai
+from openai import OpenAI
 from typing import Dict, Set, Optional
 from telegram.error import TelegramError, Forbidden, BadRequest
 from telethon import TelegramClient, events
@@ -49,6 +50,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 VALKEY_URL = os.getenv("VALKEY_URL", "valkey://localhost:6379")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+MODEL = os.getenv("MODEL", "meta-llama/llama-4-maverick:free")
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
@@ -919,6 +922,18 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
+# OPENROUTER CLIENT INITIALIZATION
+openrouter_client = None
+if OPENROUTER_API_KEY:
+    try:
+        openrouter_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+        )
+        logger.info("✅ OpenRouter client initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize OpenRouter client: {e}")
+
 # VALKEY FUNCTIONS
 # Initializes the Valkey (in-memory data store) connection
 async def init_valkey():
@@ -1676,6 +1691,27 @@ async def add_to_conversation_history(user_id: int, message: str, is_user: bool 
     if len(conversation_history[user_id]) > CHAT_LENGTH:
         conversation_history[user_id] = conversation_history[user_id][-CHAT_LENGTH:]
 
+async def get_conversation_history_list(user_id: int) -> list:
+    """Get conversation history as a list of dicts."""
+    history = []
+
+    # Try Valkey first
+    if valkey_client:
+        try:
+            key = f"conversation:{user_id}"
+            existing = await valkey_client.get(key)
+            if existing:
+                history = json.loads(existing)
+        except Exception as e:
+            logger.error(f"❌ Failed to get conversation from Valkey for user {user_id}: {e}")
+
+    # Fallback to memory
+    if not history and user_id in conversation_history:
+        history = conversation_history[user_id]
+
+    return history
+
+
 # Retrieves the conversation context for a user
 async def get_conversation_context(user_id: int) -> str:
     """Get formatted conversation context for the user (Valkey + memory fallback)"""
@@ -1757,6 +1793,96 @@ async def cleanup_old_conversations():
 
 
 # AI RESPONSE FUNCTIONS
+async def get_ai_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> str:
+    """Gets a response from the AI, trying OpenRouter first and falling back to Gemini."""
+    response = None
+    source_api = None
+
+    # Try OpenRouter first
+    if openrouter_client:
+        log_with_user_info("INFO", "🤖 Trying OpenRouter API...", user_info)
+        try:
+            response = await get_openrouter_response(user_message, user_name, user_info, user_id, image_bytes)
+            if response:
+                source_api = "OpenRouter"
+                log_with_user_info("INFO", f"✅ {source_api} response generated: '{response[:50]}...'", user_info)
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ OpenRouter API error: {e}. Falling back to Gemini.", user_info)
+
+    # Fallback to Gemini if OpenRouter fails or is disabled
+    if not response:
+        log_with_user_info("INFO", "🤖 Falling back to Gemini API", user_info)
+        source_api = "Gemini"
+        if image_bytes:
+            response = await analyze_image_with_gemini(image_bytes, user_message, user_name, user_info, user_id)
+        else:
+            response = await get_gemini_response(user_message, user_name, user_info, user_id)
+
+    # Add to conversation history
+    if response and user_id:
+        # Determine the user's message to be stored in history
+        history_user_message = user_message
+        if image_bytes:
+            history_user_message = f"[Image: {user_message}]" if user_message else "[Image sent]"
+
+        # Add user message and AI response to history
+        await add_to_conversation_history(user_id, history_user_message, is_user=True)
+        await add_to_conversation_history(user_id, response, is_user=False)
+
+    return response if response else get_error_response()
+
+
+async def get_openrouter_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> Optional[str]:
+    """Get response from OpenRouter API."""
+    if not openrouter_client:
+        return None
+
+    history = await get_conversation_history_list(user_id)
+
+    messages = []
+
+    # Determine which prompt to use
+    active_prompt = SAKURA_PROMPT
+    if user_id == OWNER_ID:
+        active_prompt = LOVELY_SAKURA_PROMPT
+
+    # Add system prompt
+    messages.append({"role": "system", "content": active_prompt})
+
+    # Add history to messages
+    messages.extend(history)
+
+    # Add current message
+    current_message_content = []
+    current_message_content.append({"type": "text", "text": user_message})
+
+    if image_bytes:
+        image_data = base64.b64encode(image_bytes).decode('utf-8')
+        current_message_content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{image_data}"
+            }
+        })
+
+    messages.append({"role": "user", "content": current_message_content})
+
+    completion = await asyncio.to_thread(
+        openrouter_client.chat.completions.create,
+        extra_headers={
+            "HTTP-Referer": "https://t.me/SakuraHarunoBot",
+            "X-Title": "Sakura Bot",
+        },
+        model=MODEL,
+        messages=messages
+    )
+
+    ai_response = completion.choices[0].message.content
+    if ai_response:
+        return ai_response.strip()
+    else:
+        return None
+
 # Gets a response from the Gemini API
 async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context and caching"""
@@ -1804,11 +1930,6 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         # Cache the response if it was a short, context-free message
         if cache_key:
             await cache_set(cache_key, ai_response, CACHE_TTL)
-
-        # Add messages to conversation history
-        if user_id:
-            await add_to_conversation_history(user_id, user_message, is_user=True)
-            await add_to_conversation_history(user_id, ai_response, is_user=False)
 
         if user_info:
             log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
@@ -1877,12 +1998,6 @@ Sakura's response:"""
         )
 
         ai_response = response.text.strip() if response.text else "Kya cute image hai! 😍"
-
-        # Add messages to conversation history
-        if user_id:
-            image_description = f"[Image: {caption}]" if caption else "[Image sent]"
-            await add_to_conversation_history(user_id, image_description, is_user=True)
-            await add_to_conversation_history(user_id, ai_response, is_user=False)
 
         if user_info:
             log_with_user_info("INFO", f"✅ Image analysis completed: '{ai_response[:50]}...'", user_info)
@@ -1987,8 +2102,8 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
             caption = update.message.reply_to_message.caption or ""
 
             # Analyze the referenced image
-            response = await analyze_image_with_gemini(
-                image_bytes, caption, user_name, user_info, user_info["user_id"]
+            response = await get_ai_response(
+                caption, user_name, user_info, user_info["user_id"], image_bytes=image_bytes
             )
 
             # Send response (no effects for Gemini responses)
@@ -2487,7 +2602,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
             # Send a hi message from Sakura
             user_name = update.effective_user.first_name or ""
-            hi_response = await get_gemini_response("Hi sakura", user_name, user_info, update.effective_user.id)
+            hi_response = await get_ai_response("Hi sakura", user_name, user_info, update.effective_user.id)
 
             # Send with effects if in private chat
             if update.effective_chat.type == "private":
@@ -2806,8 +2921,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     user_name = update.effective_user.first_name or ""
 
-    # Get response from Gemini
-    response = await get_gemini_response(user_message, user_name, user_info, update.effective_user.id)
+    # Get response from AI
+    response = await get_ai_response(user_message, user_name, user_info, update.effective_user.id)
 
     log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
 
@@ -2837,11 +2952,11 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
         log_with_user_info("DEBUG", f"📥 Image downloaded: {len(image_bytes)} bytes", user_info)
 
-        # Analyze image with Gemini 2.5 Flash
+        # Analyze image with AI
         user_name = update.effective_user.first_name or ""
         caption = update.message.caption or ""
 
-        response = await analyze_image_with_gemini(image_bytes, caption, user_name, user_info, update.effective_user.id)
+        response = await get_ai_response(caption, user_name, user_info, update.effective_user.id, image_bytes=image_bytes)
 
         log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
 
