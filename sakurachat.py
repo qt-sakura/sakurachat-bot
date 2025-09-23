@@ -9,6 +9,8 @@ import asyncio
 import aiohttp
 import logging
 import asyncpg
+import base64
+import hashlib
 import datetime
 import threading
 from telegram import (
@@ -1784,7 +1786,6 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         # Check cache for similar short messages (without personal context)
         cache_key = None
         if len(user_message) <= 50 and not context and user_id:  # Only cache short, context-free messages
-            import hashlib
             cache_key = f"gemini_response:{user_id}:{hashlib.md5(user_message.lower().encode()).hexdigest()}"
             cached_response = await cache_get(cache_key)
             if cached_response:
@@ -1857,7 +1858,6 @@ Analyze this image and respond in Sakura's style about what you see. Be descript
 Sakura's response:"""
 
         # Create the request with image using proper format
-        import base64
 
         # Convert bytes to base64 string
         image_data = base64.b64encode(image_bytes).decode('utf-8')
