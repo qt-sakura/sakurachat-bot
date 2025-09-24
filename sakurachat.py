@@ -2065,6 +2065,45 @@ Your response must be a JSON object with "text" and "reaction" keys, as describe
         return "Image analyze nahi kar paa rahi 😕", None
 
 
+# Analyzes a poll using the OpenRouter and Gemini APIs
+async def get_poll_analysis_response(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> (Optional[str], Optional[str]):
+    """Gets a response for a poll, trying OpenRouter first and falling back to Gemini."""
+    response_text, reaction = None, None
+    source_api = None
+
+    # Format the poll into a text message for the AI to understand in context of a conversation.
+    poll_as_text = f"Analyze the following poll and provide the answer in your usual style.\nQuestion: {poll_question}\nOptions: {', '.join(poll_options)}"
+
+    # Try OpenRouter first
+    if openrouter_client:
+        log_with_user_info("INFO", "🤖 Trying OpenRouter API for poll analysis...", user_info)
+        try:
+            # We use get_openrouter_response as it correctly handles history and system prompts
+            response_text, reaction = await get_openrouter_response(poll_as_text, user_name, user_info, user_id)
+            if response_text:
+                source_api = "OpenRouter"
+                log_with_user_info("INFO", f"✅ {source_api} poll response generated: '{response_text[:50]}...'", user_info)
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ OpenRouter API error on poll: {e}. Falling back to Gemini.", user_info)
+
+    # Fallback to Gemini if OpenRouter fails or is disabled
+    if not response_text:
+        log_with_user_info("INFO", "🤖 Falling back to Gemini API for poll analysis", user_info)
+        source_api = "Gemini"
+        response_text, reaction = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, user_id)
+
+    # Add to conversation history
+    if response_text and user_id:
+        # User message for history should be concise
+        history_user_message = f"[Poll Analysis Request: {poll_question}]"
+
+        # Add user message and AI response to history
+        await add_to_conversation_history(user_id, history_user_message, is_user=True)
+        await add_to_conversation_history(user_id, response_text, is_user=False)
+
+    return (response_text, reaction) if response_text else (get_error_response(), None)
+
+
 # Analyzes a poll that was referenced in a message
 async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent poll and handle it"""
@@ -2099,7 +2138,7 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
             user_name = update.effective_user.first_name or ""
 
             # Analyze the referenced poll
-            response_text, reaction_emoji = await analyze_poll_with_gemini(
+            response_text, reaction_emoji = await get_poll_analysis_response(
                 poll_question, poll_options, user_name, user_info, user_info["user_id"]
             )
 
@@ -2262,12 +2301,6 @@ Your response must be a JSON object with "text" and "reaction" keys, as describe
         ai_response_text = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
 
         text, reaction = _parse_ai_response(ai_response_text, user_info)
-
-        # Add messages to conversation history
-        if user_id and text:
-            poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
-            await add_to_conversation_history(user_id, poll_description, is_user=True)
-            await add_to_conversation_history(user_id, text, is_user=False)
 
         if user_info:
             log_with_user_info("INFO", f"✅ Poll analysis completed: '{text[:50]}...'", user_info)
@@ -3084,7 +3117,7 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Analyze poll with Gemini 2.5 Flash
         user_name = update.effective_user.first_name or ""
 
-        response_text, reaction_emoji = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, update.effective_user.id)
+        response_text, reaction_emoji = await get_poll_analysis_response(poll_question, poll_options, user_name, user_info, update.effective_user.id)
 
         log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response_text[:50]}...'", user_info)
 
