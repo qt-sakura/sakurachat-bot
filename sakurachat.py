@@ -2121,6 +2121,18 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
     if update.message.reply_to_message and update.message.reply_to_message.poll:
         log_with_user_info("INFO", "🔍 User asking about replied poll", user_info)
 
+        # React to the message to show the bot is "thinking"
+        try:
+            emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
+            await send_animated_reaction(
+                chat_id=update.effective_chat.id,
+                message_id=update.message.message_id,
+                emoji=emoji_to_react
+            )
+            log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied poll", user_info)
+        except Exception as e:
+            log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for replied poll: {e}", user_info)
+
         # Send typing action to show bot is processing
         await send_typing_action(context, update.effective_chat.id, user_info)
 
@@ -2207,6 +2219,18 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
     # Priority 1: Check if replying to a message with photo
     if update.message.reply_to_message and update.message.reply_to_message.photo:
         log_with_user_info("INFO", "🔍 User asking about replied image", user_info)
+
+        # React to the message to show the bot is "thinking"
+        try:
+            emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
+            await send_animated_reaction(
+                chat_id=update.effective_chat.id,
+                message_id=update.message.message_id,
+                emoji=emoji_to_react
+            )
+            log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied image", user_info)
+        except Exception as e:
+            log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for replied image: {e}", user_info)
 
         # Send typing action to show bot is processing
         await send_typing_action(context, update.effective_chat.id, user_info)
@@ -3114,6 +3138,18 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "📷 Image message received", user_info)
 
+    # React to the message to show the bot is "thinking"
+    try:
+        emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
+        await send_animated_reaction(
+            chat_id=update.effective_chat.id,
+            message_id=update.message.message_id,
+            emoji=emoji_to_react
+        )
+        log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for image", user_info)
+    except Exception as e:
+        log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for image: {e}", user_info)
+
     await send_typing_action(context, update.effective_chat.id, user_info)
 
     try:
@@ -3151,6 +3187,18 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Handle poll messages with AI analysis using Gemini 2.5 Flash"""
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "📊 Poll message received", user_info)
+
+    # React to the message to show the bot is "thinking"
+    try:
+        emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
+        await send_animated_reaction(
+            chat_id=update.effective_chat.id,
+            message_id=update.message.message_id,
+            emoji=emoji_to_react
+        )
+        log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for poll", user_info)
+    except Exception as e:
+        log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for poll: {e}", user_info)
 
     await send_typing_action(context, update.effective_chat.id, user_info)
 
