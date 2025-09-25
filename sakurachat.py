@@ -1,6 +1,6 @@
 import os
 import time
-import json
+import orjson
 import uvloop
 import random
 import psutil
@@ -753,11 +753,11 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
 
         # Add reply markup if provided
         if reply_markup:
-            payload['reply_markup'] = reply_markup.to_json()
+            payload['reply_markup'] = reply_markup.to_dict()
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
             async with session.post(url, json=payload) as response:
-                result = await response.json()
+                result = await response.json(loads=orjson.loads)
                 if result.get('ok'):
                     logger.info(f"✨ Effect message sent to {chat_id}")
                     return True
@@ -780,9 +780,9 @@ async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> b
             'is_big': True  # This makes the reaction animated/big
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
             async with session.post(url, json=payload) as response:
-                result = await response.json()
+                result = await response.json(loads=orjson.loads)
                 if result.get('ok'):
                     logger.info(f"🎭 Animated reaction {emoji} sent to {chat_id}")
                     return True
@@ -848,42 +848,11 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
 
         # Add reply markup if provided
         if reply_markup:
-            payload['reply_markup'] = reply_markup.to_json()
+            payload['reply_markup'] = reply_markup.to_dict()
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
             async with session.post(url, json=payload) as response:
-                result = await response.json()
-                if result.get('ok'):
-                    logger.info(f"✨ Effect photo sent to {chat_id}")
-                    return True
-                else:
-                    logger.error(f"❌ Photo effect failed for {chat_id}: {result}")
-                    return False
-    except Exception as e:
-        logger.error(f"❌ Photo effect error for {chat_id}: {e}")
-        return False
-    """Send photo message with random effect using direct API"""
-    if not effects_client:
-        logger.warning("⚠️ Telethon effects client not available")
-        return False
-
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-        payload = {
-            'chat_id': chat_id,
-            'photo': photo_url,
-            'caption': caption,
-            'message_effect_id': random.choice(EFFECTS),
-            'parse_mode': 'HTML'
-        }
-
-        # Add reply markup if provided
-        if reply_markup:
-            payload['reply_markup'] = reply_markup.to_json()
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload) as response:
-                result = await response.json()
+                result = await response.json(loads=orjson.loads)
                 if result.get('ok'):
                     logger.info(f"✨ Effect photo sent to {chat_id}")
                     return True
@@ -988,7 +957,7 @@ async def save_user_session(user_id: int, session_data: dict):
         await valkey_client.setex(
             key,
             SESSION_TTL,
-            json.dumps(session_data)
+            orjson.dumps(session_data)
         )
         logger.debug(f"💾 Session saved for user {user_id}")
         return True
@@ -1006,7 +975,7 @@ async def get_user_session(user_id: int) -> dict:
         key = f"session:{user_id}"
         data = await valkey_client.get(key)
         if data:
-            return json.loads(data)
+            return orjson.loads(data)
         return {}
     except Exception as e:
         logger.error(f"❌ Failed to get session for user {user_id}: {e}")
@@ -1036,7 +1005,7 @@ async def cache_set(key: str, value: any, ttl: int = CACHE_TTL):
 
     try:
         if isinstance(value, (dict, list)):
-            value = json.dumps(value)
+            value = orjson.dumps(value)
         await valkey_client.setex(f"cache:{key}", ttl, value)
         logger.debug(f"📦 Cache set for key: {key}")
         return True
@@ -1054,7 +1023,7 @@ async def cache_get(key: str) -> any:
         value = await valkey_client.get(f"cache:{key}")
         if value:
             try:
-                return json.loads(value)
+                return orjson.loads(value)
             except:
                 return value
         return None
@@ -1088,7 +1057,7 @@ async def save_user_state(user_id: int, state_data: dict):
         await valkey_client.setex(
             key,
             SESSION_TTL,
-            json.dumps(state_data)
+            orjson.dumps(state_data)
         )
         logger.debug(f"💾 User state saved for user {user_id}")
         return True
@@ -1106,7 +1075,7 @@ async def get_user_state(user_id: int) -> dict:
         key = f"user_state:{user_id}"
         data = await valkey_client.get(key)
         if data:
-            return json.loads(data)
+            return orjson.loads(data)
         return {}
     except Exception as e:
         logger.error(f"❌ Failed to get user state for user {user_id}: {e}")
@@ -1668,7 +1637,7 @@ async def add_to_conversation_history(user_id: int, message: str, is_user: bool 
             existing = await valkey_client.get(key)
 
             if existing:
-                history = json.loads(existing)
+                history = orjson.loads(existing)
             else:
                 history = []
 
@@ -1678,7 +1647,7 @@ async def add_to_conversation_history(user_id: int, message: str, is_user: bool 
             if len(history) > CHAT_LENGTH:
                 history = history[-CHAT_LENGTH:]
 
-            await valkey_client.setex(key, SESSION_TTL, json.dumps(history))
+            await valkey_client.setex(key, SESSION_TTL, orjson.dumps(history))
             logger.debug(f"💬 Conversation updated in Valkey for user {user_id}")
             return
 
@@ -1705,7 +1674,7 @@ async def get_conversation_history_list(user_id: int) -> list:
             key = f"conversation:{user_id}"
             existing = await valkey_client.get(key)
             if existing:
-                history = json.loads(existing)
+                history = orjson.loads(existing)
         except Exception as e:
             logger.error(f"❌ Failed to get conversation from Valkey for user {user_id}: {e}")
 
@@ -1727,7 +1696,7 @@ async def get_conversation_context(user_id: int) -> str:
             key = f"conversation:{user_id}"
             existing = await valkey_client.get(key)
             if existing:
-                history = json.loads(existing)
+                history = orjson.loads(existing)
         except Exception as e:
             logger.error(f"❌ Failed to get conversation from Valkey for user {user_id}: {e}")
 
@@ -3174,9 +3143,9 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     'message_effect_id': random.choice(EFFECTS)
                 }
 
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
                     async with session.post(url, json=payload) as response:
-                        result = await response.json()
+                        result = await response.json(loads=orjson.loads)
                         if result.get('ok'):
                             log_with_user_info("INFO", f"✨ Invoice with effects sent for {amount} stars", user_info)
                         else:
@@ -3270,9 +3239,9 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         'parse_mode': 'HTML'
                     }
 
-                    async with aiohttp.ClientSession() as session:
+                    async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
                         async with session.post(url, json=payload) as response:
-                            result = await response.json()
+                            result = await response.json(loads=orjson.loads)
                             if result.get('ok'):
                                 log_with_user_info("INFO", "✨ No buyers message with effects sent successfully", user_info)
                             else:
@@ -3343,9 +3312,9 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     'disable_web_page_preview': True
                 }
 
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
                     async with session.post(url, json=payload) as response:
-                        result = await response.json()
+                        result = await response.json(loads=orjson.loads)
                         if result.get('ok'):
                             log_with_user_info("INFO", f"✨ Buyers list with effects sent with {len(purchases)} buyers", user_info)
                         else:
@@ -3672,12 +3641,12 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                         'text': refund_msg,
                         'message_effect_id': random.choice(EFFECTS),
                         'parse_mode': 'HTML',
-                        'reply_markup': reply_markup.to_json()
+                    'reply_markup': reply_markup.to_dict()
                     }
 
-                    async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
                         async with session.post(url, json=payload) as response:
-                            result = await response.json()
+                        result = await response.json(loads=orjson.loads)
                             if result.get('ok'):
                                 log_with_user_info("INFO", "✨ Refund message with effects sent successfully", user_info)
                             else:
@@ -3728,12 +3697,12 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                     'text': success_msg,
                     'message_effect_id': random.choice(EFFECTS),
                     'parse_mode': 'HTML',
-                    'reply_markup': reply_markup.to_json()
+                    'reply_markup': reply_markup.to_dict()
                 }
 
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
                     async with session.post(url, json=payload) as response:
-                        result = await response.json()
+                        result = await response.json(loads=orjson.loads)
                         if result.get('ok'):
                             log_with_user_info("INFO", "✨ Thank you message with effects sent successfully", user_info)
                         else:

@@ -3,7 +3,8 @@ uvloop
 valkey
 psutil
 asyncpg
-aiohttp
+aiohttp[speedups]
+orjson
 requests
 tgcrypto
 telethon
