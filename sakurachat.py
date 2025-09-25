@@ -3672,12 +3672,12 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                         'text': refund_msg,
                         'message_effect_id': random.choice(EFFECTS),
                         'parse_mode': 'HTML',
-                    'reply_markup': reply_markup.to_dict()
+                        'reply_markup': reply_markup.to_dict()
                     }
 
-                async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
+                    async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
                         async with session.post(url, json=payload) as response:
-                        result = await response.json(loads=json.loads)
+                            result = await response.json(loads=json.loads)
                             if result.get('ok'):
                                 log_with_user_info("INFO", "✨ Refund message with effects sent successfully", user_info)
                             else:
