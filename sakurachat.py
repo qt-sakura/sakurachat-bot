@@ -95,6 +95,65 @@ EMOJI_REACT = [
     "🔥",  "❤️"
 ]
 
+# Contextual reaction mapping
+CONTEXTUAL_REACTIONS = {
+    # Positive emotions
+    "love": ["❤️", "🥰", "😍", "💘", "❤️‍🔥"],
+    "happy": ["😁", "🎉", "🤩", "😘", "🔥"],
+    "excited": ["🎉", "🔥", "🤩", "⚡", "💯"],
+    "funny": ["🤣", "😁", "🤡", "🙈", "😂"],
+    "impressed": ["🤯", "🔥", "👏", "💯", "🏆"],
+    "cute": ["🥰", "😍", "🦄", "🍓", "💘"],
+    "cool": ["🆒", "😎", "🔥", "👌", "⚡"],
+
+    # Negative emotions
+    "sad": ["😢", "😭", "💔", "🙏", "🤗"],
+    "angry": ["😡", "🤬", "🔥", "😠", "💢"],
+    "confused": ["🤔", "🤨", "😐", "🤷", "❓"],
+    "tired": ["😴", "🥱", "😪", "💤", "😌"],
+    "sick": ["🤮", "🤒", "😷", "💊", "🙄"],
+    "shocked": ["😱", "🤯", "😨", "😰", "😵"],
+
+    # Actions/Activities
+    "food": ["🍓", "🍌", "🌭", "🍾", "😋"],
+    "study": ["👨‍💻", "📚", "✍️", "🤓", "📖"],
+    "celebration": ["🎉", "🏆", "🥳", "🎊", "🔥"],
+    "thanks": ["🙏", "👍", "❤️", "🤗", "😊"],
+    "agreement": ["👍", "💯", "👌", "🔥", "✅"],
+
+    # Special cases
+    "flirty": ["😘", "😍", "💋", "🔥", "😏"],
+    "mysterious": ["🌚", "👀", "🤐", "🕵️", "🔍"],
+    "playful": ["🤪", "😜", "🤡", "🙈", "😋"],
+    "supportive": ["🤗", "👍", "💪", "🙏", "❤️"]
+}
+
+# Keywords that trigger specific reaction categories
+REACTION_KEYWORDS = {
+    "love": ["love", "pyaar", "mohabbat", "ishq", "heart", "dil", "miss", "yaad"],
+    "happy": ["happy", "khushi", "khush", "good", "accha", "amazing", "awesome", "great"],
+    "excited": ["excited", "wow", "omg", "awesome", "incredible", "fantastic"],
+    "funny": ["haha", "lol", "funny", "hasna", "mazak", "joke", "comedy"],
+    "impressed": ["impressive", "amazing", "wow", "incredible", "outstanding"],
+    "cute": ["cute", "sweet", "adorable", "pyara", "meetha"],
+    "cool": ["cool", "nice", "badiya", "mast", "solid"],
+    "sad": ["sad", "dukh", "upset", "cry", "rona", "depression", "down"],
+    "angry": ["angry", "gussa", "mad", "frustrated", "annoyed"],
+    "confused": ["confused", "confuse", "samajh", "understand", "kya", "what"],
+    "tired": ["tired", "thak", "sleepy", "neend", "rest", "sleep"],
+    "sick": ["sick", "bimar", "ill", "fever", "headache", "pain"],
+    "shocked": ["shocked", "surprise", "omg", "what", "kya", "really"],
+    "food": ["food", "khana", "eat", "hungry", "bhookh", "delicious", "tasty"],
+    "study": ["study", "padhai", "exam", "test", "homework", "assignment"],
+    "celebration": ["congrats", "congratulations", "celebrate", "party", "success"],
+    "thanks": ["thanks", "thank", "dhanyawad", "shukriya", "grateful"],
+    "agreement": ["yes", "haan", "right", "correct", "sahi", "agree"],
+    "flirty": ["beautiful", "handsome", "sexy", "hot", "gorgeous"],
+    "mysterious": ["secret", "mystery", "hidden", "raaz", "chupana"],
+    "playful": ["play", "fun", "enjoy", "masti", "timepass"],
+    "supportive": ["support", "help", "sahayata", "madad", "care"]
+}
+
 # TELETHON EFFECTS CONFIGURATION
 EFFECTS = [
     "5104841245755180586",
@@ -1633,6 +1692,48 @@ def get_user_mention(user) -> str:
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'
 
 
+# REACTION LOGIC
+async def handle_contextual_reaction(update: Update, user_info: Dict[str, any]):
+    """
+    Analyzes the message text and sends a contextual, animated emoji reaction
+    with a certain probability.
+    """
+    try:
+        # Only react to private messages and a certain percentage of the time
+        if update.effective_chat.type != "private" or random.random() > 0.3:  # 30% chance to react
+            return
+
+        message_text = (update.message.text or "").lower()
+        if not message_text:
+            return
+
+        log_with_user_info("DEBUG", f"🤔 Analyzing message for reaction: '{message_text[:50]}...'", user_info)
+
+        found_context = None
+        # Find a matching context from keywords
+        for context, keywords in REACTION_KEYWORDS.items():
+            if any(keyword in message_text for keyword in keywords):
+                found_context = context
+                log_with_user_info("INFO", f"✅ Context found for reaction: '{found_context}'", user_info)
+                break
+
+        if found_context:
+            # Select a random emoji from the matched context
+            emoji_to_react = random.choice(CONTEXTUAL_REACTIONS[found_context])
+            log_with_user_info("INFO", f"🥰 Selected emoji for reaction: {emoji_to_react}", user_info)
+
+            # Send the animated reaction
+            await send_animated_reaction(
+                chat_id=update.effective_chat.id,
+                message_id=update.message.message_id,
+                emoji=emoji_to_react
+            )
+            log_with_user_info("INFO", f"🚀 Sent animated reaction '{emoji_to_react}' successfully", user_info)
+
+    except Exception as e:
+        log_with_user_info("ERROR", f"❌ Failed to handle contextual reaction: {e}", user_info)
+
+
 # CONVERSATION MEMORY FUNCTIONS
 # Adds a message to the user's conversation history
 async def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
@@ -3119,6 +3220,9 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         if await is_rate_limited(user_id, user_info["chat_id"]):
             log_with_user_info("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
+
+        # Handle contextual reactions in the background
+        asyncio.create_task(handle_contextual_reaction(update, user_info))
 
         # Handle different message types
         if update.message.sticker:
