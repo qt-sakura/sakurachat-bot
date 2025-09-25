@@ -3139,7 +3139,7 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # React to the message to show the bot is "thinking"
     try:
-        emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
+        emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["love"])
         await send_animated_reaction(
             chat_id=update.effective_chat.id,
             message_id=update.message.message_id,
