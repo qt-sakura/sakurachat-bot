@@ -2031,7 +2031,7 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
             user_name = update.effective_user.first_name or ""
 
             # Analyze the referenced poll
-            response = await analyze_poll_with_gemini(
+            response = await analyze_poll(
                 poll_question, poll_options, user_name, user_info, user_info["user_id"]
             )
 
@@ -2050,6 +2050,38 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
             return True
 
     return False
+
+
+# Analyzes a poll, trying OpenRouter first and falling back to Gemini
+async def analyze_poll(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+    """Analyze a poll, trying OpenRouter first and falling back to Gemini."""
+    response = None
+    source_api = None
+
+    # Try OpenRouter first
+    if openrouter_client:
+        log_with_user_info("INFO", "🤖 Trying OpenRouter API for poll analysis...", user_info)
+        try:
+            response = await analyze_poll_with_openrouter(poll_question, poll_options, user_name, user_info, user_id)
+            if response:
+                source_api = "OpenRouter"
+        except Exception as e:
+            log_with_user_info("ERROR", f"❌ OpenRouter poll analysis error: {e}. Falling back to Gemini.", user_info)
+
+    # Fallback to Gemini if OpenRouter fails or is disabled
+    if not response:
+        log_with_user_info("INFO", "🤖 Falling back to Gemini API for poll analysis", user_info)
+        source_api = "Gemini"
+        response = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, user_id)
+
+    # Add messages to conversation history
+    if response and user_id:
+        poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
+        await add_to_conversation_history(user_id, poll_description, is_user=True)
+        await add_to_conversation_history(user_id, response, is_user=False)
+        log_with_user_info("INFO", f"✅ Poll analysis via {source_api} completed and saved to history", user_info)
+
+    return response if response else "Poll analyze nahi kar paa rahi 😕"
 
 
 # Analyzes an image that was referenced in a message
@@ -2123,6 +2155,70 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
     return False
 
 
+# Analyzes a poll using the OpenRouter API
+async def analyze_poll_with_openrouter(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> Optional[str]:
+    """Analyze poll using OpenRouter API to suggest the correct answer."""
+    if not openrouter_client:
+        return None
+
+    if user_info:
+        log_with_user_info("DEBUG", f"📊 Analyzing poll with OpenRouter: '{poll_question[:50]}...'", user_info)
+
+    try:
+        history = await get_conversation_history_list(user_id)
+        messages = []
+
+        # Determine which prompt to use
+        active_prompt = SAKURA_PROMPT
+        if user_id == OWNER_ID:
+            active_prompt = LOVELY_SAKURA_PROMPT
+
+        messages.append({"role": "system", "content": active_prompt})
+        messages.extend(history)
+
+        # Format poll options
+        options_text = "\n".join([f"{i+1}. {option}" for i, option in enumerate(poll_options)])
+
+        # Build poll analysis prompt
+        poll_prompt = f"""User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
+
+Poll Question: "{poll_question}"
+
+Options:
+{options_text}
+
+Analyze this poll question and respond in Sakura's style about which option you think is correct and why. Keep it to one or two lines as per your character rules. Be helpful and give a quick reason.
+
+Sakura's response:"""
+
+        messages.append({"role": "user", "content": poll_prompt})
+
+        completion = await asyncio.to_thread(
+            openrouter_client.chat.completions.create,
+            extra_headers={
+                "HTTP-Referer": "https://t.me/SakuraHarunoBot",
+                "X-Title": "Sakura Bot",
+            },
+            model=MODEL,
+            messages=messages
+        )
+
+        ai_response = completion.choices[0].message.content
+        if ai_response:
+            if user_info:
+                log_with_user_info("INFO", f"✅ OpenRouter poll analysis completed: '{ai_response[:50]}...'", user_info)
+            return ai_response.strip()
+        else:
+            return None
+
+    except Exception as e:
+        if user_info:
+            log_with_user_info("ERROR", f"❌ OpenRouter poll analysis error: {e}", user_info)
+        else:
+            logger.error(f"OpenRouter poll analysis error: {e}")
+        return None
+
+
 # Analyzes a poll using the Gemini API
 async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze poll using Gemini 2.5 Flash to suggest the correct answer"""
@@ -2173,14 +2269,8 @@ Sakura's response:"""
 
         ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
 
-        # Add messages to conversation history
-        if user_id:
-            poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
-            await add_to_conversation_history(user_id, poll_description, is_user=True)
-            await add_to_conversation_history(user_id, ai_response, is_user=False)
-
         if user_info:
-            log_with_user_info("INFO", f"✅ Poll analysis completed: '{ai_response[:50]}...'", user_info)
+            log_with_user_info("INFO", f"✅ Gemini poll analysis completed: '{ai_response[:50]}...'", user_info)
 
         return ai_response
 
@@ -2970,10 +3060,10 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         log_with_user_info("DEBUG", f"📊 Poll question: '{poll_question}' with {len(poll_options)} options", user_info)
 
-        # Analyze poll with Gemini 2.5 Flash
+        # Analyze poll
         user_name = update.effective_user.first_name or ""
 
-        response = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, update.effective_user.id)
+        response = await analyze_poll(poll_question, poll_options, user_name, user_info, update.effective_user.id)
 
         log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
 
