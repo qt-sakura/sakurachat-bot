@@ -1699,8 +1699,8 @@ async def handle_contextual_reaction(update: Update, user_info: Dict[str, any]):
     with a certain probability.
     """
     try:
-        # Only react to private messages and a certain percentage of the time
-        if update.effective_chat.type != "private" or random.random() > 0.3:  # 30% chance to react
+        # Only react a certain percentage of the time to feel more human
+        if random.random() > 0.3:  # 30% chance to react
             return
 
         message_text = (update.message.text or "").lower()
