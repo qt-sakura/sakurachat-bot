@@ -755,8 +755,12 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
         if reply_markup:
             payload['reply_markup'] = reply_markup.to_dict()
 
-        async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-            async with session.post(url, json=payload) as response:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                data=json.dumps(payload),
+                headers={'Content-Type': 'application/json'}
+            ) as response:
                 result = await response.json(loads=json.loads)
                 if result.get('ok'):
                     logger.info(f"✨ Effect message sent to {chat_id}")
@@ -780,8 +784,12 @@ async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> b
             'is_big': True  # This makes the reaction animated/big
         }
 
-        async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-            async with session.post(url, json=payload) as response:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                data=json.dumps(payload),
+                headers={'Content-Type': 'application/json'}
+            ) as response:
                 result = await response.json(loads=json.loads)
                 if result.get('ok'):
                     logger.info(f"🎭 Animated reaction {emoji} sent to {chat_id}")
@@ -850,39 +858,12 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
         if reply_markup:
             payload['reply_markup'] = reply_markup.to_dict()
 
-        async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-            async with session.post(url, json=payload) as response:
-                result = await response.json(loads=json.loads)
-                if result.get('ok'):
-                    logger.info(f"✨ Effect photo sent to {chat_id}")
-                    return True
-                else:
-                    logger.error(f"❌ Photo effect failed for {chat_id}: {result}")
-                    return False
-    except Exception as e:
-        logger.error(f"❌ Photo effect error for {chat_id}: {e}")
-        return False
-    """Send photo message with random effect using direct API"""
-    if not effects_client:
-        logger.warning("⚠️ Telethon effects client not available")
-        return False
-
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-        payload = {
-            'chat_id': chat_id,
-            'photo': photo_url,
-            'caption': caption,
-            'message_effect_id': random.choice(EFFECTS),
-            'parse_mode': 'HTML'
-        }
-
-        # Add reply markup if provided
-        if reply_markup:
-            payload['reply_markup'] = reply_markup.to_dict()
-
-        async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-            async with session.post(url, json=payload) as response:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                data=json.dumps(payload),
+                headers={'Content-Type': 'application/json'}
+            ) as response:
                 result = await response.json(loads=json.loads)
                 if result.get('ok'):
                     logger.info(f"✨ Effect photo sent to {chat_id}")
@@ -3174,8 +3155,12 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     'message_effect_id': random.choice(EFFECTS)
                 }
 
-                async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-                    async with session.post(url, json=payload) as response:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        url,
+                        data=json.dumps(payload),
+                        headers={'Content-Type': 'application/json'}
+                    ) as response:
                         result = await response.json(loads=json.loads)
                         if result.get('ok'):
                             log_with_user_info("INFO", f"✨ Invoice with effects sent for {amount} stars", user_info)
@@ -3270,8 +3255,12 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         'parse_mode': 'HTML'
                     }
 
-                    async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-                        async with session.post(url, json=payload) as response:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            url,
+                            data=json.dumps(payload),
+                            headers={'Content-Type': 'application/json'}
+                        ) as response:
                             result = await response.json(loads=json.loads)
                             if result.get('ok'):
                                 log_with_user_info("INFO", "✨ No buyers message with effects sent successfully", user_info)
@@ -3343,8 +3332,12 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     'disable_web_page_preview': True
                 }
 
-                async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-                    async with session.post(url, json=payload) as response:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        url,
+                        data=json.dumps(payload),
+                        headers={'Content-Type': 'application/json'}
+                    ) as response:
                         result = await response.json(loads=json.loads)
                         if result.get('ok'):
                             log_with_user_info("INFO", f"✨ Buyers list with effects sent with {len(purchases)} buyers", user_info)
@@ -3675,8 +3668,12 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                         'reply_markup': reply_markup.to_dict()
                     }
 
-                    async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-                        async with session.post(url, json=payload) as response:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            url,
+                            data=json.dumps(payload),
+                            headers={'Content-Type': 'application/json'}
+                        ) as response:
                             result = await response.json(loads=json.loads)
                             if result.get('ok'):
                                 log_with_user_info("INFO", "✨ Refund message with effects sent successfully", user_info)
@@ -3731,8 +3728,12 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                     'reply_markup': reply_markup.to_dict()
                 }
 
-                async with aiohttp.ClientSession(json_serialize=json.dumps) as session:
-                    async with session.post(url, json=payload) as response:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        url,
+                        data=json.dumps(payload),
+                        headers={'Content-Type': 'application/json'}
+                    ) as response:
                         result = await response.json(loads=json.loads)
                         if result.get('ok'):
                             log_with_user_info("INFO", "✨ Thank you message with effects sent successfully", user_info)
