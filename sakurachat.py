@@ -2129,9 +2129,16 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
         # React to the message to show the bot is "thinking"
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
+            # React to the user's message
             await send_animated_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
+                emoji=emoji_to_react
+            )
+            # React to the original poll message as well
+            await send_animated_reaction(
+                chat_id=update.effective_chat.id,
+                message_id=update.message.reply_to_message.message_id,
                 emoji=emoji_to_react
             )
             log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied poll", user_info)
@@ -2221,9 +2228,16 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
         # React to the message to show the bot is "thinking"
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["love"])
+            # React to the user's message
             await send_animated_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
+                emoji=emoji_to_react
+            )
+            # React to the original image message as well
+            await send_animated_reaction(
+                chat_id=update.effective_chat.id,
+                message_id=update.message.reply_to_message.message_id,
                 emoji=emoji_to_react
             )
             log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied image", user_info)
