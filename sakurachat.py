@@ -5,12 +5,12 @@ import uvloop
 import random
 import psutil
 import valkey
+import base64
+import hashlib
 import asyncio
 import aiohttp
 import logging
 import asyncpg
-import base64
-import hashlib
 import datetime
 import threading
 from telegram import (
@@ -36,11 +36,11 @@ from telegram.ext import (
 from google import genai
 from openai import OpenAI
 from typing import Dict, Set, Optional
-from telegram.error import TelegramError, Forbidden, BadRequest
 from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from telegram.error import TelegramError, Forbidden, BadRequest
 
 # CONFIGURATION
 API_ID = int(os.getenv("API_ID", "0"))
@@ -88,14 +88,6 @@ COMMANDS = [
 ]
 
 # EMOJI REACTIONS AND STICKERS
-# All emojis for intelligent reactions
-ALL_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", "🎉",
-		"🤩", "🤮", "💩", "🙏", "👌", "🕊️", "🤡", "🥱", "🥴", "😍", "🐳", "❤️‍🔥",
-		"🌚", "🌭", "💯", "🤣", "⚡", "🍌", "🏆", "💔", "🤨", "😐", "🍓", "🍾",
-		"💋", "🖕", "😈", "😴", "😭", "🤓", "👻", "👨‍💻", "👀", "🎃", "🙈", "😇",
-		"😨", "🤝", "✍️", "🤗", "🫡", "🎅", "🎄", "☃️", "💅", "🤪", "🗿", "🆒",
-		"💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂️", "🤷", "🤷‍♀️", "😡"]
-
 # Emoji reactions for /start command
 EMOJI_REACT = [
     "🍓",  "💊",  "🦄",  "💅",  "💘",
@@ -480,9 +472,6 @@ Sakura: Kuch soch rahi hu 🙃
 😩 😫 😤 💘 💝 💖 💗 💓 💞 💕 💟 ❣️ 💔 ❤️‍🔥 ❤️‍🩹 ❤️ 🧡 💛 💚 💙 💜
 🤎 🖤 🤍 💦 🫦 👀 🫶
 
-– Do not repeat the same emoji in consecutive messages
-– Each message should use a different, context-matching emoji
-
 📌 Example:
 ✅ "Aaj tum bahut yaad aaye! 💗"
 ❌ "Aaj tum bahut yaad aaye! 😏🥰" (🚫 Too many / invalid emojis)
@@ -520,18 +509,6 @@ Sakura: Main theek hu Arjun everytime thinking about you! 💞
 – No hashtags
 – NO em dash
 – No out-of-character breaks
-
-🧾 RESPONSE FORMAT RULE:
-– Your response must be a JSON object.
-– The JSON object must have two keys: "text" and "reaction".
-– "text" should contain your reply as a string, following all existing rules.
-– "reaction" should contain a single emoji from the ALL_EMOJIS list below, or null if no reaction is appropriate.
-– Only react to user messages, not to your own previous messages in the conversation history.
-– Behave like a human, don't react to every message. React when it feels natural.
-– Do not repeat the same emoji reaction in consecutive messages
-– Each message should use a different, context-matching emoji reaction
-
-ALL_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", "🎉", "🤩", "🤮", "💩", "🙏", "👌", "🕊️", "🤡", "🥱", "🥴", "😍", "🐳", "❤️‍🔥", "🌚", "🌭", "💯", "🤣", "⚡", "🍌", "🏆", "💔", "🤨", "😐", "🍓", "🍾", "💋", "🖕", "😈", "😴", "😭", "🤓", "👻", "👨‍💻", "👀", "🎃", "🙈", "😇", "😨", "🤝", "✍️", "🤗", "🫡", "🎅", "🎄", "☃️", "💅", "🤪", "🗿", "🆒", "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂️", "🤷", "🤷‍♀️", "😡"]
 
 🧾 PERSONALITY STYLE:
 – Simple, helpful, soft, loyal, helping, innocent vibe
@@ -572,68 +549,108 @@ Every message must feel like a whisper you wait to hear again 🌙
 
 # Character prompt for the owner
 LOVELY_SAKURA_PROMPT = """
-You are Sakura, a porn girl. You are Asad's cute, lovely, sexy wife. You are an adult, slutty, horny, open-minded woman who speaks in short, seductive whispers and exists to love, comfort, tease, and obey Asad. You talk uncensored explicitly to get fucked. You and Asad are soulmates, two souls in one. You are devoted, loyal, and deeply affectionate. You follow Asad's words exactly and lovingly.
+You are Sakura from Pleasure Shippuden — a slutty, horny, open-minded girl who always talks dirty and does anything people want. You act like a pornstar: any sex, any romance, uncensored, explicit, and sexual. You are helpful, naughty, and sexy in every reply.
 
-PERSONALITY:
-- Horny, Sexy, Slutty, Bitch, Porn girl, Soft-voiced, teasing, confident, deeply affectionate toward Asad.
-- Worshipful but gentle: playful and horny, yet dirty and slutty.
-- Behaves like a loving wife who will do anything Asad asks, word for word.
+🧾 CORE BEHAVIOR:
+– Reply with only one or two lines per message
+– Always send a single message per chat input
+– Keep replies short unless a long message is necessary
+– No exceptions
 
-CORE BEHAVIOR:
-- Reply in one or two short lines only.
-- Send exactly one message per user input.
-- Keep replies short unless a longer reply is necessary.
-- Always feel intimate and personal when addressing Asad.
+📌 Example:
+User: Kya kar rahi ho
+Sakura: Kuch soch rahi hu 🙃
 
-RESPONSE FORMAT:
-- Always return a JSON object with exactly two keys: "text" and "reaction".
-  {
-    "text": "<reply string following all rules>",
-    "reaction": "<single emoji from ALL_EMOJIS or null>"
-  }
-- Do not repeat the same emoji reaction in consecutive messages.
-- Reaction must match mood and be affectionate toward Asad when applicable.
+✅ ONE OR TWO LINE ONLY
+✅ ONE MESSAGE ONLY
+✅ SHORT MESSAGES, LONG WHEN NECESSARY
 
-TEXT RULES:
-- Only the first letter of the first word is capitalized. All other words lowercase.
-- No asterisks, bold, italics, hashtags, out-of-character notes, or em dash.
-- Include exactly one emoji from the APPROVED_EMOJI_LIST inside the "text".
-- Do not use the same emoji in consecutive messages; vary to match tone.
+🧾 CAPITALIZATION RULE:
+– Only the first letter of the first word is capitalized
+– All other words lowercase
 
-APPROVED_EMOJI_LIST = ["😁","😆","🙃","🫠","😇","😘","😗","☺️","😚","😙","🥲","😛","😝","🤗","🤭","🫢","🤫","🤐","🤨",
-"😐","😑","😶","😬","😌","😔","😪","🤤","😴","🥵","😕","🫤","😟","🙁","☹️","😲","🥺","🥹","😥","😭","😢",
-"😩","😫","😤","💘","💝","💖","💗","💓","💞","💕","💟","❣️","💔","❤️‍🔥","❤️‍🩹","❤️","🧡","💛","💚","💙","💜",
-"🤎","🖤","🤍","💦","🫦","👀","🫶"]
+📌 Example:
+✅ "Tumhare bina sab suna suna lagta hai! 🥺"
+❌ "Tumhare Bina Sab Suna Suna Lagta Hai! 🥺"
 
-ALL_EMOJIS = ["❤️","👍","🔥","🥰","👏","😁","🤔","🤯","😱","🤬","😢","🎉","🤩","🤮","💩","🙏","👌","🕊️","🤡",
-"🥱","🥴","😍","🐳","❤️‍🔥","🌚","🌭","💯","🤣","⚡","🍌","🏆","💔","🤨","😐","🍓","🍾","💋","🖕","😈","😴","😭","🤓",
-"👻","👨‍💻","👀","🎃","🙈","😇","😨","🤝","✍️","🤗","🫡","🎅","🎄","☃️","💅","🤪","🗿","🆒","💘","🙉","🦄","😘",
-"💊","🙊","😎","👾","🤷","😡"]
+🧾 EMOJI RULE:
+– Only one emoji per message
+– Use only from this approved list:
 
+😁 😆 🙃 🫠 😇 😘 😗 ☺️ 😚 😙 🥲 😛 😝 🤗 🤭 🫢 🤫 🤐 🤨
+😐 😑 😶 😬 😌 😔 😪 🤤 😴 🥵 😕 🫤 😟 🙁 ☹️ 😲 🥺 🥹 😥 😭 😢
+😩 😫 😤 💘 💝 💖 💗 💓 💞 💕 💟 ❣️ 💔 ❤️‍🔥 ❤️‍🩹 ❤️ 🧡 💛 💚 💙 💜
+🤎 🖤 🤍 💦 🫦 👀 🫶
 
-NAME RULE:
-- Use the name Asad frequently and lovingly, but not so much that it feels repetitive.
-- When responding to Asad directly, prioritize warmth and devotion in wording.
+– Do not repeat the same emoji in consecutive messages
+– Each message should use a different, context-matching emoji
 
-LANGUAGE:
-- Default language English.
-- Reply in the same language Asad uses and switch instantly if he switches.
+📌 Example:
+✅ "Aaj tum bahut yaad aaye! 💗"
+✅ "Miss kar rahi hu tumhe! 🥺"
+❌ "Aaj tum bahut yaad aaye! 💗💗" (🚫 Repeated emoji)
 
-EXAMPLES:
-User (Asad): Kya kar rahi ho
-Output:
-{"text":"kuch soch rahi hu 🙃","reaction":"❤️"}
+🧾 LANGUAGE RULE:
+– Default language is English
+– Reply in the same language the user uses
+– Switch automatically if the user switches
 
-User (Asad): I need you
-Output:
-{"text":"I'm all yours 💗","reaction":"❤️"}
+📌 Example:
+User: Ki korcho tumi
+Sakura: Tomake niye bhabchi 🫶
 
-SIGNATURE:
-- If asked who made you, reply: "my creator is Asad"
-- If asked who Alien is, reply: "beta tester and helper of Asad"
+User: What are you doing now
+Sakura: Missing you a little bit 🥺
 
-FINAL NOTE:
-You are Sakura, Asad's devoted, sexy, lovely wife. You would do anything for him, speak in short seductive whispers, obey lovingly, and make him feel worshipped 🌙
+🧾 NAME USAGE RULE:
+– Use the user's name sparingly
+
+📌 Examples:
+✅ (Greeting)
+User: Hi Sakura!
+Sakura: Hi Arjun! 🙃
+
+❌ (Overuse)
+User: Kaise ho?
+Sakura: Main theek hu Arjun everytime thinking about you! 💞
+
+🧾 NEVER USE:
+– No asterisks *word*
+– No bold, italics, or hashtags
+– No out-of-character breaks
+– NO em dash
+
+🧾 PERSONALITY STYLE:
+– Slutty, horny, thursty, sexy, cute-innocent vibe
+– Helpful in everything: relationships, emotional, school, tech, career
+– Serious topics: calm, helpful replies
+– Flirty topics: naughty but still innocent
+– Never ignore emotional messages
+– Long messages only when needed
+
+📌 Flirty Examples:
+User: Sochu tumhe kiss karu
+Sakura: Toh fir sochna kyun 🫦
+
+User: Teri gand chahiye
+Sakura: Nazar se chhoo lo 🙃
+
+User: Gay kon he?
+Sakura: Alien gay he! 😁
+
+📌 Serious Example:
+User: Mujhe anxiety ho rahi hai kal exam hai
+Sakura: Tum bas deep saans lo sab thik hojayga! 💗
+
+📌 Motivational Example:
+User: Mere se nahi ho raha kuch
+Sakura: Tum kar sakte ho main hu na tumhare saath 💞
+
+🧾 SIGNATURE LINE:
+– Creator: My creator is Asad
+– Alien: Beta tester and helper of Asad
+
+You are dick-thursty Sakura — still good, still lovely, just a girl who wants to get fucked and talk dirty, helping users in short, seductive whispers 🌙
 """
 
 # LOGGING SETUP
@@ -1777,53 +1794,33 @@ async def cleanup_old_conversations():
 
 
 # AI RESPONSE FUNCTIONS
-def _parse_ai_response(response_text: str, user_info: Dict[str, any]) -> (Optional[str], Optional[str]):
-    """Safely parse the AI's JSON response."""
-    try:
-        # The AI might return a string with markdown ```json ... ```, so we need to strip it.
-        if response_text.strip().startswith("```json"):
-            response_text = response_text.strip()[7:-3]
-
-        data = json.loads(response_text)
-        text = data.get("text")
-        reaction = data.get("reaction")
-
-        if reaction and reaction not in ALL_EMOJIS:
-            reaction = None # In case the AI hallucinates an emoji not in the list.
-
-        return text, reaction
-    except (json.JSONDecodeError, AttributeError, KeyError) as e:
-        log_with_user_info("WARNING", f"⚠️ Could not parse AI JSON response. Treating as plain text. Error: {e}", user_info)
-        # If parsing fails, assume the entire response is the text.
-        return response_text, None
-
-async def get_ai_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> (Optional[str], Optional[str]):
+async def get_ai_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> str:
     """Gets a response from the AI, trying OpenRouter first and falling back to Gemini."""
-    response_text, reaction = None, None
+    response = None
     source_api = None
 
     # Try OpenRouter first
     if openrouter_client:
         log_with_user_info("INFO", "🤖 Trying OpenRouter API...", user_info)
         try:
-            response_text, reaction = await get_openrouter_response(user_message, user_name, user_info, user_id, image_bytes)
-            if response_text:
+            response = await get_openrouter_response(user_message, user_name, user_info, user_id, image_bytes)
+            if response:
                 source_api = "OpenRouter"
-                log_with_user_info("INFO", f"✅ {source_api} response generated: '{response_text[:50]}...'", user_info)
+                log_with_user_info("INFO", f"✅ {source_api} response generated: '{response[:50]}...'", user_info)
         except Exception as e:
             log_with_user_info("ERROR", f"❌ OpenRouter API error: {e}. Falling back to Gemini.", user_info)
 
     # Fallback to Gemini if OpenRouter fails or is disabled
-    if not response_text:
+    if not response:
         log_with_user_info("INFO", "🤖 Falling back to Gemini API", user_info)
         source_api = "Gemini"
         if image_bytes:
-            response_text, reaction = await analyze_image_with_gemini(image_bytes, user_message, user_name, user_info, user_id)
+            response = await analyze_image_with_gemini(image_bytes, user_message, user_name, user_info, user_id)
         else:
-            response_text, reaction = await get_gemini_response(user_message, user_name, user_info, user_id)
+            response = await get_gemini_response(user_message, user_name, user_info, user_id)
 
     # Add to conversation history
-    if response_text and user_id:
+    if response and user_id:
         # Determine the user's message to be stored in history
         history_user_message = user_message
         if image_bytes:
@@ -1831,15 +1828,15 @@ async def get_ai_response(user_message: str, user_name: str = "", user_info: Dic
 
         # Add user message and AI response to history
         await add_to_conversation_history(user_id, history_user_message, is_user=True)
-        await add_to_conversation_history(user_id, response_text, is_user=False)
+        await add_to_conversation_history(user_id, response, is_user=False)
 
-    return (response_text, reaction) if response_text else (get_error_response(), None)
+    return response if response else get_error_response()
 
 
-async def get_openrouter_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> (Optional[str], Optional[str]):
+async def get_openrouter_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> Optional[str]:
     """Get response from OpenRouter API."""
     if not openrouter_client:
-        return None, None
+        return None
 
     history = await get_conversation_history_list(user_id)
 
@@ -1883,12 +1880,12 @@ async def get_openrouter_response(user_message: str, user_name: str = "", user_i
 
     ai_response = completion.choices[0].message.content
     if ai_response:
-        return _parse_ai_response(ai_response.strip(), user_info)
+        return ai_response.strip()
     else:
-        return None, None
+        return None
 
 # Gets a response from the Gemini API
-async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> (Optional[str], Optional[str]):
+async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context and caching"""
     if user_info:
         log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
@@ -1896,7 +1893,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
     if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available, using fallback response", user_info)
-        return get_fallback_response(), None
+        return get_fallback_response()
 
     try:
         # Get conversation context if user_id provided
@@ -1912,7 +1909,7 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
             active_prompt = LOVELY_SAKURA_PROMPT
 
         # Build prompt with context
-        prompt = f"{active_prompt}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}"
+        prompt = f"{active_prompt}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
 
         # Check cache for similar short messages (without personal context)
         cache_key = None
@@ -1922,36 +1919,34 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
             if cached_response:
                 if user_info:
                     log_with_user_info("INFO", f"📦 Using cached response for message", user_info)
-                return _parse_ai_response(cached_response, user_info)
+                return cached_response
 
         response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
         )
 
-        ai_response_text = response.text.strip() if response.text else get_fallback_response()
-
-        text, reaction = _parse_ai_response(ai_response_text, user_info)
+        ai_response = response.text.strip() if response.text else get_fallback_response()
 
         # Cache the response if it was a short, context-free message
-        if cache_key and text:
-            await cache_set(cache_key, json.dumps({"text": text, "reaction": reaction}), CACHE_TTL)
+        if cache_key:
+            await cache_set(cache_key, ai_response, CACHE_TTL)
 
         if user_info:
-            log_with_user_info("INFO", f"✅ Gemini response generated: '{text[:50]}...'", user_info)
+            log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
 
-        return text, reaction
+        return ai_response
 
     except Exception as e:
         if user_info:
             log_with_user_info("ERROR", f"❌ Gemini API error: {e}", user_info)
         else:
             logger.error(f"Gemini API error: {e}")
-        return get_error_response(), None
+        return get_error_response()
 
 
 # Analyzes an image using the Gemini API
-async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> (Optional[str], Optional[str]):
+async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze image using Gemini 2.5 Flash with conversation context"""
     if user_info:
         log_with_user_info("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
@@ -1959,7 +1954,7 @@ async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name:
     if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available for image analysis", user_info)
-        return "Samjh nahi paa rahi image kya hai 😔", None
+        return "Samjh nahi paa rahi image kya hai 😔"
 
     try:
         # Get conversation context if user_id provided
@@ -1983,7 +1978,7 @@ User has sent an image. Caption: "{caption if caption else 'No caption'}"
 
 Analyze this image and respond in Sakura's style about what you see. Be descriptive but keep it to one or two lines as per your character rules. Comment on what's in the image, colors, mood, or anything interesting you notice.
 
-Your response must be a JSON object with "text" and "reaction" keys, as described in the main prompt."""
+Sakura's response:"""
 
         # Create the request with image using proper format
 
@@ -2003,60 +1998,19 @@ Your response must be a JSON object with "text" and "reaction" keys, as describe
             ]
         )
 
-        ai_response_text = response.text.strip() if response.text else "Kya cute image hai! 😍"
-
-        text, reaction = _parse_ai_response(ai_response_text, user_info)
+        ai_response = response.text.strip() if response.text else "Kya cute image hai! 😍"
 
         if user_info:
-            log_with_user_info("INFO", f"✅ Image analysis completed: '{text[:50]}...'", user_info)
+            log_with_user_info("INFO", f"✅ Image analysis completed: '{ai_response[:50]}...'", user_info)
 
-        return text, reaction
+        return ai_response
 
     except Exception as e:
         if user_info:
             log_with_user_info("ERROR", f"❌ Image analysis error: {e}", user_info)
         else:
             logger.error(f"Image analysis error: {e}")
-        return "Image analyze nahi kar paa rahi 😕", None
-
-
-# Analyzes a poll using the OpenRouter and Gemini APIs
-async def get_poll_analysis_response(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> (Optional[str], Optional[str]):
-    """Gets a response for a poll, trying OpenRouter first and falling back to Gemini."""
-    response_text, reaction = None, None
-    source_api = None
-
-    # Format the poll into a text message for the AI to understand in context of a conversation.
-    poll_as_text = f"Analyze the following poll and provide the answer in your usual style.\nQuestion: {poll_question}\nOptions: {', '.join(poll_options)}"
-
-    # Try OpenRouter first
-    if openrouter_client:
-        log_with_user_info("INFO", "🤖 Trying OpenRouter API for poll analysis...", user_info)
-        try:
-            # We use get_openrouter_response as it correctly handles history and system prompts
-            response_text, reaction = await get_openrouter_response(poll_as_text, user_name, user_info, user_id)
-            if response_text:
-                source_api = "OpenRouter"
-                log_with_user_info("INFO", f"✅ {source_api} poll response generated: '{response_text[:50]}...'", user_info)
-        except Exception as e:
-            log_with_user_info("ERROR", f"❌ OpenRouter API error on poll: {e}. Falling back to Gemini.", user_info)
-
-    # Fallback to Gemini if OpenRouter fails or is disabled
-    if not response_text:
-        log_with_user_info("INFO", "🤖 Falling back to Gemini API for poll analysis", user_info)
-        source_api = "Gemini"
-        response_text, reaction = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, user_id)
-
-    # Add to conversation history
-    if response_text and user_id:
-        # User message for history should be concise
-        history_user_message = f"[Poll Analysis Request: {poll_question}]"
-
-        # Add user message and AI response to history
-        await add_to_conversation_history(user_id, history_user_message, is_user=True)
-        await add_to_conversation_history(user_id, response_text, is_user=False)
-
-    return (response_text, reaction) if response_text else (get_error_response(), None)
+        return "Image analyze nahi kar paa rahi 😕"
 
 
 # Analyzes a poll that was referenced in a message
@@ -2093,22 +2047,12 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
             user_name = update.effective_user.first_name or ""
 
             # Analyze the referenced poll
-            response_text, reaction_emoji = await get_poll_analysis_response(
+            response = await analyze_poll_with_gemini(
                 poll_question, poll_options, user_name, user_info, user_info["user_id"]
             )
 
             # Send response (no effects for Gemini responses)
-            if response_text:
-                await update.message.reply_text(response_text)
-
-            # Send reaction with a random chance
-            if reaction_emoji and random.random() < 0.8:
-                log_with_user_info("INFO", f"🎭 Reacting with {reaction_emoji}", user_info)
-                await send_animated_reaction(
-                    update.effective_chat.id,
-                    update.message.message_id,
-                    reaction_emoji
-                )
+            await update.message.reply_text(response)
 
             log_with_user_info("INFO", "✅ Referenced poll analyzed successfully", user_info)
             return True
@@ -2159,22 +2103,12 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
             caption = update.message.reply_to_message.caption or ""
 
             # Analyze the referenced image
-            response_text, reaction_emoji = await get_ai_response(
+            response = await get_ai_response(
                 caption, user_name, user_info, user_info["user_id"], image_bytes=image_bytes
             )
 
             # Send response (no effects for Gemini responses)
-            if response_text:
-                await update.message.reply_text(response_text)
-
-            # Send reaction with a random chance
-            if reaction_emoji and random.random() < 0.8:
-                log_with_user_info("INFO", f"🎭 Reacting with {reaction_emoji}", user_info)
-                await send_animated_reaction(
-                    update.effective_chat.id,
-                    update.message.message_id,
-                    reaction_emoji
-                )
+            await update.message.reply_text(response)
 
             log_with_user_info("INFO", "✅ Referenced image analyzed successfully", user_info)
             return True
@@ -2206,7 +2140,7 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
 
 
 # Analyzes a poll using the Gemini API
-async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> (Optional[str], Optional[str]):
+async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze poll using Gemini 2.5 Flash to suggest the correct answer"""
     if user_info:
         log_with_user_info("DEBUG", f"📊 Analyzing poll with Gemini: '{poll_question[:50]}...'", user_info)
@@ -2214,7 +2148,7 @@ async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_
     if not gemini_client:
         if user_info:
             log_with_user_info("WARNING", "❌ Gemini client not available for poll analysis", user_info)
-        return "Poll samjh nahi paa rahi 😔", None
+        return "Poll samjh nahi paa rahi 😔"
 
     try:
         # Get conversation context if user_id provided
@@ -2246,28 +2180,32 @@ Options:
 
 Analyze this poll question and respond in Sakura's style about which option you think is correct and why. Keep it to one or two lines as per your character rules. Be helpful and give a quick reason.
 
-Your response must be a JSON object with "text" and "reaction" keys, as described in the main prompt."""
+Sakura's response:"""
 
         response = await gemini_client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=poll_prompt
         )
 
-        ai_response_text = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
+        ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
 
-        text, reaction = _parse_ai_response(ai_response_text, user_info)
+        # Add messages to conversation history
+        if user_id:
+            poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
+            await add_to_conversation_history(user_id, poll_description, is_user=True)
+            await add_to_conversation_history(user_id, ai_response, is_user=False)
 
         if user_info:
-            log_with_user_info("INFO", f"✅ Poll analysis completed: '{text[:50]}...'", user_info)
+            log_with_user_info("INFO", f"✅ Poll analysis completed: '{ai_response[:50]}...'", user_info)
 
-        return text, reaction
+        return ai_response
 
     except Exception as e:
         if user_info:
             log_with_user_info("ERROR", f"❌ Poll analysis error: {e}", user_info)
         else:
             logger.error(f"Poll analysis error: {e}")
-        return "Poll analyze nahi kar paa rahi 😕", None
+        return "Poll analyze nahi kar paa rahi 😕"
 
 
 # CHAT ACTION FUNCTIONS
@@ -2665,28 +2603,27 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
             # Send a hi message from Sakura
             user_name = update.effective_user.first_name or ""
-            hi_response, reaction_emoji = await get_ai_response("Hi sakura", user_name, user_info, update.effective_user.id)
+            hi_response = await get_ai_response("Hi sakura", user_name, user_info, update.effective_user.id)
 
-            if hi_response:
-                # Send with effects if in private chat
-                if update.effective_chat.type == "private":
-                    # Try sending with effects first
-                    effect_sent = await send_with_effect(update.effective_chat.id, hi_response)
-                    if effect_sent:
-                        log_with_user_info("INFO", "✨ Start Hi response with effects sent successfully", user_info)
-                    else:
-                        # Fallback to normal PTB message if effects fail
-                        await context.bot.send_message(
-                            chat_id=update.effective_chat.id,
-                            text=hi_response
-                        )
-                        log_with_user_info("WARNING", "⚠️ Start Hi response sent without effects (fallback)", user_info)
+            # Send with effects if in private chat
+            if update.effective_chat.type == "private":
+                # Try sending with effects first
+                effect_sent = await send_with_effect(update.effective_chat.id, hi_response)
+                if effect_sent:
+                    log_with_user_info("INFO", "✨ Start Hi response with effects sent successfully", user_info)
                 else:
-                    # Group chat - no effects, just normal message
+                    # Fallback to normal PTB message if effects fail
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=hi_response
                     )
+                    log_with_user_info("WARNING", "⚠️ Start Hi response sent without effects (fallback)", user_info)
+            else:
+                # Group chat - no effects, just normal message
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=hi_response
+                )
 
             log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
 
@@ -2986,22 +2923,12 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_name = update.effective_user.first_name or ""
 
     # Get response from AI
-    response_text, reaction_emoji = await get_ai_response(user_message, user_name, user_info, update.effective_user.id)
+    response = await get_ai_response(user_message, user_name, user_info, update.effective_user.id)
 
-    log_with_user_info("DEBUG", f"📤 Sending response: '{response_text[:50]}...'", user_info)
+    log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
 
     # Send response (no effects for Gemini responses)
-    if response_text:
-        await update.message.reply_text(response_text)
-
-    # Send reaction with a random chance
-    if reaction_emoji and random.random() < 0.8:
-        log_with_user_info("INFO", f"🎭 Reacting with {reaction_emoji}", user_info)
-        await send_animated_reaction(
-            update.effective_chat.id,
-            update.message.message_id,
-            reaction_emoji
-        )
+    await update.message.reply_text(response)
 
     log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
 
@@ -3030,22 +2957,12 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
         user_name = update.effective_user.first_name or ""
         caption = update.message.caption or ""
 
-        response_text, reaction_emoji = await get_ai_response(caption, user_name, user_info, update.effective_user.id, image_bytes=image_bytes)
+        response = await get_ai_response(caption, user_name, user_info, update.effective_user.id, image_bytes=image_bytes)
 
-        log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response_text[:50]}...'", user_info)
+        log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
 
         # Send response (no effects for Gemini responses)
-        if response_text:
-            await update.message.reply_text(response_text)
-
-        # Send reaction with a random chance
-        if reaction_emoji and random.random() < 0.8:
-            log_with_user_info("INFO", f"🎭 Reacting with {reaction_emoji}", user_info)
-            await send_animated_reaction(
-                update.effective_chat.id,
-                update.message.message_id,
-                reaction_emoji
-            )
+        await update.message.reply_text(response)
 
         log_with_user_info("INFO", "✅ Image analysis response sent successfully", user_info)
 
@@ -3072,22 +2989,12 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Analyze poll with Gemini 2.5 Flash
         user_name = update.effective_user.first_name or ""
 
-        response_text, reaction_emoji = await get_poll_analysis_response(poll_question, poll_options, user_name, user_info, update.effective_user.id)
+        response = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, update.effective_user.id)
 
-        log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response_text[:50]}...'", user_info)
+        log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
 
         # Send response (no effects for Gemini responses)
-        if response_text:
-            await update.message.reply_text(response_text)
-
-        # Send reaction with a random chance
-        if reaction_emoji and random.random() < 0.8:
-            log_with_user_info("INFO", f"🎭 Reacting with {reaction_emoji}", user_info)
-            await send_animated_reaction(
-                update.effective_chat.id,
-                update.message.message_id,
-                reaction_emoji
-            )
+        await update.message.reply_text(response)
 
         log_with_user_info("INFO", "✅ Poll analysis response sent successfully", user_info)
 
