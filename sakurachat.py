@@ -95,75 +95,6 @@ EMOJI_REACT = [
     "🔥",  "❤️"
 ]
 
-# Available Telegram reaction emojis
-TELEGRAM_REACTIONS = [
-    "❤️", "👍", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", "🎉",
-    "🤩", "🤮", "💩", "🙏", "👌", "🕊️", "🤡", "🥱", "🥴", "😍", "🐳", "❤️‍🔥",
-    "🌚", "🌭", "💯", "🤣", "⚡", "🍌", "🏆", "💔", "🤨", "😐", "🍓", "🍾",
-    "💋", "🖕", "😈", "😴", "😭", "🤓", "👻", "👨‍💻", "👀", "🎃", "🙈", "😇",
-    "😨", "🤝", "✍️", "🤗", "🫡", "🎅", "🎄", "☃️", "💅", "🤪", "🗿", "🆒",
-    "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂️", "🤷", "🤷‍♀️", "😡"
-]
-
-# Contextual reaction mapping
-CONTEXTUAL_REACTIONS = {
-    # Positive emotions
-    "love": ["❤️", "🥰", "😍", "💘", "❤️‍🔥"],
-    "happy": ["😁", "🎉", "🤩", "😘", "🔥"],
-    "excited": ["🎉", "🔥", "🤩", "⚡", "💯"],
-    "funny": ["🤣", "😁", "🤡", "🙈", "😂"],
-    "impressed": ["🤯", "🔥", "👏", "💯", "🏆"],
-    "cute": ["🥰", "😍", "🦄", "🍓", "💘"],
-    "cool": ["🆒", "😎", "🔥", "👌", "⚡"],
-
-    # Negative emotions
-    "sad": ["😢", "😭", "💔", "🙏", "🤗"],
-    "angry": ["😡", "🤬", "🔥", "😠", "💢"],
-    "confused": ["🤔", "🤨", "😐", "🤷", "❓"],
-    "tired": ["😴", "🥱", "😪", "💤", "😌"],
-    "sick": ["🤮", "🤒", "😷", "💊", "🙄"],
-    "shocked": ["😱", "🤯", "😨", "😰", "😵"],
-
-    # Actions/Activities
-    "food": ["🍓", "🍌", "🌭", "🍾", "😋"],
-    "study": ["👨‍💻", "📚", "✍️", "🤓", "📖"],
-    "celebration": ["🎉", "🏆", "🥳", "🎊", "🔥"],
-    "thanks": ["🙏", "👍", "❤️", "🤗", "😊"],
-    "agreement": ["👍", "💯", "👌", "🔥", "✅"],
-
-    # Special cases
-    "flirty": ["😘", "😍", "💋", "🔥", "😏"],
-    "mysterious": ["🌚", "👀", "🤐", "🕵️", "🔍"],
-    "playful": ["🤪", "😜", "🤡", "🙈", "😋"],
-    "supportive": ["🤗", "👍", "💪", "🙏", "❤️"]
-}
-
-# Keywords that trigger specific reaction categories
-REACTION_KEYWORDS = {
-    "love": ["love", "pyaar", "mohabbat", "ishq", "heart", "dil", "miss", "yaad"],
-    "happy": ["happy", "khushi", "khush", "good", "accha", "amazing", "awesome", "great"],
-    "excited": ["excited", "wow", "omg", "awesome", "incredible", "fantastic"],
-    "funny": ["haha", "lol", "funny", "hasna", "mazak", "joke", "comedy"],
-    "impressed": ["impressive", "amazing", "wow", "incredible", "outstanding"],
-    "cute": ["cute", "sweet", "adorable", "pyara", "meetha"],
-    "cool": ["cool", "nice", "badiya", "mast", "solid"],
-    "sad": ["sad", "dukh", "upset", "cry", "rona", "depression", "down"],
-    "angry": ["angry", "gussa", "mad", "frustrated", "annoyed"],
-    "confused": ["confused", "confuse", "samajh", "understand", "kya", "what"],
-    "tired": ["tired", "thak", "sleepy", "neend", "rest", "sleep"],
-    "sick": ["sick", "bimar", "ill", "fever", "headache", "pain"],
-    "shocked": ["shocked", "surprise", "omg", "what", "kya", "really"],
-    "food": ["food", "khana", "eat", "hungry", "bhookh", "delicious", "tasty"],
-    "study": ["study", "padhai", "exam", "test", "homework", "assignment"],
-    "celebration": ["congrats", "congratulations", "celebrate", "party", "success"],
-    "thanks": ["thanks", "thank", "dhanyawad", "shukriya", "grateful"],
-    "agreement": ["yes", "haan", "right", "correct", "sahi", "agree"],
-    "flirty": ["beautiful", "handsome", "sexy", "hot", "gorgeous"],
-    "mysterious": ["secret", "mystery", "hidden", "raaz", "chupana"],
-    "playful": ["play", "fun", "enjoy", "masti", "timepass"],
-    "supportive": ["support", "help", "sahayata", "madad", "care"]
-}
-
 # TELETHON EFFECTS CONFIGURATION
 EFFECTS = [
     "5104841245755180586",
@@ -905,113 +836,6 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
 
     except Exception as e:
         log_with_user_info("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
-
-
-# Add this function after get_contextual_reaction
-async def send_contextual_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE, user_info: Dict[str, any]) -> bool:
-    """
-    Send a contextual reaction based on message content.
-    Returns True if a reaction was sent, False otherwise.
-    """
-    try:
-        message_text = update.message.text or update.message.caption or ""
-        chat_type = update.effective_chat.type
-
-        log_with_user_info("DEBUG", f"🎭 Starting contextual reaction process for {chat_type} chat", user_info)
-
-        # Get contextual reaction
-        reaction_emoji = await get_contextual_reaction(message_text, user_info)
-
-        if not reaction_emoji:
-            log_with_user_info("DEBUG", "🎭 No contextual reaction determined, skipping", user_info)
-            return False
-
-        log_with_user_info("INFO", f"🎭 Attempting to send contextual reaction: {reaction_emoji} in {chat_type}", user_info)
-
-        # Always try animated reaction first for both private and groups
-        if effects_client:
-            log_with_user_info("DEBUG", "🎭 Trying Telethon animated reaction (is_big=True)", user_info)
-            reaction_sent = await send_animated_reaction(
-                update.effective_chat.id,
-                update.message.message_id,
-                reaction_emoji
-            )
-            if reaction_sent:
-                log_with_user_info("INFO", f"✨ Contextual animated reaction sent successfully: {reaction_emoji}", user_info)
-                return True
-            else:
-                log_with_user_info("WARNING", "⚠️ Telethon animated reaction failed, falling back to PTB", user_info)
-        else:
-            log_with_user_info("DEBUG", "🎭 Telethon effects client not available, using PTB directly", user_info)
-
-        # Fallback to PTB reaction (also with is_big for both private and groups)
-        log_with_user_info("DEBUG", "🎭 Using PTB reaction as fallback", user_info)
-        await add_ptb_reaction(context, update, reaction_emoji, user_info)
-        log_with_user_info("INFO", f"✅ Contextual PTB reaction sent successfully: {reaction_emoji}", user_info)
-        return True
-
-    except Exception as e:
-        log_with_user_info("ERROR", f"❌ Failed to send contextual reaction: {e}", user_info)
-        return False
-
-async def get_contextual_reaction(message_text: str, user_info: Dict[str, any]) -> Optional[str]:
-    """
-    Analyze message context and return appropriate reaction emoji.
-    Returns None if no contextual reaction should be sent.
-    """
-    if not message_text:
-        log_with_user_info("DEBUG", "🎭 No message text provided for contextual reaction", user_info)
-        return None
-
-    message_lower = message_text.lower()
-    log_with_user_info("DEBUG", f"🎭 Analyzing message for contextual reaction: '{message_text[:50]}...'", user_info)
-
-    # Don't react to every message - add some randomness (30% chance)
-    import random
-    reaction_chance = random.random()
-    log_with_user_info("DEBUG", f"🎭 Reaction chance: {reaction_chance:.2f} (threshold: 0.3)", user_info)
-
-    if reaction_chance > 0.3:
-        log_with_user_info("DEBUG", "🎭 Skipping reaction due to randomness", user_info)
-        return None
-
-    # Find matching categories based on keywords
-    matching_categories = []
-    matched_keywords = []
-
-    for category, keywords in REACTION_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in message_lower:
-                matching_categories.append(category)
-                matched_keywords.append(keyword)
-                log_with_user_info("DEBUG", f"🎭 Keyword match: '{keyword}' -> category: {category}", user_info)
-                break
-
-    # If no categories match, occasionally send a general positive reaction
-    if not matching_categories:
-        log_with_user_info("DEBUG", "🎭 No keyword categories matched", user_info)
-        # 10% chance for general positive reactions on longer messages
-        if len(message_text) > 20 and random.random() < 0.1:
-            general_reaction = random.choice(["👍", "😊", "❤️", "🔥"])
-            log_with_user_info("DEBUG", f"🎭 Selected general positive reaction: {general_reaction}", user_info)
-            return general_reaction
-        log_with_user_info("DEBUG", "🎭 No general reaction selected", user_info)
-        return None
-
-    # Select a random matching category and reaction
-    selected_category = random.choice(matching_categories)
-    available_reactions = CONTEXTUAL_REACTIONS.get(selected_category, [])
-
-    log_with_user_info("DEBUG", f"🎭 Matched categories: {matching_categories}, selected: {selected_category}", user_info)
-    log_with_user_info("DEBUG", f"🎭 Available reactions for {selected_category}: {available_reactions}", user_info)
-
-    if available_reactions:
-        reaction = random.choice(available_reactions)
-        log_with_user_info("INFO", f"🎭 Selected contextual reaction: {reaction} for category: {selected_category} (keywords: {matched_keywords})", user_info)
-        return reaction
-
-    log_with_user_info("WARNING", f"🎭 No available reactions for category: {selected_category}", user_info)
-    return None
 
 # Sends a photo with a random effect
 async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
@@ -3160,9 +2984,6 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     log_with_user_info("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
 
-    # Send contextual reaction before processing (don't await to not block)
-    asyncio.create_task(send_contextual_reaction(update, context, user_info))
-
     # Check if user is asking to analyze a previously sent image
     if await analyze_referenced_image(update, context, user_message, user_info):
         return
@@ -3192,44 +3013,6 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "📷 Image message received", user_info)
 
-    # Send contextual reaction for images (images often get positive reactions)
-    caption = update.message.caption or ""
-    if caption:
-        log_with_user_info("DEBUG", f"📷 Image has caption: '{caption[:50]}...'", user_info)
-        asyncio.create_task(send_contextual_reaction(update, context, user_info))
-    else:
-        # For images without caption, sometimes react positively
-        import random
-        reaction_chance = random.random()
-        log_with_user_info("DEBUG", f"📷 Image without caption, reaction chance: {reaction_chance:.2f} (threshold: 0.4)", user_info)
-
-        if reaction_chance < 0.4:  # 40% chance
-            positive_reactions = ["😍", "🔥", "👀", "❤️", "🤩", "👍"]
-            reaction = random.choice(positive_reactions)
-            log_with_user_info("INFO", f"📷 Sending positive reaction to image: {reaction}", user_info)
-
-            try:
-                # Always try animated reaction first for both private and groups
-                if effects_client:
-                    log_with_user_info("DEBUG", "📷 Trying Telethon animated reaction for image", user_info)
-                    reaction_sent = await send_animated_reaction(
-                        update.effective_chat.id,
-                        update.message.message_id,
-                        reaction
-                    )
-                    if reaction_sent:
-                        log_with_user_info("INFO", f"✨ Image animated reaction sent successfully: {reaction}", user_info)
-                    else:
-                        log_with_user_info("WARNING", "⚠️ Image animated reaction failed, using PTB fallback", user_info)
-                        await add_ptb_reaction(context, update, reaction, user_info)
-                else:
-                    log_with_user_info("DEBUG", "📷 Using PTB reaction for image (no Telethon)", user_info)
-                    await add_ptb_reaction(context, update, reaction, user_info)
-            except Exception as e:
-                log_with_user_info("ERROR", f"❌ Failed to react to image: {e}", user_info)
-        else:
-            log_with_user_info("DEBUG", "📷 Not reacting to image due to randomness", user_info)
-
     await send_typing_action(context, update.effective_chat.id, user_info)
 
     try:
@@ -3246,6 +3029,7 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
         # Analyze image with AI
         user_name = update.effective_user.first_name or ""
+        caption = update.message.caption or ""
 
         response = await get_ai_response(caption, user_name, user_info, update.effective_user.id, image_bytes=image_bytes)
 
@@ -3266,38 +3050,6 @@ async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Handle poll messages with AI analysis using Gemini 2.5 Flash"""
     user_info = extract_user_info(update.message)
     log_with_user_info("INFO", "📊 Poll message received", user_info)
-
-    # React to polls with thinking/curious emojis
-    import random
-    poll_reactions = ["🤔", "👀", "🤯", "💭", "🧠"]
-    reaction_chance = random.random()
-    log_with_user_info("DEBUG", f"📊 Poll reaction chance: {reaction_chance:.2f} (threshold: 0.6)", user_info)
-
-    if reaction_chance < 0.6:  # 60% chance to react to polls
-        reaction = random.choice(poll_reactions)
-        log_with_user_info("INFO", f"📊 Sending thinking reaction to poll: {reaction}", user_info)
-
-        try:
-            # Always try animated reaction first for both private and groups
-            if effects_client:
-                log_with_user_info("DEBUG", "📊 Trying Telethon animated reaction for poll", user_info)
-                reaction_sent = await send_animated_reaction(
-                    update.effective_chat.id,
-                    update.message.message_id,
-                    reaction
-                )
-                if reaction_sent:
-                    log_with_user_info("INFO", f"✨ Poll animated reaction sent successfully: {reaction}", user_info)
-                else:
-                    log_with_user_info("WARNING", "⚠️ Poll animated reaction failed, using PTB fallback", user_info)
-                    await add_ptb_reaction(context, update, reaction, user_info)
-            else:
-                log_with_user_info("DEBUG", "📊 Using PTB reaction for poll (no Telethon)", user_info)
-                await add_ptb_reaction(context, update, reaction, user_info)
-        except Exception as e:
-            log_with_user_info("ERROR", f"❌ Failed to react to poll: {e}", user_info)
-    else:
-        log_with_user_info("DEBUG", "📊 Not reacting to poll due to randomness", user_info)
 
     await send_typing_action(context, update.effective_chat.id, user_info)
 
