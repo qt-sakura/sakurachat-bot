@@ -68,7 +68,6 @@ OLD_CHAT = 3600
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
 group_ids: Set[int] = set()
-help_expanded: Dict[int, bool] = {}
 broadcast_mode: Dict[int, str] = {}
 user_message_counts: Dict[str, list] = {}
 rate_limited_users: Dict[str, float] = {}
@@ -1163,32 +1162,6 @@ async def get_user_state(user_id: int) -> dict:
     except Exception as e:
         logger.error(f"❌ Failed to get user state for user {user_id}: {e}")
         return {}
-
-# Updates the "help expanded" state for a user
-async def update_help_expanded_state(user_id: int, expanded: bool):
-    """Update help expanded state in both memory and Valkey"""
-    global help_expanded
-
-    # Update memory
-    help_expanded[user_id] = expanded
-
-    # Update Valkey
-    if valkey_client:
-        state = await get_user_state(user_id)
-        state['help_expanded'] = expanded
-        await save_user_state(user_id, state)
-
-# Retrieves the "help expanded" state for a user
-async def get_help_expanded_state(user_id: int) -> bool:
-    """Get help expanded state from Valkey with memory fallback"""
-    # Try Valkey first
-    if valkey_client:
-        state = await get_user_state(user_id)
-        if 'help_expanded' in state:
-            return state['help_expanded']
-
-    # Fallback to memory
-    return help_expanded.get(user_id, False)
 
 # RATE LIMITING FUNCTIONS
 # Checks if a user has been rate-limited
@@ -2483,14 +2456,16 @@ def get_info_start_caption(user_mention: str) -> str:
 
 
 # Creates the keyboard for the /help command
-def create_help_keyboard(user_id: int, expanded: bool = False) -> InlineKeyboardMarkup:
+def create_help_keyboard(expanded: bool = False) -> InlineKeyboardMarkup:
     """Create help command keyboard"""
     if expanded:
         button_text = HELP_MESSAGES["button_texts"]["minimize"]
+        callback_data = "help_minimize"
     else:
         button_text = HELP_MESSAGES["button_texts"]["expand"]
+        callback_data = "help_expand"
 
-    keyboard = [[InlineKeyboardButton(button_text, callback_data=f"help_expand_{user_id}")]]
+    keyboard = [[InlineKeyboardButton(button_text, callback_data=callback_data)]]
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -2663,10 +2638,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await send_photo_action(context, update.effective_chat.id, user_info)
 
         # Step 3: Prepare help content
-        user_id = update.effective_user.id
-        keyboard = create_help_keyboard(user_id, False)
+        keyboard = create_help_keyboard(expanded=False)
         user_mention = get_user_mention(update.effective_user)
-        help_text = get_help_text(user_mention, False)
+        help_text = get_help_text(user_mention, expanded=False)
 
         # Step 4: Send help message with random image
         random_image = random.choice(SAKURA_IMAGES)
@@ -2863,28 +2837,22 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     try:
         user_info = extract_user_info(query.message)
-        log_with_user_info("INFO", "🔄 Help expand/minimize callback received", user_info)
+        log_with_user_info("INFO", f"🔄 Help callback received: {query.data}", user_info)
 
-        callback_data = query.data
-        user_id = int(callback_data.split('_')[2])
-
-        if update.effective_user.id != user_id:
-            log_with_user_info("WARNING", "⚠️ Unauthorized help button access attempt", user_info)
-            await query.answer("This button isn't for you 💔", show_alert=True)
-            return
-
-        is_expanded = await get_help_expanded_state(user_id)
-        await update_help_expanded_state(user_id, not is_expanded)
-
-        # Answer callback with appropriate message
-        if not is_expanded:
-            await query.answer(HELP_MESSAGES["callback_answers"]["expand"], show_alert=False)
-        else:
-            await query.answer(HELP_MESSAGES["callback_answers"]["minimize"], show_alert=False)
-
-        keyboard = create_help_keyboard(user_id, not is_expanded)
         user_mention = get_user_mention(update.effective_user)
-        help_text = get_help_text(user_mention, not is_expanded)
+
+        # Determine the new state based on the callback data
+        if query.data == "help_expand":
+            expanded = True
+            await query.answer(HELP_MESSAGES["callback_answers"]["expand"], show_alert=False)
+        elif query.data == "help_minimize":
+            expanded = False
+            await query.answer(HELP_MESSAGES["callback_answers"]["minimize"], show_alert=False)
+        else:
+            return # Should not happen with the new pattern
+
+        keyboard = create_help_keyboard(expanded=expanded)
+        help_text = get_help_text(user_mention, expanded=expanded)
 
         # Update the photo caption with new help text and keyboard
         await query.edit_message_caption(
@@ -2893,7 +2861,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=keyboard
         )
 
-        log_with_user_info("INFO", f"✅ Help message {'expanded' if not is_expanded else 'minimized'}", user_info)
+        log_with_user_info("INFO", f"✅ Help message {'expanded' if expanded else 'minimized'}", user_info)
 
     except Exception as e:
         user_info = extract_user_info(query.message) if query.message else {}
@@ -4034,7 +4002,7 @@ def setup_handlers(application: Application) -> None:
 
     # Callback query handlers
     application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))
-    application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_expand_"))
+    application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_"))
     application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_|^get_flowers_again$"))
     application.add_handler(CallbackQueryHandler(stats_refresh_callback, pattern="^refresh_stats$"))
 
