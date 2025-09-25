@@ -127,6 +127,19 @@ CONTEXTUAL_REACTIONS = {
     "playful": ["🤪", "🤡", "🙈"],
     "supportive": ["🤗", "👍", "🙏", "❤️"]
 }
+# Poll and photo analysis trigger lists
+POLL_ANALYSIS_TRIGGERS = [
+    "poll", "question", "answer", "correct", "option", "choice",
+    "batao", "jawab", "sahi", "galat", "kya hai", "what is", "tell me",
+    "this", "isme", "ismein", "yeh", "ye", "is", "mein", "sawal"
+]
+
+IMAGE_ANALYSIS_TRIGGERS = [
+    "photo", "image", "picture", "pic", "foto", "tasveer",
+    "analyze", "batao", "dekho", "kya hai", "what is", "tell me",
+    "this", "isme", "ismein", "yeh", "ye", "is", "mein"
+]
+
 # Keywords that trigger specific reaction categories
 REACTION_KEYWORDS = {
     "love": ["love", "pyaar", "mohabbat", "ishq", "heart", "dil", "miss", "yaad"],
@@ -2101,15 +2114,8 @@ Sakura's response:"""
 async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent poll and handle it"""
     # Check if message contains requests for poll analysis
-    poll_analysis_triggers = [
-        "poll", "question", "answer", "correct", "option", "choice",
-        "batao", "jawab", "sahi", "galat", "kya hai", "what is", "tell me",
-        "this", "isme", "ismein", "yeh", "ye", "is", "mein", "sawal"
-    ]
-
-    # Check if user is asking about a poll
     message_lower = user_message.lower()
-    contains_poll_request = any(trigger in message_lower for trigger in poll_analysis_triggers)
+    contains_poll_request = any(trigger in message_lower for trigger in POLL_ANALYSIS_TRIGGERS)
 
     if not contains_poll_request:
         return False
@@ -2200,15 +2206,8 @@ async def analyze_poll(poll_question: str, poll_options: list, user_name: str = 
 async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent image and handle it"""
     # Check if message contains requests for image analysis
-    image_analysis_triggers = [
-        "photo", "image", "picture", "pic", "foto", "tasveer",
-        "analyze", "batao", "dekho", "kya hai", "what is", "tell me",
-        "this", "isme", "ismein", "yeh", "ye", "is", "mein"
-    ]
-
-    # Check if user is asking about an image
     message_lower = user_message.lower()
-    contains_image_request = any(trigger in message_lower for trigger in image_analysis_triggers)
+    contains_image_request = any(trigger in message_lower for trigger in IMAGE_ANALYSIS_TRIGGERS)
 
     if not contains_image_request:
         return False
