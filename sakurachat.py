@@ -3533,6 +3533,10 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Get all purchases from database
         purchases = await get_all_purchases()
 
+        # Create the inline keyboard for buying flowers
+        keyboard = [[InlineKeyboardButton("Buy Flowers 🌸", callback_data="get_flowers_again")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         if not purchases:
             no_buyers_text = (
                 "🌸 <b>Flower Buyers</b>\n\n"
@@ -3548,7 +3552,8 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         'chat_id': update.effective_chat.id,
                         'text': no_buyers_text,
                         'message_effect_id': random.choice(EFFECTS),
-                        'parse_mode': 'HTML'
+                        'parse_mode': 'HTML',
+                        'reply_markup': reply_markup.to_dict()
                     }
 
                     async with aiohttp.ClientSession() as session:
@@ -3564,21 +3569,24 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                 # Fallback to normal PTB message if effects fail
                                 await update.message.reply_text(
                                     no_buyers_text,
-                                    parse_mode=ParseMode.HTML
+                                    parse_mode=ParseMode.HTML,
+                                    reply_markup=reply_markup
                                 )
                                 log_with_user_info("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
                 except Exception:
                     # Fallback to normal PTB message if effects fail
                     await update.message.reply_text(
                         no_buyers_text,
-                        parse_mode=ParseMode.HTML
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=reply_markup
                     )
                     log_with_user_info("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
             else:
                 # Group chat - no effects, just normal message
                 await update.message.reply_text(
                     no_buyers_text,
-                    parse_mode=ParseMode.HTML
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup
                 )
 
             log_with_user_info("INFO", "✅ No buyers found message sent", user_info)
@@ -3625,7 +3633,8 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     'text': buyers_text,
                     'message_effect_id': random.choice(EFFECTS),
                     'parse_mode': 'HTML',
-                    'disable_web_page_preview': True
+                    'disable_web_page_preview': True,
+                    'reply_markup': reply_markup.to_dict()
                 }
 
                 async with aiohttp.ClientSession() as session:
@@ -3642,7 +3651,8 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                             await update.message.reply_text(
                                 buyers_text,
                                 parse_mode=ParseMode.HTML,
-                                disable_web_page_preview=True
+                                disable_web_page_preview=True,
+                                reply_markup=reply_markup
                             )
                             log_with_user_info("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
             except Exception:
@@ -3650,7 +3660,8 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await update.message.reply_text(
                     buyers_text,
                     parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=True
+                    disable_web_page_preview=True,
+                    reply_markup=reply_markup
                 )
                 log_with_user_info("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
         else:
@@ -3658,7 +3669,8 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.message.reply_text(
                 buyers_text,
                 parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True
+                disable_web_page_preview=True,
+                reply_markup=reply_markup
             )
             log_with_user_info("INFO", f"✅ Buyers list sent with {len(purchases)} buyers", user_info)
 
