@@ -77,6 +77,9 @@ db_pool = None
 cleanup_task = None
 valkey_client: AsyncValkey = None
 payment_storage = {}
+effects_client = None
+gemini_client = None
+openrouter_client = None
 
 # Commands dictionary
 COMMANDS = [
@@ -871,7 +874,6 @@ if os.path.exists('sakura_effects.session'):
 logger = setup_colored_logging()
 
 # Initialize Telethon client for effects
-effects_client = None
 try:
     effects_client = TelegramClient('sakura_effects', API_ID, API_HASH)
     logger.info("✅ Telethon effects client initialized")
@@ -1044,7 +1046,6 @@ async def stop_effects_client():
 
 # GEMINI CLIENT INITIALIZATION
 # Initialize Gemini client
-gemini_client = None
 try:
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     logger.info("✅ Gemini client initialized successfully")
@@ -1052,7 +1053,6 @@ except Exception as e:
     logger.error(f"❌ Failed to initialize Gemini client: {e}")
 
 # OPENROUTER CLIENT INITIALIZATION
-openrouter_client = None
 if OPENROUTER_API_KEY:
     try:
         openrouter_client = OpenAI(
