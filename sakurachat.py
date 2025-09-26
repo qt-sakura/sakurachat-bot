@@ -98,73 +98,147 @@ EMOJI_REACT = [
 CONTEXTUAL_REACTIONS = {
     # Positive emotions
     "love": ["❤️", "🥰", "😍", "💘", "❤️‍🔥"],
-    "happy": ["😁", "🎉", "🤩", "😘", "🔥"],
-    "excited": ["🎉", "🔥", "🤩", "⚡", "💯"],
-    "funny": ["🤣", "😁", "🤡", "🙈"],
-    "impressed": ["🤯", "🔥", "👏", "💯", "🏆"],
-    "cute": ["🥰", "😍", "🦄", "🍓", "💘"],
-    "cool": ["🆒", "😎", "🔥", "👌", "⚡"],
+    "happy": ["😁", "🤗", "🤩", "😘", "❤️"],
+    "excited": ["🤗", "🔥", "🤩", "⚡", "💯", "❤️"],
+    "funny": ["🤣", "😁", "❤️", "🤗"],
+    "impressed": ["🤯", "😨", "👏", "😱", "👌", "❤️"],
+    "cute": ["🥰", "😍", "❤️", "🍓", "💘"],
+    "cool": ["❤️", "😎", "🤗", "👌", "👍"],
 
     # Negative emotions
-    "sad": ["😢", "😭", "💔", "🙏", "🤗"],
-    "angry": ["😡", "🤬", "🔥"],
-    "confused": ["🤔", "🤨", "😐", "🤷"],
+    "sad": ["😢", "😭", "💔", "💘", "🤗"],
+    "angry": ["😡", "🤬", "👎"],
+    "confused": ["🤔", "🤨", "😐", "👍", "👀"],
     "tired": ["😴", "🥱"],
-    "sick": ["🤮", "💊"],
+    "sick": ["💔", "😭", "❤️"],
     "shocked": ["😱", "🤯", "😨"],
 
     # Actions/Activities
-    "food": ["🍓", "🍌", "🌭", "🍾"],
-    "study": ["👨‍💻", "✍️", "🤓"],
-    "celebration": ["🎉", "🏆", "🔥"],
-    "thanks": ["🙏", "👍", "❤️", "🤗"],
-    "agreement": ["👍", "💯", "👌", "🔥"],
+    "food": ["🍓", "🍌", "🌭", "🍾", "❤️"],
+    "study": ["👨‍💻", "✍️", "🤓", "❤️"],
+    "celebration": ["🎉", "🏆", "🔥", "❤️"],
+    "thanks": ["🥰", "👍", "❤️", "🤗", "❤️"],
+    "agreement": ["👍", "💯", "👌", "❤️"],
 
     # Special cases
-    "flirty": ["😘", "😍", "💋", "🔥"],
+    "flirty": ["😘", "😍", "💋", "❤️", "👀"],
     "mysterious": ["🌚", "👀"],
-    "playful": ["🤪", "🤡", "🙈"],
-    "supportive": ["🤗", "👍", "🙏", "❤️"]
+    "playful": ["🤪", "👀", "🙈", "❤️"],
+    "supportive": ["🤗", "👍", "💘", "❤️", "🥰"]
 }
-# Poll and photo analysis trigger lists
+
+# Poll and photo analysis trigger lists (max-expanded)
 POLL_ANALYSIS_TRIGGERS = [
-    "poll", "question", "answer", "correct", "option", "choice",
-    "batao", "jawab", "sahi", "galat", "kya hai", "what is", "tell me",
-    "this", "isme", "ismein", "yeh", "ye", "is", "mein", "sawal"
+    "poll", "polls", "question", "questions", "query", "queries", "quiz", "quiz question",
+    "answer", "answers", "reply", "replies", "solution", "solutions",
+    "correct", "wrong", "galat", "sahi", "right", "incorrect", "true", "false",
+    "option", "options", "choice", "choices", "selection", "selections",
+    "batao", "jawab", "kya hai", "kya hai ye", "ye kya hai", "isme kya hai", 
+    "ismein kya hai", "sawal", "sawal ka jawab", "jawab do", "btao mujhe", 
+    "tell me", "what is", "which", "which one", "pick one", "choose one", "kaunsa sahi", 
+    "kaunsa galat", "kaunsa option", "kaunsa choice"
 ]
 
 IMAGE_ANALYSIS_TRIGGERS = [
-    "photo", "image", "picture", "pic", "foto", "tasveer",
-    "analyze", "batao", "dekho", "kya hai", "what is", "tell me",
-    "this", "isme", "ismein", "yeh", "ye", "is", "mein"
+    "photo", "photos", "picture", "pictures", "image", "images", "pic", "pics", "foto", "fotos",
+    "tasveer", "tasveeren", "photo ka matlab", "isme kya hai", "yeh kya hai", "ye kya hai",
+    "image analysis", "photo analysis", "identify", "identify this", "analyze", "analyze this", 
+    "batao", "dekho", "kya hai", "what is", "tell me", "isme", "ismein", "yeh", "ye", "is", "mein",
+    "kaun si cheez", "kaun sa object", "ye object kya hai", "isme kya object hai", "yeh cheez kya hai"
 ]
 
-# Keywords that trigger specific reaction categories
+# Keywords that trigger specific reaction categories (max-expanded)
 REACTION_KEYWORDS = {
-    "love": ["love", "pyaar", "mohabbat", "ishq", "heart", "dil", "miss", "yaad"],
-    "happy": ["happy", "khushi", "khush", "good", "accha", "amazing", "awesome", "great"],
-    "excited": ["excited", "wow", "omg", "awesome", "incredible", "fantastic"],
-    "funny": ["haha", "lol", "funny", "hasna", "mazak", "joke", "comedy"],
-    "impressed": ["impressive", "amazing", "wow", "incredible", "outstanding"],
-    "cute": ["cute", "sweet", "adorable", "pyara", "meetha"],
-    "cool": ["cool", "nice", "badiya", "mast", "solid"],
-    "sad": ["sad", "dukh", "upset", "cry", "rona", "depression", "down"],
-    "angry": ["angry", "gussa", "mad", "frustrated", "annoyed"],
-    "confused": ["confused", "confuse", "samajh", "understand", "kya", "what"],
-    "tired": ["tired", "thak", "sleepy", "neend", "rest", "sleep"],
-    "sick": ["sick", "bimar", "ill", "fever", "headache", "pain"],
-    "shocked": ["shocked", "surprise", "omg", "what", "kya", "really"],
-    "food": ["food", "khana", "eat", "hungry", "bhookh", "delicious", "tasty"],
-    "study": ["study", "padhai", "exam", "test", "homework", "assignment"],
-    "celebration": ["congrats", "congratulations", "celebrate", "party", "success"],
-    "thanks": ["thanks", "thank", "dhanyawad", "shukriya", "grateful"],
-    "agreement": ["yes", "haan", "right", "correct", "sahi", "agree"],
-    "flirty": ["beautiful", "handsome", "sexy", "hot", "gorgeous"],
-    "mysterious": ["secret", "mystery", "hidden", "raaz", "chupana"],
-    "playful": ["play", "fun", "enjoy", "masti", "timepass"],
-    "supportive": ["support", "help", "sahayata", "madad", "care"]
+    "love": [
+        "love", "pyaar", "mohabbat", "ishq", "dil", "heart", "miss", "yaad", "romance",
+        "lover", "sweetheart", "bf", "gf", "husband", "wife", "husbae", "hubby", "wifey",
+        "crush", "dosti", "pyara", "pyari", "cute love", "romantic", "romantically", "affection"
+    ],
+    "happy": [
+        "happy", "khushi", "khush", "joy", "joyful", "good", "accha", "amazing", "awesome",
+        "great", "fantastic", "excellent", "wonderful", "yay", "hooray", "feeling good", "blessed"
+    ],
+    "excited": [
+        "excited", "wow", "omg", "awesome", "incredible", "fantastic", "amazing",
+        "can't wait", "looking forward", "pumped", "hyped", "stoked", "ecstatic", "thrilled"
+    ],
+    "funny": [
+        "haha", "lol", "funny", "hasna", "mazak", "joke", "comedy", "laugh", "lmao", "rofl",
+        "funniest", "humor", "hilarious", "prank", "memes"
+    ],
+    "impressed": [
+        "impressive", "amazing", "wow", "incredible", "outstanding", "awesome", "brilliant",
+        "fantastic", "marvelous", "astounding", "superb", "mind blown", "🤯"
+    ],
+    "cute": [
+        "cute", "sweet", "adorable", "pyara", "meetha", "pyaara", "lovely", "charming",
+        "kawaii", "baby", "innocent", "fluffy", "precious", "angel", "sweety"
+    ],
+    "cool": [
+        "cool", "nice", "badiya", "mast", "solid", "awesome", "great", "amazing", "impressive",
+        "dope", "lit", "chill", "awesome sauce", "fantastic", "stylish", "swag"
+    ],
+    "sad": [
+        "sad", "dukh", "upset", "cry", "rona", "depression", "down", "lonely", "trouble",
+        "heartbroken", "pain", "hurt", "miserable", "unhappy", "😭", "😢", "💔"
+    ],
+    "angry": [
+        "angry", "gussa", "mad", "frustrated", "annoyed", "irritated", "furious", "rage",
+        "hate", "🤬", "pissed", "grumpy", "upset", "boiling"
+    ],
+    "confused": [
+        "confused", "confuse", "samajh", "understand", "kya", "what", "huh", "kaise", "how",
+        "uncertain", "unsure", "puzzled", "baffled", "perplexed", "🤔", "thinking"
+    ],
+    "tired": [
+        "tired", "thak", "sleepy", "neend", "rest", "sleep", "exhausted", "fatigue", "weary",
+        "drowsy", "zzz", "nap", "burnt out", "drained"
+    ],
+    "sick": [
+        "sick", "bimar", "ill", "fever", "headache", "pain", "unwell", "vomit", "dizzy",
+        "ache", "cold", "flu", "🤒", "nausea", "sore", "cough", "infection"
+    ],
+    "shocked": [
+        "shocked", "surprise", "omg", "what", "kya", "really", "no way", "unbelievable",
+        "astonished", "😱", "🤯", "😨", "stunned", "speechless", "mind blown"
+    ],
+    "food": [
+        "food", "khana", "eat", "hungry", "bhookh", "delicious", "tasty", "meal", "snack",
+        "breakfast", "lunch", "dinner", "dinner time", "yum", "yummy", "🍔", "🍕", "🍗", "🍣", "🍩", "🥗"
+    ],
+    "study": [
+        "study", "padhai", "exam", "test", "homework", "assignment", "learn", "revision",
+        "quiz", "project", "prepare", "notes", "📚", "read", "educate", "lecture"
+    ],
+    "celebration": [
+        "congrats", "congratulations", "celebrate", "party", "success", "win", "achievement",
+        "cheers", "hooray", "yay", "🎉", "🏆", "🥳", "victory", "🥂", "clap", "👏"
+    ],
+    "thanks": [
+        "thanks", "thank", "dhanyawad", "shukriya", "grateful", "thank you", "appreciate",
+        "obliged", "🙏", "cheers", "merci", "arigato"
+    ],
+    "agreement": [
+        "yes", "haan", "right", "correct", "sahi", "agree", "okay", "ok", "yep", "sure",
+        "absolutely", "👍", "💯", "of course", "definitely"
+    ],
+    "flirty": [
+        "beautiful", "handsome", "sexy", "hot", "gorgeous", "cute", "attractive", "desirable",
+        "stunning", "bae", "babe", "lover", "hottie", "🔥", "😍", "😘", "💋"
+    ],
+    "mysterious": [
+        "secret", "mystery", "hidden", "raaz", "chupana", "unknown", "enigmatic", "puzzle",
+        "suspense", "cryptic", "🕵️", "dark", "hidden meaning"
+    ],
+    "playful": [
+        "play", "fun", "enjoy", "masti", "timepass", "tease", "joke", "prank", "games",
+        "funtime", "🙈", "😂", "🤣", "silly", "goofy", "playful banter", "😂"
+    ],
+    "supportive": [
+        "support", "help", "sahayata", "madad", "care", "assistance", "backup", "encourage",
+        "aid", "stand by", "💪", "🤗", "👍", "I got you", "here for you"
+    ]
 }
-
 # TELETHON EFFECTS CONFIGURATION
 EFFECTS = [
     "5104841245755180586",
