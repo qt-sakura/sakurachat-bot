@@ -1,7 +1,7 @@
 # 🌸 Sakura Bot — Telegram Bot  
-[![Telegram Bot](https://img.shields.io/badge/Chat%20Now-@SluttySakuraBot-fd79a8?logo=telegram&style=for-the-badge)](https://t.me/SakuraHarunoBot)
+[![Telegram Bot](https://img.shields.io/badge/Chat%20Now-@SluttySakuraBot-fd79a8?logo=telegram&style=for-the-badge)](https://t.me/SluttySakuraBot)
 
-**Sakura Bot** is your late-night conversational partner, embodying Sakura Haruno’s intimate, flirty persona.  
+**Sakura Bot** is your soft, helpful, and caring conversational partner, embodying Sakura Haruno’s supportive and gentle persona.
 From heartfelt check-ins to playful sticker replies — Sakura’s got you covered.
 
 ---
@@ -10,11 +10,11 @@ From heartfelt check-ins to playful sticker replies — Sakura’s got you cover
 
 Whether you’re looking to:
 - Experience a one-on-one chat with Sakura Haruno  
-- Get personalized, first-name mentions in every reply  
+- Get thoughtful and caring replies
 - Enjoy spontaneous sticker reactions in private or group chats  
-- Or immerse yourself in a bold, romantic, late-night “Sakura” persona...
+- Or immerse yourself in a supportive, gentle, and helpful “Sakura” persona...
 
-**Sakura Bot** brings emotional depth, playful teasing, and flirty energy right into your Telegram chat window.
+**Sakura Bot** brings emotional depth, playful fun, and a caring energy right into your Telegram chat window.
 
 > **“Every line feels like her lips are almost touching yours—yet holding the kiss.”** 🌙💖
 
@@ -22,12 +22,14 @@ Whether you’re looking to:
 
 ## ✨ Features
 
-- **First-Name Personalization** — Sakura remembers your name and addresses you intimately in each reply  
-- **Sticker-Reply Support** — Reply to Sakura’s messages with a sticker, and she’ll “choose” one back  
-- **“Choose Sticker” Indicator** — Watch Sakura “typing” and “choosing a sticker” for an authentic chat experience  
-- **AI-Powered Conversations** — Powered by Google Gemini (via `google-generativeai`), Sakura responds in her signature late-night style  
-- **Group / Private Chats** — Sakura responds in private DMs or when “Sakura” is mentioned/replied to in a group  
-- **Flirty Persona Prompt** — Sakura’s secret, midnight-only persona is defined by a richly-crafted prompt, ensuring authentic, intimate responses  
+- **Contextual AI-Powered Conversations** — Powered by **OpenRouter (Grok)** and **Google Gemini**, Sakura provides thoughtful, context-aware responses tailored to the conversation.
+- **Image & Poll Analysis** — Send an image or poll, and Sakura will analyze and comment on it.
+- **Contextual Emoji Reactions** — The bot automatically reacts to messages with animated emojis that match the context of the conversation.
+- **Sticker-Reply Support** — Reply to Sakura’s messages with a sticker, and she’ll send one back.
+- **Telegram Stars Integration** — Support the bot using Telegram Stars with the `/buy` command.
+- **Supporter Leaderboard** — View the top supporters with the `/buyers` command.
+- **Group / Private Chats** — Sakura responds in private DMs or when “Sakura” is mentioned or replied to in a group.
+- **Enhanced Performance** — A robust backend with a **PostgreSQL** database and a **Valkey** cache ensures a fast and persistent user experience.
 
 ---
 
@@ -35,20 +37,22 @@ Whether you’re looking to:
 
 | Command      | Description                                   |
 |--------------|-----------------------------------------------|
-| `/start`     | Send Sakura’s welcome message 🌸               |
-| `/help`      | Show usage instructions and Sakura’s topics 💁 |
-| *Any text*   | Chat freely in private or trigger Sakura in groups by mentioning “Sakura”  |
+| `/start`     | Wake up Sakura and get a welcome message 🌸    |
+| `/help`      | Show usage instructions and a short guide 💁   |
+| `/buy`       | Support the bot by buying flowers with Telegram Stars ⭐ |
+| `/buyers`    | View the list of top supporters 🏆             |
 
 ---
 
 ## ⚙️ Tech Stack
 
-- **Language:** Python 3.8+  
-- **Framework:** [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)  
-- **AI API:** Google Gemini (via `google-generativeai`)  
-- **HTTP:** Requests library for Telegram API calls  
-- **Hosting:** Any server or VPS that supports Python and has internet access (Heroku, Railway, AWS, etc.)  
-- **Database:** None (stateless, in-memory chat sessions per user)  
+- **Language:** Python 3.8+
+- **Core Libraries:** `python-telegram-bot`, `telethon`
+- **AI APIs:** OpenRouter (Grok), Google Gemini
+- **Database:** PostgreSQL (via `asyncpg`)
+- **Caching:** Valkey (a high-performance Redis fork)
+- **Performance:** `uvloop` (for asyncio event loop), `orjson` (for fast JSON processing)
+- **Hosting:** Any server or VPS that supports Python.
 
 ---
 
@@ -58,12 +62,12 @@ A cute and charming Telegram bot that brings soft chats, sweet flirts, and a coz
 
 ---
 
-## 🌸 Getting Started
+## 🚀 Getting Started
 
-1. Visit [@SluttySakuraBot](https://t.me/SluttySakuraBot) on Telegram  
-2. Press `/start`  
-3. Pick a vibe or command  
-4. Dive into sweet chats and cute moments!
+1.  **Visit [@SluttySakuraBot](https://t.me/SluttySakuraBot) on Telegram.**
+2.  **Press `/start`** to wake her up.
+3.  **Chat freely** or use commands like `/help` to explore.
+4.  **Enjoy** the conversation!
 
 ---
 
