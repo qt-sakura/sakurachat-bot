@@ -1,6 +1,5 @@
 import os
 import time
-import orjson as json
 import uvloop
 import random
 import psutil
@@ -13,6 +12,7 @@ import logging
 import asyncpg
 import datetime
 import threading
+import orjson as json
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -50,11 +50,11 @@ VALKEY_URL = os.getenv("VALKEY_URL", "valkey://localhost:6379")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-MODEL = os.getenv("MODEL", "meta-llama/llama-4-maverick:free")
+MODEL = os.getenv("MODEL", "x-ai/grok-4-fast:free")
 OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 SUPPORT_LINK = os.getenv("SUPPORT_LINK", "https://t.me/SoulMeetsHQ")
 UPDATE_LINK = os.getenv("UPDATE_LINK", "https://t.me/WorkGlows")
-GROUP_LINK = "https://t.me/SoulMeetsHQ"
+GROUP_LINK = "https://t.me/WorkGlows"
 SESSION_TTL = 3600
 CACHE_TTL = 300
 RATE_LIMIT_TTL = 60
