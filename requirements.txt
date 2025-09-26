@@ -1,1 +1,13 @@
-# Removed by asad
+cryptg
+uvloop
+valkey
+psutil
+asyncpg
+aiohttp[speedups]
+orjson
+requests
+tgcrypto
+telethon
+google-genai
+python-telegram-bot
+openai
