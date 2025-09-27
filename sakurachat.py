@@ -4136,7 +4136,7 @@ async def run_bot() -> None:
         logger.info("🌸 Sakura Bot initialization completed!")
 
     # Setup shutdown handler
-    async def on_shutdown(app: Application) -> None:
+    async def post_shutdown(app: Application) -> None:
         global cleanup_task
         # Cancel cleanup task gracefully
         if cleanup_task and not cleanup_task.done():
@@ -4155,7 +4155,7 @@ async def run_bot() -> None:
         logger.info("🌸 Sakura Bot shutdown completed!")
 
     application.post_init = post_init
-    application.on_shutdown = on_shutdown
+    application.post_shutdown = post_shutdown
 
     logger.info("🌸 Sakura Bot is starting...")
 
