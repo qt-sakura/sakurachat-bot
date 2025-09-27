@@ -1,4 +1,3 @@
-
 import os
 import time
 import orjson
@@ -41,7 +40,7 @@ from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from telegram.error import TelegramError, Forbidden, BadRequest, Conflict, NetworkError, TimedOut
+from telegram.error import TelegramError, Forbidden, BadRequest
 
 # CONFIGURATION
 API_ID = int(os.getenv("API_ID", "0"))
@@ -4129,27 +4128,6 @@ async def main() -> None:
 
     # --- Step 2: Set up the bot application ---
     application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
-
-    # --- Pre-flight check to detect conflicts and other critical errors on startup ---
-    try:
-        await application.bot.get_updates(limit=1, timeout=0)
-    except Conflict:
-        logger.error("❌ Conflict detected: Another instance of the bot is already running.")
-        logger.warning("Please ensure only one bot instance is running. Shutting down.")
-        return
-    except Forbidden:
-        logger.error("❌ Authentication error: The bot token is likely invalid or revoked.")
-        logger.warning("Please check your BOT_TOKEN environment variable. Shutting down.")
-        return
-    except (NetworkError, TimedOut) as e:
-        logger.error(f"❌ Network error during pre-flight check: {e}")
-        logger.warning("Could not connect to Telegram. Please check your network connection. Shutting down.")
-        return
-    except Exception as e:
-        logger.error(f"❌ An unexpected error occurred during pre-flight check: {e}")
-        logger.warning("Shutting down due to an unexpected error during initialization.")
-        return
-
 
     # We are no longer using post_init/post_shutdown as we control the lifecycle directly.
     application.post_init = None
