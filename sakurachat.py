@@ -7,15 +7,6 @@ import psutil
 import valkey
 import base64
 import hashlib
-import os
-import time
-import orjson
-import uvloop
-import random
-import psutil
-import valkey
-import base64
-import hashlib
 import asyncio
 import aiohttp
 import logging
@@ -43,13 +34,6 @@ from telegram.ext import (
     filters,
     ChatMemberHandler,
 )
-from google import genai
-from openai import OpenAI
-from typing import Dict, Set, Optional
-from telethon import TelegramClient, events
-from valkey.asyncio import Valkey as AsyncValkey
-from telegram.constants import ParseMode, ChatAction
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram.error import (
     TelegramError,
     Forbidden,
@@ -57,6 +41,13 @@ from telegram.error import (
     Conflict,
     NetworkError,
 )
+from google import genai
+from openai import OpenAI
+from typing import Dict, Set, Optional
+from telethon import TelegramClient, events
+from valkey.asyncio import Valkey as AsyncValkey
+from telegram.constants import ParseMode, ChatAction
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # CONFIGURATION
 API_ID = int(os.getenv("API_ID", "0"))
