@@ -4198,11 +4198,7 @@ async def main() -> None:
     logger.info("🌸 Sakura Bot is starting...")
 
     # Run the bot asynchronously
-    async with application:
-        await application.start()
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-        # Keep the bot running until interrupted
-        await asyncio.Event().wait()
+    await application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
