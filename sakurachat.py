@@ -4101,8 +4101,8 @@ def setup_handlers(application: Application) -> None:
 
 
 # Runs the bot
-async def run_bot() -> None:
-    """Run the bot asynchronously."""
+def run_bot() -> None:
+    """Run the bot"""
     if not validate_config():
         return
 
@@ -4115,8 +4115,9 @@ async def run_bot() -> None:
     setup_handlers(application)
 
     # Setup bot commands and database using post_init
-    async def post_init(app: Application) -> None:
+    async def post_init(app):
         global cleanup_task
+
         # Initialize Valkey
         valkey_success = await connect_cache()
         if not valkey_success:
@@ -4129,15 +4130,18 @@ async def run_bot() -> None:
 
         # Start Telethon effects client
         await start_effects()
+
         await setup_commands(app)
 
         # Start conversation cleanup task and store reference
         cleanup_task = asyncio.create_task(cleanup_conversations())
+
         logger.info("🌸 Sakura Bot initialization completed!")
 
     # Setup shutdown handler
-    async def post_shutdown(app: Application) -> None:
+    async def post_shutdown(app):
         global cleanup_task
+
         # Cancel cleanup task gracefully
         if cleanup_task and not cleanup_task.done():
             logger.info("🛑 Cancelling cleanup task...")
@@ -4159,14 +4163,8 @@ async def run_bot() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot asynchronously
-    async with application:
-        await application.start()
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-        logger.info("🤖 Bot is running. Press Ctrl+C to stop.")
-        await asyncio.Event().wait()  # Keep the application running
-        await application.updater.stop()
-        await application.stop()
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 # HTTP SERVER FOR DEPLOYMENT
@@ -4199,30 +4197,32 @@ def start_server() -> None:
 
 # MAIN FUNCTION
 # The main function to run the bot
-async def main() -> None:
-    """Main function to set up and run the bot."""
-    logger.info("🌸 Sakura Bot starting up...")
-
-    # Start dummy server in background thread
-    threading.Thread(target=start_server, daemon=True).start()
-
-    # Run the bot
-    await run_bot()
-
-
-if __name__ == "__main__":
-    # Install uvloop for better performance
+def main() -> None:
+    """Main function"""
     try:
-        uvloop.install()
-        logger.info("🚀 uvloop installed successfully")
-    except ImportError:
-        logger.warning("⚠️ uvloop not available, using default asyncio loop")
-    except Exception as e:
-        logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # Install uvloop for better performance - ADD THESE 6 LINES
+        try:
+            uvloop.install()
+            logger.info("🚀 uvloop installed successfully")
+        except ImportError:
+            logger.warning("⚠️ uvloop not available")
+        except Exception as e:
+            logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
 
-    try:
-        asyncio.run(main())
+        logger.info("🌸 Sakura Bot starting up...")
+
+        # Start dummy server in background thread
+        threading.Thread(target=start_server, daemon=True).start()
+
+        # Run the bot
+        run_bot()
+
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
     except Exception as e:
-        logger.error(f"💥 Fatal error in main loop: {e}")
+        logger.error(f"💥 Fatal error: {e}")
+
+
+if __name__ == "__main__":
+    main()
