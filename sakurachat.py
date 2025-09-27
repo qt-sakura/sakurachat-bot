@@ -3370,50 +3370,22 @@ async def handle_member_update(update: Update, context: ContextTypes.DEFAULT_TYP
 # ERROR HANDLER
 # The main error handler for the bot
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Log errors and handle critical ones by shutting down the bot."""
-    error = context.error
-    shutdown_signal = context.bot_data.get("shutdown_signal")
+    """Handle errors"""
+    logger.error(f"Exception while handling an update: {context.error}")
 
-    # Handle critical errors that should stop the bot
-    if isinstance(error, Conflict):
-        logger.error("❌ Conflict detected: Another instance of the bot is already running.")
-        logger.warning("Please ensure only one bot instance is running. Shutting down.")
-        if shutdown_signal and not shutdown_signal.done():
-            shutdown_signal.set_result(None)
-        return
-
-    if isinstance(error, Forbidden):
-        logger.error("❌ Authentication error: The bot token is likely invalid or revoked.")
-        logger.warning("Please check your BOT_TOKEN environment variable. Shutting down.")
-        if shutdown_signal and not shutdown_signal.done():
-            shutdown_signal.set_result(None)
-        return
-
-    if isinstance(error, (NetworkError, TimedOut)):
-        logger.error(f"❌ Network error: {error}. Could not connect to Telegram.")
-        logger.warning("This may be a temporary issue. The bot will shut down and can be restarted.")
-        if shutdown_signal and not shutdown_signal.done():
-            shutdown_signal.set_result(None)
-        return
-
-    # For non-critical errors, log them with user context if available
-    log_message = f"Exception while handling an update: {error}"
-    try:
-        user_info = {}
-        if hasattr(update, 'message') and update.message:
+    # Try to extract user info if update has a message
+    if hasattr(update, 'message') and update.message:
+        try:
             user_info = get_user_info(update.message)
-        elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
+            log_action("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for error: {context.error}")
+    elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
+        try:
             user_info = get_user_info(update.callback_query.message)
-
-        if user_info:
-            log_action("ERROR", f"💥 Non-critical exception occurred: {error}", user_info)
-        else:
-            logger.error(log_message)
-
-    except Exception as e:
-        # Fallback if getting user info fails
-        logger.error(log_message)
-        logger.error(f"Additionally, failed to extract user info during error handling: {e}")
+            log_action("ERROR", f"💥 Callback query exception: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
 # STAR PAYMENT FUNCTIONS
@@ -4158,6 +4130,27 @@ async def main() -> None:
     # --- Step 2: Set up the bot application ---
     application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
 
+    # --- Pre-flight check to detect conflicts and other critical errors on startup ---
+    try:
+        await application.bot.get_updates(limit=1, timeout=0)
+    except Conflict:
+        logger.error("❌ Conflict detected: Another instance of the bot is already running.")
+        logger.warning("Please ensure only one bot instance is running. Shutting down.")
+        return
+    except Forbidden:
+        logger.error("❌ Authentication error: The bot token is likely invalid or revoked.")
+        logger.warning("Please check your BOT_TOKEN environment variable. Shutting down.")
+        return
+    except (NetworkError, TimedOut) as e:
+        logger.error(f"❌ Network error during pre-flight check: {e}")
+        logger.warning("Could not connect to Telegram. Please check your network connection. Shutting down.")
+        return
+    except Exception as e:
+        logger.error(f"❌ An unexpected error occurred during pre-flight check: {e}")
+        logger.warning("Shutting down due to an unexpected error during initialization.")
+        return
+
+
     # We are no longer using post_init/post_shutdown as we control the lifecycle directly.
     application.post_init = None
     application.post_shutdown = None
@@ -4172,10 +4165,6 @@ async def main() -> None:
             # --- Step 3: Start background tasks and polling ---
             await setup_commands(application)
 
-            # Create a shutdown signal Future and store it in bot_data
-            shutdown_signal = asyncio.Future()
-            application.bot_data["shutdown_signal"] = shutdown_signal
-
             # Start the background task for cleaning up old conversations
             cleanup_task = asyncio.create_task(cleanup_conversations())
 
@@ -4186,8 +4175,8 @@ async def main() -> None:
                 drop_pending_updates=True
             )
 
-            # Keep the script running until the shutdown signal is received
-            await shutdown_signal
+            # Keep the script running until interrupted
+            await asyncio.Future()
 
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("🛑 Bot shutdown initiated by user...")
