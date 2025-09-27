@@ -41,7 +41,7 @@ from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from telegram.error import TelegramError, Forbidden, BadRequest
+from telegram.error import TelegramError, Forbidden, BadRequest, Conflict, NetworkError, TimedOut
 
 # CONFIGURATION
 API_ID = int(os.getenv("API_ID", "0"))
@@ -4157,6 +4157,17 @@ async def main() -> None:
             # Keep the script running until interrupted
             await asyncio.Future()
 
+    except Conflict:
+        logger.error("❌ Conflict detected. Another instance of the bot is already running.")
+        logger.warning("Please ensure that only one instance of the bot is running at a time.")
+        logger.warning("Shutting down this instance to prevent issues.")
+    except Forbidden:
+        logger.error("❌ Authentication failed. The bot token might be invalid or expired.")
+        logger.warning("Please check your BOT_TOKEN environment variable.")
+    except (NetworkError, TimedOut):
+        logger.error("❌ Network error occurred while connecting to Telegram.")
+        logger.warning("This could be a temporary issue with your connection or Telegram's servers.")
+        logger.warning("The bot will shut down. Please try again later.")
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("🛑 Bot shutdown initiated by user...")
 
