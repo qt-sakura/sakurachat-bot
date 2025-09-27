@@ -7,12 +7,22 @@ import psutil
 import valkey
 import base64
 import hashlib
+import os
+import time
+import orjson
+import uvloop
+import random
+import psutil
+import valkey
+import base64
+import hashlib
 import asyncio
 import aiohttp
 import logging
 import asyncpg
 import datetime
 import threading
+import traceback
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -21,7 +31,7 @@ from telegram import (
     Message,
     ReactionTypeEmoji,
     LabeledPrice,
-    ChatMember
+    ChatMember,
 )
 from telegram.ext import (
     Application,
@@ -31,7 +41,7 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
     ContextTypes,
     filters,
-    ChatMemberHandler
+    ChatMemberHandler,
 )
 from google import genai
 from openai import OpenAI
@@ -40,7 +50,13 @@ from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from telegram.error import TelegramError, Forbidden, BadRequest
+from telegram.error import (
+    TelegramError,
+    Forbidden,
+    BadRequest,
+    Conflict,
+    NetworkError,
+)
 
 # CONFIGURATION
 API_ID = int(os.getenv("API_ID", "0"))
@@ -3369,22 +3385,39 @@ async def handle_member_update(update: Update, context: ContextTypes.DEFAULT_TYP
 # ERROR HANDLER
 # The main error handler for the bot
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle errors"""
-    logger.error(f"Exception while handling an update: {context.error}")
+    """
+    Log errors caused by updates and provide clean, informative feedback.
+    Handles specific Telegram errors gracefully and logs detailed tracebacks for others.
+    """
+    err = context.error
 
-    # Try to extract user info if update has a message
-    if hasattr(update, 'message') and update.message:
-        try:
-            user_info = get_user_info(update.message)
-            log_action("ERROR", f"💥 Exception occurred: {context.error}", user_info)
-        except:
-            logger.error(f"Could not extract user info for error: {context.error}")
-    elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
-        try:
-            user_info = get_user_info(update.callback_query.message)
-            log_action("ERROR", f"💥 Callback query exception: {context.error}", user_info)
-        except:
-            logger.error(f"Could not extract user info for callback error: {context.error}")
+    # Handle common Telegram API errors with clean, single-line logs
+    if isinstance(err, Conflict):
+        logger.warning(f"⚠️ Conflict Error: {err}. The bot might be running on another instance.")
+        return
+    if isinstance(err, Forbidden):
+        logger.warning(f"⚠️ Forbidden Error: {err}. Bot may be blocked or kicked from a chat.")
+        return
+    if isinstance(err, BadRequest):
+        logger.warning(f"⚠️ BadRequest Error: {err}. The request was malformed.")
+        return
+    if isinstance(err, NetworkError):
+        logger.warning(f"⚠️ Network Error: {err}. A network issue occurred during the request.")
+        return
+
+    # For all other exceptions, log the full traceback for detailed debugging
+    tb_list = traceback.format_exception(None, err, err.__traceback__)
+    tb_string = "".join(tb_list)
+    logger.error(f"❌ An unhandled exception occurred:\n{tb_string}")
+
+    # Try to extract user info for additional context if possible
+    user_info_str = "N/A"
+    if hasattr(update, "effective_user") and update.effective_user:
+        user_info_str = f"User: {update.effective_user.id}"
+    if hasattr(update, "effective_chat") and update.effective_chat:
+        user_info_str += f", Chat: {update.effective_chat.id} ({update.effective_chat.type})"
+
+    logger.error(f"💥 Exception context: Update={update}, Context={user_info_str}")
 
 
 # STAR PAYMENT FUNCTIONS
@@ -4146,12 +4179,40 @@ async def main() -> None:
             # Start the background task for cleaning up old conversations
             cleanup_task = asyncio.create_task(cleanup_conversations())
 
+            # Pre-flight check to detect critical errors before polling
+            logger.info("📡 Performing pre-flight check...")
+            try:
+                await application.bot.get_updates(limit=1)
+                logger.info("✅ Pre-flight check successful.")
+            except Conflict:
+                logger.error(
+                    "❌ Conflict: Another instance of the bot is already running. "
+                    "Please stop the other instance before starting a new one."
+                )
+                return
+            except Forbidden:
+                logger.error(
+                    "❌ Forbidden: The bot token is invalid or expired. "
+                    "Please check your BOT_TOKEN environment variable."
+                )
+                return
+            except NetworkError as e:
+                logger.error(f"❌ NetworkError on startup: {e}. Check your internet connection.")
+                return
+            except Exception as e:
+                logger.error(f"❌ An unexpected error occurred during pre-flight check: {e}")
+                return
+
             logger.info("🌸 Sakura Bot is starting polling...")
-            await application.start()
-            await application.updater.start_polling(
-                allowed_updates=Update.ALL_TYPES,
-                drop_pending_updates=True
-            )
+            try:
+                await application.start()
+                await application.updater.start_polling(
+                    allowed_updates=Update.ALL_TYPES,
+                    drop_pending_updates=True
+                )
+            except Exception as e:
+                logger.error(f"❌ Failed to start polling: {e}")
+                return
 
             # Keep the script running until interrupted
             await asyncio.Future()
