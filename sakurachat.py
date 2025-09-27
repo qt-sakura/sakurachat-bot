@@ -4207,20 +4207,14 @@ async def main() -> None:
             try:
                 await application.bot.get_updates(limit=1)
                 logger.info("✅ Pre-flight check successful.")
-            except Conflict:
-                logger.error(
-                    "❌ Conflict: Another instance of the bot is already running. "
-                    "Please stop the other instance before starting a new one."
-                )
+            except Conflict as e:
+                logger.warning(f"⚠️ Conflict Error: {e}. Another instance of the bot is already running.")
                 return
-            except Forbidden:
-                logger.error(
-                    "❌ Forbidden: The bot token is invalid or expired. "
-                    "Please check your BOT_TOKEN environment variable."
-                )
+            except Forbidden as e:
+                logger.warning(f"⚠️ Forbidden Error: {e}. The bot token is invalid or expired.")
                 return
             except NetworkError as e:
-                logger.error(f"❌ NetworkError on startup: {e}. Check your internet connection.")
+                logger.warning(f"⚠️ NetworkError on startup: {e}. Check your internet connection.")
                 return
             except Exception as e:
                 logger.error(f"❌ An unexpected error occurred during pre-flight check: {e}")
