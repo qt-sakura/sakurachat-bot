@@ -843,6 +843,14 @@ class ColoredFormatter(logging.Formatter):
 def setup_logging():
     # Sets up a colored logger for the bot
     """Setup colored logging configuration"""
+    # Filter out noisy polling errors from the telegram library
+    logging.getLogger("telegram.ext").addFilter(
+        lambda record: not (
+            'Exception happened while polling' in record.getMessage() and
+            'terminated by other getUpdates request' in record.getMessage()
+        )
+    )
+
     logger = logging.getLogger("SAKURA 🌸")
     logger.setLevel(logging.INFO)
 
