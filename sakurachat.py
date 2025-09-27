@@ -1,3 +1,4 @@
+
 import os
 import time
 import orjson
@@ -4100,43 +4101,9 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
-# HTTP SERVER FOR DEPLOYMENT
-# A dummy HTTP handler for keep-alive purposes on deployment platforms
-class DummyHandler(BaseHTTPRequestHandler):
-    """Simple HTTP handler for keep-alive server"""
-
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Sakura bot is alive!")
-
-    def do_HEAD(self):
-        self.send_response(200)
-        self.end_headers()
-
-    def log_message(self, format, *args):
-        # Suppress HTTP server logs
-        pass
-
-
-# Starts the dummy HTTP server
-def start_server() -> None:
-    """Start dummy HTTP server for deployment platforms"""
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), DummyHandler)
-    logger.info(f"🌐 Dummy server listening on port {port}")
-    server.serve_forever()
-
-
-# MAIN FUNCTION
-# The main function to run the bot
-async def main() -> None:
-    """Main function"""
-    logger.info("🌸 Sakura Bot starting up...")
-
-    # Start dummy server in background thread
-    threading.Thread(target=start_server, daemon=True).start()
-
+# Runs the bot
+def run_bot() -> None:
+    """Run the bot"""
     if not validate_config():
         return
 
@@ -4197,23 +4164,66 @@ async def main() -> None:
 
     logger.info("🌸 Sakura Bot is starting...")
 
-    # Run the bot asynchronously
-    await application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
-if __name__ == "__main__":
-    # Install uvloop for better performance
+# HTTP SERVER FOR DEPLOYMENT
+# A dummy HTTP handler for keep-alive purposes on deployment platforms
+class DummyHandler(BaseHTTPRequestHandler):
+    """Simple HTTP handler for keep-alive server"""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Sakura bot is alive!")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        # Suppress HTTP server logs
+        pass
+
+
+# Starts the dummy HTTP server
+def start_server() -> None:
+    """Start dummy HTTP server for deployment platforms"""
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), DummyHandler)
+    logger.info(f"🌐 Dummy server listening on port {port}")
+    server.serve_forever()
+
+
+# MAIN FUNCTION
+# The main function to run the bot
+def main() -> None:
+    """Main function"""
     try:
-        uvloop.install()
-        logger.info("🚀 uvloop installed successfully")
-    except ImportError:
-        logger.warning("⚠️ uvloop not available")
-    except Exception as e:
-        logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # Install uvloop for better performance - ADD THESE 6 LINES
+        try:
+            uvloop.install()
+            logger.info("🚀 uvloop installed successfully")
+        except ImportError:
+            logger.warning("⚠️ uvloop not available")
+        except Exception as e:
+            logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
 
-    try:
-        asyncio.run(main())
+        logger.info("🌸 Sakura Bot starting up...")
+
+        # Start dummy server in background thread
+        threading.Thread(target=start_server, daemon=True).start()
+
+        # Run the bot
+        run_bot()
+
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user")
     except Exception as e:
         logger.error(f"💥 Fatal error: {e}")
+
+
+if __name__ == "__main__":
+    main()
