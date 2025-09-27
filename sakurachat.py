@@ -830,6 +830,24 @@ class Colors:
     RESET = '\033[0m'      # Reset color
     BOLD = '\033[1m'       # Bold text
 
+# Custom filter to suppress Conflict errors from traceback
+class ConflictFilter(logging.Filter):
+    """
+    Filters out log records for telegram.error.Conflict to prevent spammy tracebacks.
+    The `handle_error` function will still log a clean, single-line warning.
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Check if the log record was created from an exception
+        if record.exc_info:
+            # Extract the exception type
+            exc_type, exc_value, _ = record.exc_info
+            # If the exception is a Conflict error, suppress the log record
+            if isinstance(exc_value, Conflict):
+                return False  # False means "do not log this record"
+        # For all other log records, allow them to be logged
+        return True
+
+
 # Custom formatter for colored logs
 class ColoredFormatter(logging.Formatter):
     """Custom formatter to add colors to entire log messages"""
@@ -857,8 +875,13 @@ class ColoredFormatter(logging.Formatter):
 
 # Configure logging with colors
 def setup_logging():
+    """Setup colored logging configuration and add a filter for Conflict errors."""
+    # Get the logger used by the `python-telegram-bot` library's updater
+    ptb_ext_logger = logging.getLogger("telegram.ext.Updater")
+    # Add our custom filter to it to suppress Conflict error tracebacks
+    ptb_ext_logger.addFilter(ConflictFilter())
+
     # Sets up a colored logger for the bot
-    """Setup colored logging configuration"""
     logger = logging.getLogger("SAKURA 🌸")
     logger.setLevel(logging.INFO)
 
