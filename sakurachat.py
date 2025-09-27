@@ -840,7 +840,7 @@ class ColoredFormatter(logging.Formatter):
         return colored_format
 
 # Configure logging with colors
-def setup_colored_logging():
+def setup_logging():
     # Sets up a colored logger for the bot
     """Setup colored logging configuration"""
     logger = logging.getLogger("SAKURA 🌸")
@@ -871,7 +871,7 @@ if os.path.exists('sakura_effects.session'):
     os.remove('sakura_effects.session')
 
 # Initialize colored logger first
-logger = setup_colored_logging()
+logger = setup_logging()
 
 # Initialize Telethon client for effects
 try:
@@ -882,7 +882,7 @@ except Exception as e:
 
 # TELETHON EFFECTS FUNCTIONS
 # Sends a message with a random effect using Telethon
-async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
+async def send_effect(chat_id: int, text: str, reply_markup=None) -> bool:
     """Send message with random effect using Telethon"""
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
@@ -919,7 +919,7 @@ async def send_with_effect(chat_id: int, text: str, reply_markup=None) -> bool:
         return False
 
 # Sends an animated emoji reaction to a message
-async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> bool:
+async def send_big_reaction(chat_id: int, message_id: int, emoji: str) -> bool:
     """Send animated emoji reaction using direct API call"""
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
@@ -948,7 +948,7 @@ async def send_animated_reaction(chat_id: int, message_id: int, emoji: str) -> b
         return False
 
 # Adds a reaction to a message using PTB's method as a fallback
-async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any]):
+async def add_reaction(context, update, emoji: str, user_info: Dict[str, any]):
     """Fallback PTB reaction without animation"""
     try:
         # Try the new API format first
@@ -959,7 +959,7 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
                 message_id=update.message.message_id,
                 reaction=reaction
             )
-            log_with_user_info("DEBUG", f"🍓 Added emoji reaction (new format): {emoji}", user_info)
+            log_action("DEBUG", f"🍓 Added emoji reaction (new format): {emoji}", user_info)
 
         except ImportError:
             # Fallback to direct emoji string (older versions)
@@ -969,7 +969,7 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
                     message_id=update.message.message_id,
                     reaction=emoji
                 )
-                log_with_user_info("DEBUG", f"🍓 Added emoji reaction (string format): {emoji}", user_info)
+                log_action("DEBUG", f"🍓 Added emoji reaction (string format): {emoji}", user_info)
 
             except Exception:
                 # Try with list of strings
@@ -978,13 +978,13 @@ async def add_ptb_reaction(context, update, emoji: str, user_info: Dict[str, any
                     message_id=update.message.message_id,
                     reaction=[emoji]
                 )
-                log_with_user_info("DEBUG", f"🍓 Added emoji reaction (list format): {emoji}", user_info)
+                log_action("DEBUG", f"🍓 Added emoji reaction (list format): {emoji}", user_info)
 
     except Exception as e:
-        log_with_user_info("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
+        log_action("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
 
 # Sends a photo with a random effect
-async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
+async def send_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
     """Send photo message with random effect using direct API"""
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
@@ -1022,7 +1022,7 @@ async def send_with_effect_photo(chat_id: int, photo_url: str, caption: str, rep
         return False
 
 # Starts the Telethon client for sending effects
-async def start_effects_client():
+async def start_effects():
     """Start Telethon effects client"""
     global effects_client
     if effects_client:
@@ -1034,7 +1034,7 @@ async def start_effects_client():
             effects_client = None
 
 # Stops the Telethon client
-async def stop_effects_client():
+async def stop_effects():
     """Stop Telethon effects client"""
     global effects_client
     if effects_client:
@@ -1065,7 +1065,7 @@ if OPENROUTER_API_KEY:
 
 # VALKEY FUNCTIONS
 # Initializes the Valkey (in-memory data store) connection
-async def init_valkey():
+async def connect_cache():
     """Initialize Valkey connection"""
     global valkey_client
 
@@ -1090,7 +1090,7 @@ async def init_valkey():
         return False
 
 # Closes the Valkey connection
-async def close_valkey():
+async def close_cache():
     """Close Valkey connection"""
     global valkey_client
 
@@ -1103,7 +1103,7 @@ async def close_valkey():
 
 # SESSION STORAGE FUNCTIONS
 # Saves a user's session data to Valkey
-async def save_user_session(user_id: int, session_data: dict):
+async def save_session(user_id: int, session_data: dict):
     """Save user session data to Valkey"""
     if not valkey_client:
         return False
@@ -1122,7 +1122,7 @@ async def save_user_session(user_id: int, session_data: dict):
         return False
 
 # Retrieves a user's session data from Valkey
-async def get_user_session(user_id: int) -> dict:
+async def get_session(user_id: int) -> dict:
     """Get user session data from Valkey"""
     if not valkey_client:
         return {}
@@ -1138,7 +1138,7 @@ async def get_user_session(user_id: int) -> dict:
         return {}
 
 # Deletes a user's session from Valkey
-async def delete_user_session(user_id: int):
+async def delete_session(user_id: int):
     """Delete user session from Valkey"""
     if not valkey_client:
         return False
@@ -1154,7 +1154,7 @@ async def delete_user_session(user_id: int):
 
 # CACHING FUNCTIONS
 # Sets a value in the Valkey cache
-async def cache_set(key: str, value: any, ttl: int = CACHE_TTL):
+async def set_cache(key: str, value: any, ttl: int = CACHE_TTL):
     """Set cache value in Valkey"""
     if not valkey_client:
         return False
@@ -1170,7 +1170,7 @@ async def cache_set(key: str, value: any, ttl: int = CACHE_TTL):
         return False
 
 # Retrieves a value from the Valkey cache
-async def cache_get(key: str) -> any:
+async def get_cache(key: str) -> any:
     """Get cache value from Valkey"""
     if not valkey_client:
         return None
@@ -1188,7 +1188,7 @@ async def cache_get(key: str) -> any:
         return None
 
 # Deletes a value from the Valkey cache
-async def cache_delete(key: str):
+async def delete_cache(key: str):
     """Delete cache value from Valkey"""
     if not valkey_client:
         return False
@@ -1203,7 +1203,7 @@ async def cache_delete(key: str):
 
 # USER STATE MANAGEMENT
 # Saves the state of a user (e.g., help menu expanded) to Valkey
-async def save_user_state(user_id: int, state_data: dict):
+async def save_state(user_id: int, state_data: dict):
     """Save user state (help_expanded, broadcast_mode, etc.) to Valkey"""
     if not valkey_client:
         return False
@@ -1222,7 +1222,7 @@ async def save_user_state(user_id: int, state_data: dict):
         return False
 
 # Retrieves the state of a user from Valkey
-async def get_user_state(user_id: int) -> dict:
+async def get_state(user_id: int) -> dict:
     """Get user state from Valkey"""
     if not valkey_client:
         return {}
@@ -1239,7 +1239,7 @@ async def get_user_state(user_id: int) -> dict:
 
 # RATE LIMITING FUNCTIONS
 # Checks if a user has been rate-limited
-async def is_rate_limited(user_id: int, chat_id: int) -> bool:
+async def check_limit(user_id: int, chat_id: int) -> bool:
     """
     Checks if a user is rate-limited based on a per-user, per-chat basis.
 
@@ -1318,7 +1318,7 @@ async def is_rate_limited(user_id: int, chat_id: int) -> bool:
 
 # DATABASE FUNCTIONS
 # Initializes the database connection and creates tables if they don't exist
-async def init_database():
+async def connect_database():
     """Initialize database connection and create tables"""
     global db_pool
 
@@ -1383,7 +1383,7 @@ async def init_database():
         logger.info("✅ Database tables created/verified successfully")
 
         # Load existing users and groups into memory
-        await load_data_from_database()
+        await load_data()
 
         return True
 
@@ -1392,7 +1392,7 @@ async def init_database():
         return False
 
 # Loads user and group IDs from the database into memory
-async def load_data_from_database():
+async def load_data():
     """Load user IDs and group IDs from database into memory"""
     global user_ids, group_ids
 
@@ -1416,7 +1416,7 @@ async def load_data_from_database():
         logger.error(f"❌ Failed to load data from database: {e}")
 
 # Asynchronously saves user data to the database
-def save_user_to_database_async(user_id: int, username: str = None, first_name: str = None, last_name: str = None):
+def save_user(user_id: int, username: str = None, first_name: str = None, last_name: str = None):
     """Save user to database asynchronously (fire and forget)"""
     if not db_pool:
         return
@@ -1444,7 +1444,7 @@ def save_user_to_database_async(user_id: int, username: str = None, first_name: 
     asyncio.create_task(save_user())
 
 # Asynchronously saves group data to the database
-def save_group_to_database_async(group_id: int, title: str = None, username: str = None, chat_type: str = None):
+def save_group(group_id: int, title: str = None, username: str = None, chat_type: str = None):
     """Save group to database asynchronously (fire and forget)"""
     if not db_pool:
         return
@@ -1472,7 +1472,7 @@ def save_group_to_database_async(group_id: int, title: str = None, username: str
     asyncio.create_task(save_group())
 
 # Retrieves all user IDs from the database
-async def get_users_from_database():
+async def get_users():
     """Get all user IDs from database"""
     if not db_pool:
         return list(user_ids)  # Fallback to memory
@@ -1486,7 +1486,7 @@ async def get_users_from_database():
         return list(user_ids)  # Fallback to memory
 
 # Retrieves all group IDs from the database
-async def get_groups_from_database():
+async def get_groups():
     """Get all group IDs from database"""
     if not db_pool:
         return list(group_ids)  # Fallback to memory
@@ -1500,7 +1500,7 @@ async def get_groups_from_database():
         return list(group_ids)  # Fallback to memory
 
 # Asynchronously saves purchase data to the database
-def save_purchase_to_database_async(user_id: int, username: str = None, first_name: str = None, last_name: str = None, amount: int = 0, charge_id: str = None):
+def save_purchase(user_id: int, username: str = None, first_name: str = None, last_name: str = None, amount: int = 0, charge_id: str = None):
     """Save purchase to database asynchronously (fire and forget)"""
     if not db_pool:
         return
@@ -1523,7 +1523,7 @@ def save_purchase_to_database_async(user_id: int, username: str = None, first_na
     asyncio.create_task(save_purchase())
 
 # Retrieves all purchase records from the database
-async def get_all_purchases():
+async def get_purchases():
     """Get all purchases from database ordered by amount descending"""
     if not db_pool:
         return []
@@ -1552,7 +1552,7 @@ async def close_database():
 
 
 # Removes a user from the database
-async def remove_user_from_database(user_id: int):
+async def remove_user(user_id: int):
     """Remove a user from the database and memory."""
     global user_ids
     if user_id in user_ids:
@@ -1571,7 +1571,7 @@ async def remove_user_from_database(user_id: int):
 
 
 # Removes a group from the database
-async def remove_group_from_database(group_id: int):
+async def remove_group(group_id: int):
     """Remove a group from the database and memory."""
     global group_ids
     if group_id in group_ids:
@@ -1591,7 +1591,7 @@ async def remove_group_from_database(group_id: int):
 
 # UTILITY FUNCTIONS
 # Extracts user and chat information from a message
-def extract_user_info(msg: Message) -> Dict[str, any]:
+def get_user_info(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
     logger.debug("🔍 Extracting user information from message")
     u = msg.from_user
@@ -1616,7 +1616,7 @@ def extract_user_info(msg: Message) -> Dict[str, any]:
 
 
 # Logs a message with detailed user information
-def log_with_user_info(level: str, message: str, user_info: Dict[str, any]) -> None:
+def log_action(level: str, message: str, user_info: Dict[str, any]) -> None:
     """Log message with user information"""
     user_detail = (
         f"👤 {user_info.get('full_name', 'N/A')} (@{user_info.get('username', 'N/A')}) "
@@ -1639,13 +1639,13 @@ def log_with_user_info(level: str, message: str, user_info: Dict[str, any]) -> N
 
 
 # Returns a random fallback response
-def get_fallback_response() -> str:
+def get_fallback() -> str:
     """Get a random fallback response when API fails"""
     return random.choice(RESPONSES)
 
 
 # Returns a random error response
-def get_error_response() -> str:
+def get_error() -> str:
     """Get a random error response when something goes wrong"""
     return random.choice(ERROR)
 
@@ -1675,7 +1675,7 @@ def validate_config() -> bool:
 
 
 # Updates the last response time for a user in Valkey
-async def update_user_response_time_valkey(user_id: int) -> None:
+async def update_response_time(user_id: int) -> None:
     """Update the last response time for user in Valkey"""
     if valkey_client:
         try:
@@ -1690,7 +1690,7 @@ async def update_user_response_time_valkey(user_id: int) -> None:
 
 
 # Determines if the bot should respond to a message in a group chat
-def should_respond_in_group(update: Update, bot_id: int) -> bool:
+def should_reply(update: Update, bot_id: int) -> bool:
     """Determine if bot should respond in group chat"""
     user_message = update.message.text or update.message.caption or ""
 
@@ -1707,7 +1707,7 @@ def should_respond_in_group(update: Update, bot_id: int) -> bool:
 
 
 # Tracks user and chat IDs for broadcasting purposes
-def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
+def track_user(update: Update, user_info: Dict[str, any]) -> None:
     """Track user and chat IDs for broadcasting (fast memory + async database)"""
     user_id = user_info["user_id"]
     chat_id = user_info["chat_id"]
@@ -1719,14 +1719,14 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
         user_ids.add(user_id)
 
         # Save to database asynchronously (non-blocking) to add or update user info
-        save_user_to_database_async(
+        save_user(
             user_id,
             user_info.get("username"),
             user_info.get("first_name"),
             user_info.get("last_name")
         )
         if is_new_user:
-            log_with_user_info("INFO", f"👤 New user tracked for broadcasting", user_info)
+            log_action("INFO", f"👤 New user tracked for broadcasting", user_info)
 
     elif chat_type in ['group', 'supergroup']:
         is_new_group = chat_id not in group_ids
@@ -1734,25 +1734,25 @@ def track_user_and_chat(update: Update, user_info: Dict[str, any]) -> None:
         group_ids.add(chat_id)
 
         # Save to database asynchronously (non-blocking) to add or update group info
-        save_group_to_database_async(
+        save_group(
             chat_id,
             user_info.get("chat_title"),
             user_info.get("username"),
             chat_type
         )
         if is_new_group:
-            log_with_user_info("INFO", f"📢 New group tracked for broadcasting", user_info)
+            log_action("INFO", f"📢 New group tracked for broadcasting", user_info)
 
 
 # Creates a user mention in HTML format
-def get_user_mention(user) -> str:
+def get_mention(user) -> str:
     """Create user mention for HTML parsing using first name"""
     first_name = user.first_name or "Friend"
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'
 
 
 # REACTION LOGIC
-async def handle_contextual_reaction(update: Update, user_info: Dict[str, any]):
+async def handle_reaction(update: Update, user_info: Dict[str, any]):
     """
     Analyzes the message text and sends a contextual, animated emoji reaction
     with a certain probability.
@@ -1766,36 +1766,36 @@ async def handle_contextual_reaction(update: Update, user_info: Dict[str, any]):
         if not message_text:
             return
 
-        log_with_user_info("DEBUG", f"🤔 Analyzing message for reaction: '{message_text[:50]}...'", user_info)
+        log_action("DEBUG", f"🤔 Analyzing message for reaction: '{message_text[:50]}...'", user_info)
 
         found_context = None
         # Find a matching context from keywords
         for context, keywords in REACTION_KEYWORDS.items():
             if any(keyword in message_text for keyword in keywords):
                 found_context = context
-                log_with_user_info("INFO", f"✅ Context found for reaction: '{found_context}'", user_info)
+                log_action("INFO", f"✅ Context found for reaction: '{found_context}'", user_info)
                 break
 
         if found_context:
             # Select a random emoji from the matched context
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS[found_context])
-            log_with_user_info("INFO", f"🥰 Selected emoji for reaction: {emoji_to_react}", user_info)
+            log_action("INFO", f"🥰 Selected emoji for reaction: {emoji_to_react}", user_info)
 
             # Send the animated reaction
-            await send_animated_reaction(
+            await send_big_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
                 emoji=emoji_to_react
             )
-            log_with_user_info("INFO", f"🚀 Sent animated reaction '{emoji_to_react}' successfully", user_info)
+            log_action("INFO", f"🚀 Sent animated reaction '{emoji_to_react}' successfully", user_info)
 
     except Exception as e:
-        log_with_user_info("ERROR", f"❌ Failed to handle contextual reaction: {e}", user_info)
+        log_action("ERROR", f"❌ Failed to handle contextual reaction: {e}", user_info)
 
 
 # CONVERSATION MEMORY FUNCTIONS
 # Adds a message to the user's conversation history
-async def add_to_conversation_history(user_id: int, message: str, is_user: bool = True):
+async def add_history(user_id: int, message: str, is_user: bool = True):
     """Add message to user's conversation history (Valkey + memory fallback)"""
     global conversation_history
 
@@ -1836,7 +1836,7 @@ async def add_to_conversation_history(user_id: int, message: str, is_user: bool 
     if len(conversation_history[user_id]) > CHAT_LENGTH:
         conversation_history[user_id] = conversation_history[user_id][-CHAT_LENGTH:]
 
-async def get_conversation_history_list(user_id: int) -> list:
+async def get_history(user_id: int) -> list:
     """Get conversation history as a list of dicts."""
     history = []
 
@@ -1858,7 +1858,7 @@ async def get_conversation_history_list(user_id: int) -> list:
 
 
 # Retrieves the conversation context for a user
-async def get_conversation_context(user_id: int) -> str:
+async def get_context(user_id: int) -> str:
     """Get formatted conversation context for the user (Valkey + memory fallback)"""
     history = []
 
@@ -1890,7 +1890,7 @@ async def get_conversation_context(user_id: int) -> str:
 
 
 # Periodically cleans up old conversation histories
-async def cleanup_old_conversations():
+async def cleanup_conversations():
     """Clean up old conversation histories and response times periodically"""
     global conversation_history, user_last_response_time
 
@@ -1938,30 +1938,30 @@ async def cleanup_old_conversations():
 
 
 # AI RESPONSE FUNCTIONS
-async def get_ai_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> str:
+async def get_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> str:
     """Gets a response from the AI, trying OpenRouter first and falling back to Gemini."""
     response = None
     source_api = None
 
     # Try OpenRouter first
     if openrouter_client:
-        log_with_user_info("INFO", "🤖 Trying OpenRouter API...", user_info)
+        log_action("INFO", "🤖 Trying OpenRouter API...", user_info)
         try:
-            response = await get_openrouter_response(user_message, user_name, user_info, user_id, image_bytes)
+            response = await openrouter_response(user_message, user_name, user_info, user_id, image_bytes)
             if response:
                 source_api = "OpenRouter"
-                log_with_user_info("INFO", f"✅ {source_api} response generated: '{response[:50]}...'", user_info)
+                log_action("INFO", f"✅ {source_api} response generated: '{response[:50]}...'", user_info)
         except Exception as e:
-            log_with_user_info("ERROR", f"❌ OpenRouter API error: {e}. Falling back to Gemini.", user_info)
+            log_action("ERROR", f"❌ OpenRouter API error: {e}. Falling back to Gemini.", user_info)
 
     # Fallback to Gemini if OpenRouter fails or is disabled
     if not response:
-        log_with_user_info("INFO", "🤖 Falling back to Gemini API", user_info)
+        log_action("INFO", "🤖 Falling back to Gemini API", user_info)
         source_api = "Gemini"
         if image_bytes:
-            response = await analyze_image_with_gemini(image_bytes, user_message, user_name, user_info, user_id)
+            response = await analyze_image_gemini(image_bytes, user_message, user_name, user_info, user_id)
         else:
-            response = await get_gemini_response(user_message, user_name, user_info, user_id)
+            response = await gemini_response(user_message, user_name, user_info, user_id)
 
     # Add to conversation history
     if response and user_id:
@@ -1971,18 +1971,18 @@ async def get_ai_response(user_message: str, user_name: str = "", user_info: Dic
             history_user_message = f"[Image: {user_message}]" if user_message else "[Image sent]"
 
         # Add user message and AI response to history
-        await add_to_conversation_history(user_id, history_user_message, is_user=True)
-        await add_to_conversation_history(user_id, response, is_user=False)
+        await add_history(user_id, history_user_message, is_user=True)
+        await add_history(user_id, response, is_user=False)
 
-    return response if response else get_error_response()
+    return response if response else get_error()
 
 
-async def get_openrouter_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> Optional[str]:
+async def openrouter_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None, image_bytes: Optional[bytes] = None) -> Optional[str]:
     """Get response from OpenRouter API."""
     if not openrouter_client:
         return None
 
-    history = await get_conversation_history_list(user_id)
+    history = await get_history(user_id)
 
     messages = []
 
@@ -2029,21 +2029,21 @@ async def get_openrouter_response(user_message: str, user_name: str = "", user_i
         return None
 
 # Gets a response from the Gemini API
-async def get_gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+async def gemini_response(user_message: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Get response from Gemini API with conversation context and caching"""
     if user_info:
-        log_with_user_info("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
+        log_action("DEBUG", f"🤖 Getting Gemini response for message: '{user_message[:50]}...'", user_info)
 
     if not gemini_client:
         if user_info:
-            log_with_user_info("WARNING", "❌ Gemini client not available, using fallback response", user_info)
-        return get_fallback_response()
+            log_action("WARNING", "❌ Gemini client not available, using fallback response", user_info)
+        return get_fallback()
 
     try:
         # Get conversation context if user_id provided
         context = ""
         if user_id:
-            context = await get_conversation_context(user_id)
+            context = await get_context(user_id)
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
 
@@ -2059,10 +2059,10 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
         cache_key = None
         if len(user_message) <= 50 and not context and user_id:  # Only cache short, context-free messages
             cache_key = f"gemini_response:{user_id}:{hashlib.md5(user_message.lower().encode()).hexdigest()}"
-            cached_response = await cache_get(cache_key)
+            cached_response = await get_cache(cache_key)
             if cached_response:
                 if user_info:
-                    log_with_user_info("INFO", f"📦 Using cached response for message", user_info)
+                    log_action("INFO", f"📦 Using cached response for message", user_info)
                 return cached_response
 
         response = await gemini_client.aio.models.generate_content(
@@ -2070,41 +2070,41 @@ async def get_gemini_response(user_message: str, user_name: str = "", user_info:
             contents=prompt
         )
 
-        ai_response = response.text.strip() if response.text else get_fallback_response()
+        ai_response = response.text.strip() if response.text else get_fallback()
 
         # Cache the response if it was a short, context-free message
         if cache_key:
-            await cache_set(cache_key, ai_response, CACHE_TTL)
+            await set_cache(cache_key, ai_response, CACHE_TTL)
 
         if user_info:
-            log_with_user_info("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
+            log_action("INFO", f"✅ Gemini response generated: '{ai_response[:50]}...'", user_info)
 
         return ai_response
 
     except Exception as e:
         if user_info:
-            log_with_user_info("ERROR", f"❌ Gemini API error: {e}", user_info)
+            log_action("ERROR", f"❌ Gemini API error: {e}", user_info)
         else:
             logger.error(f"Gemini API error: {e}")
-        return get_error_response()
+        return get_error()
 
 
 # Analyzes an image using the Gemini API
-async def analyze_image_with_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+async def analyze_image_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze image using Gemini 2.5 Flash with conversation context"""
     if user_info:
-        log_with_user_info("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
+        log_action("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
 
     if not gemini_client:
         if user_info:
-            log_with_user_info("WARNING", "❌ Gemini client not available for image analysis", user_info)
+            log_action("WARNING", "❌ Gemini client not available for image analysis", user_info)
         return "Samjh nahi paa rahi image kya hai 😔"
 
     try:
         # Get conversation context if user_id provided
         context = ""
         if user_id:
-            context = await get_conversation_context(user_id)
+            context = await get_context(user_id)
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
 
@@ -2145,20 +2145,20 @@ Sakura's response:"""
         ai_response = response.text.strip() if response.text else "Kya cute image hai! 😍"
 
         if user_info:
-            log_with_user_info("INFO", f"✅ Image analysis completed: '{ai_response[:50]}...'", user_info)
+            log_action("INFO", f"✅ Image analysis completed: '{ai_response[:50]}...'", user_info)
 
         return ai_response
 
     except Exception as e:
         if user_info:
-            log_with_user_info("ERROR", f"❌ Image analysis error: {e}", user_info)
+            log_action("ERROR", f"❌ Image analysis error: {e}", user_info)
         else:
             logger.error(f"Image analysis error: {e}")
         return "Image analyze nahi kar paa rahi 😕"
 
 
 # Analyzes a poll that was referenced in a message
-async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
+async def analyze_poll_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent poll and handle it"""
     # Check if message contains requests for poll analysis
     message_lower = user_message.lower()
@@ -2167,33 +2167,33 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
     if not contains_poll_request:
         return False
 
-    log_with_user_info("DEBUG", "🔍 Detected potential poll analysis request", user_info)
+    log_action("DEBUG", "🔍 Detected potential poll analysis request", user_info)
 
     # Check if replying to a message with poll
     if update.message.reply_to_message and update.message.reply_to_message.poll:
-        log_with_user_info("INFO", "🔍 User asking about replied poll", user_info)
+        log_action("INFO", "🔍 User asking about replied poll", user_info)
 
         # React to the message to show the bot is "thinking"
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
             # React to the user's message
-            await send_animated_reaction(
+            await send_big_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
                 emoji=emoji_to_react
             )
             # React to the original poll message as well
-            await send_animated_reaction(
+            await send_big_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.reply_to_message.message_id,
                 emoji=emoji_to_react
             )
-            log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied poll", user_info)
+            log_action("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied poll", user_info)
         except Exception as e:
-            log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for replied poll: {e}", user_info)
+            log_action("WARNING", f"⚠️ Could not send analysis reaction for replied poll: {e}", user_info)
 
         # Send typing action to show bot is processing
-        await send_typing_action(context, update.effective_chat.id, user_info)
+        await send_typing(context, update.effective_chat.id, user_info)
 
         try:
             poll = update.message.reply_to_message.poll
@@ -2210,11 +2210,11 @@ async def analyze_referenced_poll(update: Update, context: ContextTypes.DEFAULT_
             # Send response (no effects for Gemini responses)
             await update.message.reply_text(response)
 
-            log_with_user_info("INFO", "✅ Referenced poll analyzed successfully", user_info)
+            log_action("INFO", "✅ Referenced poll analyzed successfully", user_info)
             return True
 
         except Exception as e:
-            log_with_user_info("ERROR", f"❌ Error analyzing referenced poll: {e}", user_info)
+            log_action("ERROR", f"❌ Error analyzing referenced poll: {e}", user_info)
 
             error_response = "Poll analyze nahi kar paa rahi 😔"
             await update.message.reply_text(error_response)
@@ -2232,32 +2232,32 @@ async def analyze_poll(poll_question: str, poll_options: list, user_name: str = 
 
     # Try OpenRouter first
     if openrouter_client:
-        log_with_user_info("INFO", "🤖 Trying OpenRouter API for poll analysis...", user_info)
+        log_action("INFO", "🤖 Trying OpenRouter API for poll analysis...", user_info)
         try:
-            response = await analyze_poll_with_openrouter(poll_question, poll_options, user_name, user_info, user_id)
+            response = await openrouter_poll(poll_question, poll_options, user_name, user_info, user_id)
             if response:
                 source_api = "OpenRouter"
         except Exception as e:
-            log_with_user_info("ERROR", f"❌ OpenRouter poll analysis error: {e}. Falling back to Gemini.", user_info)
+            log_action("ERROR", f"❌ OpenRouter poll analysis error: {e}. Falling back to Gemini.", user_info)
 
     # Fallback to Gemini if OpenRouter fails or is disabled
     if not response:
-        log_with_user_info("INFO", "🤖 Falling back to Gemini API for poll analysis", user_info)
+        log_action("INFO", "🤖 Falling back to Gemini API for poll analysis", user_info)
         source_api = "Gemini"
-        response = await analyze_poll_with_gemini(poll_question, poll_options, user_name, user_info, user_id)
+        response = await gemini_poll(poll_question, poll_options, user_name, user_info, user_id)
 
     # Add messages to conversation history
     if response and user_id:
         poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
-        await add_to_conversation_history(user_id, poll_description, is_user=True)
-        await add_to_conversation_history(user_id, response, is_user=False)
-        log_with_user_info("INFO", f"✅ Poll analysis via {source_api} completed and saved to history", user_info)
+        await add_history(user_id, poll_description, is_user=True)
+        await add_history(user_id, response, is_user=False)
+        log_action("INFO", f"✅ Poll analysis via {source_api} completed and saved to history", user_info)
 
     return response if response else "Poll analyze nahi kar paa rahi 😕"
 
 
 # Analyzes an image that was referenced in a message
-async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
+async def analyze_image_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent image and handle it"""
     # Check if message contains requests for image analysis
     message_lower = user_message.lower()
@@ -2266,33 +2266,33 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
     if not contains_image_request:
         return False
 
-    log_with_user_info("DEBUG", "🔍 Detected potential image analysis request", user_info)
+    log_action("DEBUG", "🔍 Detected potential image analysis request", user_info)
 
     # Priority 1: Check if replying to a message with photo
     if update.message.reply_to_message and update.message.reply_to_message.photo:
-        log_with_user_info("INFO", "🔍 User asking about replied image", user_info)
+        log_action("INFO", "🔍 User asking about replied image", user_info)
 
         # React to the message to show the bot is "thinking"
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["love"])
             # React to the user's message
-            await send_animated_reaction(
+            await send_big_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
                 emoji=emoji_to_react
             )
             # React to the original image message as well
-            await send_animated_reaction(
+            await send_big_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.reply_to_message.message_id,
                 emoji=emoji_to_react
             )
-            log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied image", user_info)
+            log_action("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied image", user_info)
         except Exception as e:
-            log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for replied image: {e}", user_info)
+            log_action("WARNING", f"⚠️ Could not send analysis reaction for replied image: {e}", user_info)
 
         # Send typing action to show bot is processing
-        await send_typing_action(context, update.effective_chat.id, user_info)
+        await send_typing(context, update.effective_chat.id, user_info)
 
         try:
             photo = update.message.reply_to_message.photo[-1]
@@ -2303,18 +2303,18 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
             caption = update.message.reply_to_message.caption or ""
 
             # Analyze the referenced image
-            response = await get_ai_response(
+            response = await get_response(
                 caption, user_name, user_info, user_info["user_id"], image_bytes=image_bytes
             )
 
             # Send response (no effects for Gemini responses)
             await update.message.reply_text(response)
 
-            log_with_user_info("INFO", "✅ Referenced image analyzed successfully", user_info)
+            log_action("INFO", "✅ Referenced image analyzed successfully", user_info)
             return True
 
         except Exception as e:
-            log_with_user_info("ERROR", f"❌ Error analyzing referenced image: {e}", user_info)
+            log_action("ERROR", f"❌ Error analyzing referenced image: {e}", user_info)
 
             error_response = "Image analyze nahi kar paa rahi 😔"
             await update.message.reply_text(error_response)
@@ -2328,7 +2328,7 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
         # Find the most recent image reference
         for message in reversed(history):
             if message["role"] == "user" and "[Image:" in message["content"]:
-                log_with_user_info("INFO", "🔍 User asking about previously sent image from history", user_info)
+                log_action("INFO", "🔍 User asking about previously sent image from history", user_info)
 
                 # If no recent replied image found, inform user
                 no_image_response = "Koi recent image nahi mil rahi analyze karne ke liye 😔"
@@ -2340,13 +2340,13 @@ async def analyze_referenced_image(update: Update, context: ContextTypes.DEFAULT
 
 
 # Analyzes a poll using the OpenRouter API
-async def analyze_poll_with_openrouter(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> Optional[str]:
+async def openrouter_poll(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> Optional[str]:
     """Analyze poll using OpenRouter API to suggest the correct answer."""
     if not openrouter_client:
         return None
 
     if user_info:
-        log_with_user_info("DEBUG", f"📊 Analyzing poll with OpenRouter: '{poll_question[:50]}...'", user_info)
+        log_action("DEBUG", f"📊 Analyzing poll with OpenRouter: '{poll_question[:50]}...'", user_info)
 
     try:
         history = await get_conversation_history_list(user_id)
@@ -2390,35 +2390,35 @@ Sakura's response:"""
         ai_response = completion.choices[0].message.content
         if ai_response:
             if user_info:
-                log_with_user_info("INFO", f"✅ OpenRouter poll analysis completed: '{ai_response[:50]}...'", user_info)
+                log_action("INFO", f"✅ OpenRouter poll analysis completed: '{ai_response[:50]}...'", user_info)
             return ai_response.strip()
         else:
             return None
 
     except Exception as e:
         if user_info:
-            log_with_user_info("ERROR", f"❌ OpenRouter poll analysis error: {e}", user_info)
+            log_action("ERROR", f"❌ OpenRouter poll analysis error: {e}", user_info)
         else:
             logger.error(f"OpenRouter poll analysis error: {e}")
         return None
 
 
 # Analyzes a poll using the Gemini API
-async def analyze_poll_with_gemini(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+async def gemini_poll(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze poll using Gemini 2.5 Flash to suggest the correct answer"""
     if user_info:
-        log_with_user_info("DEBUG", f"📊 Analyzing poll with Gemini: '{poll_question[:50]}...'", user_info)
+        log_action("DEBUG", f"📊 Analyzing poll with Gemini: '{poll_question[:50]}...'", user_info)
 
     if not gemini_client:
         if user_info:
-            log_with_user_info("WARNING", "❌ Gemini client not available for poll analysis", user_info)
+            log_action("WARNING", "❌ Gemini client not available for poll analysis", user_info)
         return "Poll samjh nahi paa rahi 😔"
 
     try:
         # Get conversation context if user_id provided
         context = ""
         if user_id:
-            context = await get_conversation_context(user_id)
+            context = await get_context(user_id)
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
 
@@ -2454,13 +2454,13 @@ Sakura's response:"""
         ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
 
         if user_info:
-            log_with_user_info("INFO", f"✅ Gemini poll analysis completed: '{ai_response[:50]}...'", user_info)
+            log_action("INFO", f"✅ Gemini poll analysis completed: '{ai_response[:50]}...'", user_info)
 
         return ai_response
 
     except Exception as e:
         if user_info:
-            log_with_user_info("ERROR", f"❌ Poll analysis error: {e}", user_info)
+            log_action("ERROR", f"❌ Poll analysis error: {e}", user_info)
         else:
             logger.error(f"Poll analysis error: {e}")
         return "Poll analyze nahi kar paa rahi 😕"
@@ -2468,29 +2468,29 @@ Sakura's response:"""
 
 # CHAT ACTION FUNCTIONS
 # Sends the "typing" action in a chat
-async def send_typing_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
+async def send_typing(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send typing action to show bot is processing"""
-    log_with_user_info("DEBUG", "⌨️ Sending typing action", user_info)
+    log_action("DEBUG", "⌨️ Sending typing action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
 
 # Sends the "uploading photo" action in a chat
 async def send_photo_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send upload photo action"""
-    log_with_user_info("DEBUG", "📷 Sending photo upload action", user_info)
+    log_action("DEBUG", "📷 Sending photo upload action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
 
 
 # Sends the "choosing sticker" action in a chat
 async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send choosing sticker action"""
-    log_with_user_info("DEBUG", "🎭 Sending sticker choosing action", user_info)
+    log_action("DEBUG", "🎭 Sending sticker choosing action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.CHOOSE_STICKER)
 
 
 # KEYBOARD CREATION FUNCTIONS
 # Creates the initial keyboard for the /start command
-def create_initial_start_keyboard() -> InlineKeyboardMarkup:
+def create_start_menu() -> InlineKeyboardMarkup:
     """Create initial start keyboard with Info and Hi buttons"""
     keyboard = [
         [
@@ -2502,7 +2502,7 @@ def create_initial_start_keyboard() -> InlineKeyboardMarkup:
 
 
 # Creates the keyboard for the "info" section of the /start command
-def create_info_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
+def create_info_menu(bot_username: str) -> InlineKeyboardMarkup:
     """Create inline keyboard for start info (original start buttons)"""
     keyboard = [
         [
@@ -2518,19 +2518,19 @@ def create_info_start_keyboard(bot_username: str) -> InlineKeyboardMarkup:
 
 
 # Gets the initial caption for the /start command
-def get_initial_start_caption(user_mention: str) -> str:
+def get_start_text(user_mention: str) -> str:
     """Get initial caption text for start command with user mention"""
     return START_MESSAGES["initial_caption"].format(user_mention=user_mention)
 
 
 # Gets the caption for the "info" section of the /start command
-def get_info_start_caption(user_mention: str) -> str:
+def get_info_text(user_mention: str) -> str:
     """Get info caption text for start command with user mention"""
     return START_MESSAGES["info_caption"].format(user_mention=user_mention)
 
 
 # Creates the keyboard for the /help command
-def create_help_keyboard(expanded: bool = False) -> InlineKeyboardMarkup:
+def create_help_menu(expanded: bool = False) -> InlineKeyboardMarkup:
     """Create help command keyboard"""
     if expanded:
         button_text = HELP_MESSAGES["button_texts"]["minimize"]
@@ -2553,7 +2553,7 @@ def get_help_text(user_mention: str, expanded: bool = False) -> str:
 
 
 # Creates the keyboard for the /broadcast command
-def create_broadcast_keyboard() -> InlineKeyboardMarkup:
+def create_broadcast_menu() -> InlineKeyboardMarkup:
     """Create broadcast target selection keyboard"""
     keyboard = [
         [
@@ -2584,10 +2584,10 @@ def get_broadcast_text() -> str:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command with two-step inline buttons and effects in private chat"""
     try:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("INFO", "🌸 /start command received", user_info)
+        user_info = get_user_info(update.message)
+        log_action("INFO", "🌸 /start command received", user_info)
 
-        track_user_and_chat(update, user_info)
+        track_user(update, user_info)
 
         # Step 1: React to the start message with random emoji and animation
         if EMOJI_REACT:
@@ -2596,57 +2596,57 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_animated_reaction(
+                    reaction_sent = await send_big_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
                     )
                     if reaction_sent:
-                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                        log_action("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
                     else:
                         # Fallback to PTB reaction without animation
-                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                        await add_reaction(context, update, random_emoji, user_info)
                 else:
                     # Group chat or no Telethon - use PTB reaction
-                    await add_ptb_reaction(context, update, random_emoji, user_info)
+                    await add_reaction(context, update, random_emoji, user_info)
 
             except Exception as e:
-                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+                log_action("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
 
         # Step 2: Send random sticker (only in private chat)
         if update.effective_chat.type == "private" and START_STICKERS:
             await send_sticker_action(context, update.effective_chat.id, user_info)
 
             random_sticker = random.choice(START_STICKERS)
-            log_with_user_info("DEBUG", f"🎭 Sending start sticker: {random_sticker}", user_info)
+            log_action("DEBUG", f"🎭 Sending start sticker: {random_sticker}", user_info)
 
             await context.bot.send_sticker(
                 chat_id=update.effective_chat.id,
                 sticker=random_sticker
             )
-            log_with_user_info("INFO", "✅ Start sticker sent successfully", user_info)
+            log_action("INFO", "✅ Start sticker sent successfully", user_info)
 
         # Step 3: Send the initial welcome message with photo and two-step buttons
         await send_photo_action(context, update.effective_chat.id, user_info)
 
         random_image = random.choice(SAKURA_IMAGES)
-        keyboard = create_initial_start_keyboard()
-        user_mention = get_user_mention(update.effective_user)
-        caption = get_initial_start_caption(user_mention)
+        keyboard = create_start_menu()
+        user_mention = get_mention(update.effective_user)
+        caption = get_start_text(user_mention)
 
-        log_with_user_info("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
+        log_action("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
 
         # Send with effects if in private chat
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main start message
-            effect_sent = await send_with_effect_photo(
+            effect_sent = await send_effect_photo(
                 update.effective_chat.id,
                 random_image,
                 caption,
                 keyboard
             )
             if effect_sent:
-                log_with_user_info("INFO", "✨ Start command with effects sent successfully", user_info)
+                log_action("INFO", "✨ Start command with effects sent successfully", user_info)
             else:
                 # Fallback to normal PTB message if effects fail
                 await context.bot.send_photo(
@@ -2656,7 +2656,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     parse_mode=ParseMode.HTML,
                     reply_markup=keyboard
                 )
-                log_with_user_info("WARNING", "⚠️ Start command sent without effects (fallback)", user_info)
+                log_action("WARNING", "⚠️ Start command sent without effects (fallback)", user_info)
         else:
             # Group chat - no effects, just normal message
             await context.bot.send_photo(
@@ -2667,22 +2667,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 reply_markup=keyboard
             )
 
-        log_with_user_info("INFO", "✅ Start command completed successfully", user_info)
+        log_action("INFO", "✅ Start command completed successfully", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("ERROR", f"❌ Error in start command: {e}", user_info)
-        await update.message.reply_text(get_error_response())
+        user_info = get_user_info(update.message)
+        log_action("ERROR", f"❌ Error in start command: {e}", user_info)
+        await update.message.reply_text(get_error())
 
 
 # Handles the /help command
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command with random image and effects in private chat"""
     try:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("INFO", "ℹ️ /help command received", user_info)
+        user_info = get_user_info(update.message)
+        log_action("INFO", "ℹ️ /help command received", user_info)
 
-        track_user_and_chat(update, user_info)
+        track_user(update, user_info)
 
         # Step 1: React to the help message with random emoji and animation
         if EMOJI_REACT:
@@ -2691,46 +2691,46 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_animated_reaction(
+                    reaction_sent = await send_big_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
                     )
                     if reaction_sent:
-                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                        log_action("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
                     else:
                         # Fallback to PTB reaction without animation
-                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                        await add_reaction(context, update, random_emoji, user_info)
                 else:
                     # Group chat or no Telethon - use PTB reaction
-                    await add_ptb_reaction(context, update, random_emoji, user_info)
+                    await add_reaction(context, update, random_emoji, user_info)
 
             except Exception as e:
-                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+                log_action("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
 
         # Step 2: Send photo action indicator
         await send_photo_action(context, update.effective_chat.id, user_info)
 
         # Step 3: Prepare help content
-        keyboard = create_help_keyboard(expanded=False)
-        user_mention = get_user_mention(update.effective_user)
+        keyboard = create_help_menu(expanded=False)
+        user_mention = get_mention(update.effective_user)
         help_text = get_help_text(user_mention, expanded=False)
 
         # Step 4: Send help message with random image
         random_image = random.choice(SAKURA_IMAGES)
-        log_with_user_info("DEBUG", f"📷 Sending help photo: {random_image[:50]}...", user_info)
+        log_action("DEBUG", f"📷 Sending help photo: {random_image[:50]}...", user_info)
 
         # Send with effects if in private chat
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main help message
-            effect_sent = await send_with_effect_photo(
+            effect_sent = await send_effect_photo(
                 update.effective_chat.id,
                 random_image,
                 help_text,
                 keyboard
             )
             if effect_sent:
-                log_with_user_info("INFO", "✨ Help command with effects sent successfully", user_info)
+                log_action("INFO", "✨ Help command with effects sent successfully", user_info)
             else:
                 # Fallback to normal PTB message if effects fail
                 await context.bot.send_photo(
@@ -2740,7 +2740,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     parse_mode=ParseMode.HTML,
                     reply_markup=keyboard
                 )
-                log_with_user_info("WARNING", "⚠️ Help command sent without effects (fallback)", user_info)
+                log_action("WARNING", "⚠️ Help command sent without effects (fallback)", user_info)
         else:
             # Group chat - no effects, just normal message
             await context.bot.send_photo(
@@ -2751,34 +2751,34 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 reply_markup=keyboard
             )
 
-        log_with_user_info("INFO", "✅ Help command completed successfully", user_info)
+        log_action("INFO", "✅ Help command completed successfully", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("ERROR", f"❌ Error in help command: {e}", user_info)
-        await update.message.reply_text(get_error_response())
+        user_info = get_user_info(update.message)
+        log_action("ERROR", f"❌ Error in help command: {e}", user_info)
+        await update.message.reply_text(get_error())
 
 
 # Handles the /broadcast command (owner only)
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast command (owner only)"""
-    user_info = extract_user_info(update.message)
+    user_info = get_user_info(update.message)
 
     if update.effective_user.id != OWNER_ID:
-        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast command", user_info)
+        log_action("WARNING", "⚠️ Non-owner attempted broadcast command", user_info)
         return
 
-    log_with_user_info("INFO", "📢 Broadcast command received from owner", user_info)
+    log_action("INFO", "📢 Broadcast command received from owner", user_info)
 
     # Refresh counts from database
-    db_users = await get_users_from_database()
-    db_groups = await get_groups_from_database()
+    db_users = await get_users()
+    db_groups = await get_groups()
 
     # Sync memory with database
     user_ids.update(db_users)
     group_ids.update(db_groups)
 
-    keyboard = create_broadcast_keyboard()
+    keyboard = create_broadcast_menu()
     broadcast_text = get_broadcast_text()
 
     await update.message.reply_text(
@@ -2787,14 +2787,14 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         parse_mode=ParseMode.HTML
     )
 
-    log_with_user_info("INFO", "✅ Broadcast selection menu sent", user_info)
+    log_action("INFO", "✅ Broadcast selection menu sent", user_info)
 
 
 # Handles the /ping command
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle ping command for everyone"""
-    user_info = extract_user_info(update.message)
-    log_with_user_info("INFO", "🏓 Ping command received", user_info)
+    user_info = get_user_info(update.message)
+    log_action("INFO", "🏓 Ping command received", user_info)
 
     start_time = time.time()
 
@@ -2811,7 +2811,7 @@ async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         disable_web_page_preview=True
     )
 
-    log_with_user_info("INFO", "✅ Ping completed", user_info)
+    log_action("INFO", "✅ Ping completed", user_info)
 
 
 
@@ -2832,51 +2832,51 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         query = update.callback_query
-        user_info = extract_user_info(query.message)
-        log_with_user_info("INFO", f"🌸 Start callback received: {query.data}", user_info)
+        user_info = get_user_info(query.message)
+        log_action("INFO", f"🌸 Start callback received: {query.data}", user_info)
 
-        user_mention = get_user_mention(update.effective_user)
+        user_mention = get_mention(update.effective_user)
 
         if query.data == "start_info":
             # Answer callback with proper message
             await query.answer(START_MESSAGES["callback_answers"]["info"], show_alert=False)
 
             # Show info with original start buttons
-            keyboard = create_info_start_keyboard(context.bot.username)
-            caption = get_info_start_caption(user_mention)
+            keyboard = create_info_menu(context.bot.username)
+            caption = get_info_text(user_mention)
 
             await query.edit_message_caption(
                 caption=caption,
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard
             )
-            log_with_user_info("INFO", "✅ Start info buttons shown", user_info)
+            log_action("INFO", "✅ Start info buttons shown", user_info)
 
         elif query.data == "start_hi":
             # Answer callback with proper message
             await query.answer(START_MESSAGES["callback_answers"]["hi"], show_alert=False)
 
             # Send typing indicator before processing
-            await send_typing_action(context, update.effective_chat.id, user_info)
-            log_with_user_info("INFO", "⌨️ Typing indicator sent for hello", user_info)
+            await send_typing(context, update.effective_chat.id, user_info)
+            log_action("INFO", "⌨️ Typing indicator sent for hello", user_info)
 
             # Send a hi message from Sakura
             user_name = update.effective_user.first_name or ""
-            hi_response = await get_ai_response("Hi sakura", user_name, user_info, update.effective_user.id)
+            hi_response = await get_response("Hi sakura", user_name, user_info, update.effective_user.id)
 
             # Send with effects if in private chat
             if update.effective_chat.type == "private":
                 # Try sending with effects first
-                effect_sent = await send_with_effect(update.effective_chat.id, hi_response)
+                effect_sent = await send_effect(update.effective_chat.id, hi_response)
                 if effect_sent:
-                    log_with_user_info("INFO", "✨ Start Hi response with effects sent successfully", user_info)
+                    log_action("INFO", "✨ Start Hi response with effects sent successfully", user_info)
                 else:
                     # Fallback to normal PTB message if effects fail
                     await context.bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=hi_response
                     )
-                    log_with_user_info("WARNING", "⚠️ Start Hi response sent without effects (fallback)", user_info)
+                    log_action("WARNING", "⚠️ Start Hi response sent without effects (fallback)", user_info)
             else:
                 # Group chat - no effects, just normal message
                 await context.bot.send_message(
@@ -2884,11 +2884,11 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     text=hi_response
                 )
 
-            log_with_user_info("INFO", "✅ Hi message sent from Sakura", user_info)
+            log_action("INFO", "✅ Hi message sent from Sakura", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(query.message) if query.message else {}
-        log_with_user_info("ERROR", f"❌ Error in start callback: {e}", user_info)
+        user_info = get_user_info(query.message) if query.message else {}
+        log_action("ERROR", f"❌ Error in start callback: {e}", user_info)
         try:
             await query.answer("Something went wrong 😔", show_alert=True)
         except:
@@ -2910,10 +2910,10 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
 
     try:
-        user_info = extract_user_info(query.message)
-        log_with_user_info("INFO", f"🔄 Help callback received: {query.data}", user_info)
+        user_info = get_user_info(query.message)
+        log_action("INFO", f"🔄 Help callback received: {query.data}", user_info)
 
-        user_mention = get_user_mention(update.effective_user)
+        user_mention = get_mention(update.effective_user)
 
         # Determine the new state based on the callback data
         if query.data == "help_expand":
@@ -2925,7 +2925,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         else:
             return # Should not happen with the new pattern
 
-        keyboard = create_help_keyboard(expanded=expanded)
+        keyboard = create_help_menu(expanded=expanded)
         help_text = get_help_text(user_mention, expanded=expanded)
 
         # Update the photo caption with new help text and keyboard
@@ -2935,11 +2935,11 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=keyboard
         )
 
-        log_with_user_info("INFO", f"✅ Help message {'expanded' if expanded else 'minimized'}", user_info)
+        log_action("INFO", f"✅ Help message {'expanded' if expanded else 'minimized'}", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(query.message) if query.message else {}
-        log_with_user_info("ERROR", f"❌ Error editing help message: {e}", user_info)
+        user_info = get_user_info(query.message) if query.message else {}
+        log_action("ERROR", f"❌ Error editing help message: {e}", user_info)
         # Fallback: answer the callback to prevent loading state
         try:
             await query.answer("Something went wrong 😔", show_alert=True)
@@ -2961,11 +2961,11 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
             return
 
-    user_info = extract_user_info(query.message)
+    user_info = get_user_info(query.message)
 
     # Handle "Buy flowers again" button - available for everyone
     if query.data == "get_flowers_again":
-        log_with_user_info("INFO", "🌸 'Buy flowers again' button clicked", user_info)
+        log_action("INFO", "🌸 'Buy flowers again' button clicked", user_info)
 
         # Answer the callback
         await query.answer("🌸 Getting more flowers for you!", show_alert=False)
@@ -2982,21 +2982,21 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 prices=[LabeledPrice(label='✨ Sakura Star', amount=50)]
             )
 
-            log_with_user_info("INFO", "✅ New invoice sent from 'Buy flowers again' button", user_info)
+            log_action("INFO", "✅ New invoice sent from 'Buy flowers again' button", user_info)
 
         except Exception as e:
-            log_with_user_info("ERROR", f"❌ Error sending new invoice from button: {e}", user_info)
+            log_action("ERROR", f"❌ Error sending new invoice from button: {e}", user_info)
             await query.message.reply_text("❌ Oops! Something went wrong. Try using /buy command instead! 🔧")
 
         return  # Exit early for get_flowers_again
 
     # For broadcast-related buttons, check if user is owner
     if query.from_user.id != OWNER_ID:
-        log_with_user_info("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
+        log_action("WARNING", "⚠️ Non-owner attempted broadcast callback", user_info)
         await query.answer("You're not authorized to use this 🚫", show_alert=True)
         return
 
-    log_with_user_info("INFO", f"🎯 Broadcast target selected: {query.data}", user_info)
+    log_action("INFO", f"🎯 Broadcast target selected: {query.data}", user_info)
 
     if query.data == "bc_users":
         # Answer callback with proper message
@@ -3007,7 +3007,7 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             BROADCAST_MESSAGES["ready_users"].format(count=len(user_ids)),
             parse_mode=ParseMode.HTML
         )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
+        log_action("INFO", f"✅ Ready to broadcast to {len(user_ids)} users", user_info)
 
     elif query.data == "bc_groups":
         # Answer callback with proper message
@@ -3018,41 +3018,41 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             BROADCAST_MESSAGES["ready_groups"].format(count=len(group_ids)),
             parse_mode=ParseMode.HTML
         )
-        log_with_user_info("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
+        log_action("INFO", f"✅ Ready to broadcast to {len(group_ids)} groups", user_info)
 
 
 # BROADCAST FUNCTIONS
 # Executes the broadcast to the selected target (users or groups)
-async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
+async def execute_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: Dict[str, any]) -> None:
     """Execute broadcast with the current message - uses forward_message for forwarded messages, copy_message for regular messages
     Compatible with python-telegram-bot==22.3"""
     try:
         if target_type == "users":
             # Get fresh data from database
-            target_list = await get_users_from_database()
+            target_list = await get_users()
             target_list = [uid for uid in target_list if uid != OWNER_ID]
             target_name = "users"
         elif target_type == "groups":
             # Get fresh data from database
-            target_list = await get_groups_from_database()
+            target_list = await get_groups()
             target_name = "groups"
         else:
             return
 
-        log_with_user_info("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
+        log_action("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
 
         if not target_list:
             await update.message.reply_text(
                 BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
             )
-            log_with_user_info("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
+            log_action("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
             return
 
         # Check if the message is forwarded
         is_forwarded = update.message.forward_origin is not None
         broadcast_method = "forward" if is_forwarded else "copy"
 
-        log_with_user_info("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
+        log_action("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
 
         # Show initial status
         status_msg = await update.message.reply_text(
@@ -3083,7 +3083,7 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
                 broadcast_count += 1
 
                 if i % 10 == 0:  # Log progress every 10 messages
-                    log_with_user_info("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)} using {broadcast_method}", user_info)
+                    log_action("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)} using {broadcast_method}", user_info)
 
                 # Small delay to avoid rate limits
                 await asyncio.sleep(BROADCAST_DELAY)
@@ -3091,15 +3091,15 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             except Forbidden:
                 failed_count += 1
                 logger.warning(f"⚠️ User {target_id} blocked the bot. Removing from DB.")
-                await remove_user_from_database(target_id)
+                await remove_user(target_id)
             except BadRequest as e:
                 failed_count += 1
                 if "chat not found" in str(e).lower():
                     logger.warning(f"⚠️ Chat {target_id} not found. Removing from DB.")
                     if target_name == "users":
-                        await remove_user_from_database(target_id)
+                        await remove_user(target_id)
                     else:
-                        await remove_group_from_database(target_id)
+                        await remove_group(target_id)
                 else:
                     logger.error(f"❌ Broadcast failed for {target_id}: {e}")
             except Exception as e:
@@ -3117,10 +3117,10 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
             parse_mode=ParseMode.HTML
         )
 
-        log_with_user_info("INFO", f"✅ Broadcast completed using {broadcast_method}: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
+        log_action("INFO", f"✅ Broadcast completed using {broadcast_method}: {broadcast_count}/{len(target_list)} successful, {failed_count} failed", user_info)
 
     except Exception as e:
-        log_with_user_info("ERROR", f"❌ Broadcast error: {e}", user_info)
+        log_action("ERROR", f"❌ Broadcast error: {e}", user_info)
         await update.message.reply_text(
             BROADCAST_MESSAGES["failed"].format(error=str(e))
         )
@@ -3128,83 +3128,83 @@ async def execute_broadcast_direct(update: Update, context: ContextTypes.DEFAULT
 
 # MESSAGE HANDLERS
 # Handles incoming sticker messages
-async def handle_sticker_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle sticker messages"""
-    user_info = extract_user_info(update.message)
-    log_with_user_info("INFO", "🎭 Sticker message received", user_info)
+    user_info = get_user_info(update.message)
+    log_action("INFO", "🎭 Sticker message received", user_info)
 
     await send_sticker_action(context, update.effective_chat.id, user_info)
 
     random_sticker = random.choice(SAKURA_STICKERS)
     chat_type = update.effective_chat.type
 
-    log_with_user_info("DEBUG", f"📤 Sending random sticker: {random_sticker}", user_info)
+    log_action("DEBUG", f"📤 Sending random sticker: {random_sticker}", user_info)
 
     # In groups, reply to the user's sticker when they replied to bot
     if (chat_type in ['group', 'supergroup'] and
         update.message.reply_to_message and
         update.message.reply_to_message.from_user.id == context.bot.id):
         await update.message.reply_sticker(sticker=random_sticker)
-        log_with_user_info("INFO", "✅ Replied to user's sticker in group", user_info)
+        log_action("INFO", "✅ Replied to user's sticker in group", user_info)
     else:
         # In private chats or regular stickers, send normally
         await context.bot.send_sticker(
             chat_id=update.effective_chat.id,
             sticker=random_sticker
         )
-        log_with_user_info("INFO", "✅ Sent sticker response", user_info)
+        log_action("INFO", "✅ Sent sticker response", user_info)
 
 
 # Handles incoming text messages
-async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text and media messages with AI response and effects in private chat"""
-    user_info = extract_user_info(update.message)
+    user_info = get_user_info(update.message)
     user_message = update.message.text or update.message.caption or "Media message"
 
-    log_with_user_info("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
+    log_action("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
 
     # Check if user is asking to analyze a previously sent image
-    if await analyze_referenced_image(update, context, user_message, user_info):
+    if await analyze_image_reply(update, context, user_message, user_info):
         return
 
     # Check if user is asking to analyze a previously sent poll
-    if await analyze_referenced_poll(update, context, user_message, user_info):
+    if await analyze_poll_reply(update, context, user_message, user_info):
         return
 
-    await send_typing_action(context, update.effective_chat.id, user_info)
+    await send_typing(context, update.effective_chat.id, user_info)
 
     user_name = update.effective_user.first_name or ""
 
     # Get response from AI
-    response = await get_ai_response(user_message, user_name, user_info, update.effective_user.id)
+    response = await get_response(user_message, user_name, user_info, update.effective_user.id)
 
-    log_with_user_info("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
+    log_action("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
 
     # Send response (no effects for Gemini responses)
     await update.message.reply_text(response)
 
-    log_with_user_info("INFO", "✅ Text message response sent successfully", user_info)
+    log_action("INFO", "✅ Text message response sent successfully", user_info)
 
 
 # Handles incoming image messages
-async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle image messages with AI analysis using Gemini 2.5 Flash"""
-    user_info = extract_user_info(update.message)
-    log_with_user_info("INFO", "📷 Image message received", user_info)
+    user_info = get_user_info(update.message)
+    log_action("INFO", "📷 Image message received", user_info)
 
     # React to the message to show the bot is "thinking"
     try:
         emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["love"])
-        await send_animated_reaction(
+        await send_big_reaction(
             chat_id=update.effective_chat.id,
             message_id=update.message.message_id,
             emoji=emoji_to_react
         )
-        log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for image", user_info)
+        log_action("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for image", user_info)
     except Exception as e:
-        log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for image: {e}", user_info)
+        log_action("WARNING", f"⚠️ Could not send analysis reaction for image: {e}", user_info)
 
-    await send_typing_action(context, update.effective_chat.id, user_info)
+    await send_typing(context, update.effective_chat.id, user_info)
 
     try:
         # Get the largest photo
@@ -3216,87 +3216,87 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
         # Download the image
         image_bytes = await file.download_as_bytearray()
 
-        log_with_user_info("DEBUG", f"📥 Image downloaded: {len(image_bytes)} bytes", user_info)
+        log_action("DEBUG", f"📥 Image downloaded: {len(image_bytes)} bytes", user_info)
 
         # Analyze image with AI
         user_name = update.effective_user.first_name or ""
         caption = update.message.caption or ""
 
-        response = await get_ai_response(caption, user_name, user_info, update.effective_user.id, image_bytes=image_bytes)
+        response = await get_response(caption, user_name, user_info, update.effective_user.id, image_bytes=image_bytes)
 
-        log_with_user_info("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
+        log_action("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
 
         # Send response (no effects for Gemini responses)
         await update.message.reply_text(response)
 
-        log_with_user_info("INFO", "✅ Image analysis response sent successfully", user_info)
+        log_action("INFO", "✅ Image analysis response sent successfully", user_info)
 
     except Exception as e:
-        log_with_user_info("ERROR", f"❌ Error analyzing image: {e}", user_info)
-        await update.message.reply_text(get_error_response())
+        log_action("ERROR", f"❌ Error analyzing image: {e}", user_info)
+        await update.message.reply_text(get_error())
 
 
 # Handles incoming poll messages
-async def handle_poll_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle poll messages with AI analysis using Gemini 2.5 Flash"""
-    user_info = extract_user_info(update.message)
-    log_with_user_info("INFO", "📊 Poll message received", user_info)
+    user_info = get_user_info(update.message)
+    log_action("INFO", "📊 Poll message received", user_info)
 
     # React to the message to show the bot is "thinking"
     try:
         emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
-        await send_animated_reaction(
+        await send_big_reaction(
             chat_id=update.effective_chat.id,
             message_id=update.message.message_id,
             emoji=emoji_to_react
         )
-        log_with_user_info("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for poll", user_info)
+        log_action("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for poll", user_info)
     except Exception as e:
-        log_with_user_info("WARNING", f"⚠️ Could not send analysis reaction for poll: {e}", user_info)
+        log_action("WARNING", f"⚠️ Could not send analysis reaction for poll: {e}", user_info)
 
-    await send_typing_action(context, update.effective_chat.id, user_info)
+    await send_typing(context, update.effective_chat.id, user_info)
 
     try:
         poll = update.message.poll
         poll_question = poll.question
         poll_options = [option.text for option in poll.options]
 
-        log_with_user_info("DEBUG", f"📊 Poll question: '{poll_question}' with {len(poll_options)} options", user_info)
+        log_action("DEBUG", f"📊 Poll question: '{poll_question}' with {len(poll_options)} options", user_info)
 
         # Analyze poll
         user_name = update.effective_user.first_name or ""
 
         response = await analyze_poll(poll_question, poll_options, user_name, user_info, update.effective_user.id)
 
-        log_with_user_info("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
+        log_action("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
 
         # Send response (no effects for Gemini responses)
         await update.message.reply_text(response)
 
-        log_with_user_info("INFO", "✅ Poll analysis response sent successfully", user_info)
+        log_action("INFO", "✅ Poll analysis response sent successfully", user_info)
 
     except Exception as e:
-        log_with_user_info("ERROR", f"❌ Error analyzing poll: {e}", user_info)
-        await update.message.reply_text(get_error_response())
+        log_action("ERROR", f"❌ Error analyzing poll: {e}", user_info)
+        await update.message.reply_text(get_error())
 
 
 # The main message handler for all incoming messages
-async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all types of messages (text, stickers, voice, photos, etc.)"""
     try:
-        user_info = extract_user_info(update.message)
+        user_info = get_user_info(update.message)
         user_id = update.effective_user.id
         chat_type = update.effective_chat.type
 
-        log_with_user_info("DEBUG", f"📨 Processing message in {chat_type}", user_info)
+        log_action("DEBUG", f"📨 Processing message in {chat_type}", user_info)
 
         # Track user and chat IDs for broadcasting
-        track_user_and_chat(update, user_info)
+        track_user(update, user_info)
 
         # Check if user is owner and in broadcast mode
         if user_id == OWNER_ID and OWNER_ID in broadcast_mode:
-            log_with_user_info("INFO", f"📢 Executing broadcast to {broadcast_mode[OWNER_ID]}", user_info)
-            await execute_broadcast_direct(update, context, broadcast_mode[OWNER_ID], user_info)
+            log_action("INFO", f"📢 Executing broadcast to {broadcast_mode[OWNER_ID]}", user_info)
+            await execute_broadcast(update, context, broadcast_mode[OWNER_ID], user_info)
             del broadcast_mode[OWNER_ID]
             return
 
@@ -3304,51 +3304,51 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         user_message = update.message.text or update.message.caption or ""
         ping_prefixes = ['?ping', '!ping', '*ping', '#ping']
         if any(user_message.lower().startswith(prefix) for prefix in ping_prefixes):
-            log_with_user_info("INFO", f"🏓 Ping command detected with prefix: {user_message}", user_info)
+            log_action("INFO", f"🏓 Ping command detected with prefix: {user_message}", user_info)
             await ping_command(update, context)
             return
 
         # Determine if bot should respond
         should_respond = True
         if chat_type in ['group', 'supergroup']:
-            should_respond = should_respond_in_group(update, context.bot.id)
+            should_respond = should_reply(update, context.bot.id)
             if not should_respond:
-                log_with_user_info("DEBUG", "🚫 Not responding to group message (no mention/reply)", user_info)
+                log_action("DEBUG", "🚫 Not responding to group message (no mention/reply)", user_info)
                 return
             else:
-                log_with_user_info("INFO", "✅ Responding to group message (mentioned/replied)", user_info)
+                log_action("INFO", "✅ Responding to group message (mentioned/replied)", user_info)
 
         # Check rate limiting (using Valkey with memory fallback)
-        if await is_rate_limited(user_id, user_info["chat_id"]):
-            log_with_user_info("WARNING", "⏱️ Rate limited - ignoring message", user_info)
+        if await check_limit(user_id, user_info["chat_id"]):
+            log_action("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
 
         # Handle contextual reactions in the background
-        asyncio.create_task(handle_contextual_reaction(update, user_info))
+        asyncio.create_task(handle_reaction(update, user_info))
 
         # Handle different message types
         if update.message.sticker:
-            await handle_sticker_message(update, context)
+            await handle_sticker(update, context)
         elif update.message.photo:
-            await handle_image_message(update, context)
+            await handle_image(update, context)
         elif update.message.poll:
-            await handle_poll_message(update, context)
+            await handle_poll(update, context)
         else:
-            await handle_text_message(update, context)
+            await handle_text(update, context)
 
         # Update response time after sending response
-        await update_user_response_time_valkey(user_id)
-        log_with_user_info("DEBUG", "⏰ Updated user response time in Valkey", user_info)
+        await update_response_time(user_id)
+        log_action("DEBUG", "⏰ Updated user response time in Valkey", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("ERROR", f"❌ Error handling message: {e}", user_info)
+        user_info = get_user_info(update.message)
+        log_action("ERROR", f"❌ Error handling message: {e}", user_info)
         if update.message.text:
-            await update.message.reply_text(get_error_response())
+            await update.message.reply_text(get_error())
 
 
 # Handles chat member updates (e.g., when the bot is blocked or removed from a group)
-async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle when a user blocks the bot or the bot is removed from a group."""
     result = update.my_chat_member
     if not result:
@@ -3360,29 +3360,29 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
     if new_status in [ChatMember.BANNED, ChatMember.LEFT]:
         if chat.type == 'private':
             logger.info(f"User {chat.id} blocked the bot. Removing from database.")
-            await remove_user_from_database(chat.id)
+            await remove_user(chat.id)
         elif chat.type in ['group', 'supergroup']:
             logger.info(f"Bot was removed from group {chat.id}. Removing from database.")
-            await remove_group_from_database(chat.id)
+            await remove_group(chat.id)
 
 
 # ERROR HANDLER
 # The main error handler for the bot
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors"""
     logger.error(f"Exception while handling an update: {context.error}")
 
     # Try to extract user info if update has a message
     if hasattr(update, 'message') and update.message:
         try:
-            user_info = extract_user_info(update.message)
-            log_with_user_info("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+            user_info = get_user_info(update.message)
+            log_action("ERROR", f"💥 Exception occurred: {context.error}", user_info)
         except:
             logger.error(f"Could not extract user info for error: {context.error}")
     elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
         try:
-            user_info = extract_user_info(update.callback_query.message)
-            log_with_user_info("ERROR", f"💥 Callback query exception: {context.error}", user_info)
+            user_info = get_user_info(update.callback_query.message)
+            log_action("ERROR", f"💥 Callback query exception: {context.error}", user_info)
         except:
             logger.error(f"Could not extract user info for callback error: {context.error}")
 
@@ -3392,11 +3392,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send an invoice for sakura flowers."""
     try:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("INFO", "🌸 /buy command received", user_info)
+        user_info = get_user_info(update.message)
+        log_action("INFO", "🌸 /buy command received", user_info)
 
         # Track user for broadcasting
-        track_user_and_chat(update, user_info)
+        track_user(update, user_info)
 
         # Step 1: React to the buy message with random emoji and animation
         if EMOJI_REACT:
@@ -3405,25 +3405,25 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_animated_reaction(
+                    reaction_sent = await send_big_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
                     )
                     if reaction_sent:
-                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                        log_action("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
                     else:
                         # Fallback to PTB reaction without animation
-                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                        await add_reaction(context, update, random_emoji, user_info)
                 else:
                     # Group chat or no Telethon - use PTB reaction
-                    await add_ptb_reaction(context, update, random_emoji, user_info)
+                    await add_reaction(context, update, random_emoji, user_info)
 
             except Exception as e:
-                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+                log_action("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
 
         # Step 1.5: Send typing action
-        await send_typing_action(context, update.effective_chat.id, user_info)
+        await send_typing(context, update.effective_chat.id, user_info)
 
         # Default to 50 stars, but allow user to specify amount
         amount = 50
@@ -3459,7 +3459,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     ) as response:
                         result = await response.json(loads=orjson.loads)
                         if result.get('ok'):
-                            log_with_user_info("INFO", f"✨ Invoice with effects sent for {amount} stars", user_info)
+                            log_action("INFO", f"✨ Invoice with effects sent for {amount} stars", user_info)
                         else:
                             # Fallback to normal invoice
                             raise Exception("Effects invoice failed")
@@ -3474,7 +3474,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     currency="XTR",  # Telegram Stars currency
                     prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
                 )
-                log_with_user_info("WARNING", f"⚠️ Invoice sent without effects (fallback) for {amount} stars", user_info)
+                log_action("WARNING", f"⚠️ Invoice sent without effects (fallback) for {amount} stars", user_info)
         else:
             # Group chat - no effects, just normal invoice
             await context.bot.send_invoice(
@@ -3486,22 +3486,22 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 currency="XTR",  # Telegram Stars currency
                 prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
             )
-            log_with_user_info("INFO", f"✅ Invoice sent for {amount} stars", user_info)
+            log_action("INFO", f"✅ Invoice sent for {amount} stars", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("ERROR", f"❌ Error sending invoice: {e}", user_info)
+        user_info = get_user_info(update.message)
+        log_action("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
 
 # Handles the /buyers command to show top supporters
 async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show all flower buyers with their donation amounts."""
     try:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("INFO", "💝 /buyers command received", user_info)
+        user_info = get_user_info(update.message)
+        log_action("INFO", "💝 /buyers command received", user_info)
 
         # Track user for broadcasting
-        track_user_and_chat(update, user_info)
+        track_user(update, user_info)
 
         # Step 1: React to the buyers message with random emoji and animation
         if EMOJI_REACT:
@@ -3510,28 +3510,28 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_animated_reaction(
+                    reaction_sent = await send_big_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
                     )
                     if reaction_sent:
-                        log_with_user_info("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
+                        log_action("DEBUG", f"🎭 Added animated emoji reaction: {random_emoji}", user_info)
                     else:
                         # Fallback to PTB reaction without animation
-                        await add_ptb_reaction(context, update, random_emoji, user_info)
+                        await add_reaction(context, update, random_emoji, user_info)
                 else:
                     # Group chat or no Telethon - use PTB reaction
-                    await add_ptb_reaction(context, update, random_emoji, user_info)
+                    await add_reaction(context, update, random_emoji, user_info)
 
             except Exception as e:
-                log_with_user_info("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+                log_action("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
 
         # Step 2: Send typing action
-        await send_typing_action(context, update.effective_chat.id, user_info)
+        await send_typing(context, update.effective_chat.id, user_info)
 
         # Get all purchases from database
-        purchases = await get_all_purchases()
+        purchases = await get_purchases()
 
         if not purchases:
             no_buyers_text = (
@@ -3559,21 +3559,21 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         ) as response:
                             result = await response.json(loads=orjson.loads)
                             if result.get('ok'):
-                                log_with_user_info("INFO", "✨ No buyers message with effects sent successfully", user_info)
+                                log_action("INFO", "✨ No buyers message with effects sent successfully", user_info)
                             else:
                                 # Fallback to normal PTB message if effects fail
                                 await update.message.reply_text(
                                     no_buyers_text,
                                     parse_mode=ParseMode.HTML
                                 )
-                                log_with_user_info("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
+                                log_action("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
                 except Exception:
                     # Fallback to normal PTB message if effects fail
                     await update.message.reply_text(
                         no_buyers_text,
                         parse_mode=ParseMode.HTML
                     )
-                    log_with_user_info("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
+                    log_action("WARNING", "⚠️ No buyers message sent without effects (fallback)", user_info)
             else:
                 # Group chat - no effects, just normal message
                 await update.message.reply_text(
@@ -3581,7 +3581,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     parse_mode=ParseMode.HTML
                 )
 
-            log_with_user_info("INFO", "✅ No buyers found message sent", user_info)
+            log_action("INFO", "✅ No buyers found message sent", user_info)
             return
 
         # Build the buyers list
@@ -3636,7 +3636,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     ) as response:
                         result = await response.json(loads=orjson.loads)
                         if result.get('ok'):
-                            log_with_user_info("INFO", f"✨ Buyers list with effects sent with {len(purchases)} buyers", user_info)
+                            log_action("INFO", f"✨ Buyers list with effects sent with {len(purchases)} buyers", user_info)
                         else:
                             # Fallback to normal PTB message if effects fail
                             await update.message.reply_text(
@@ -3644,7 +3644,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                 parse_mode=ParseMode.HTML,
                                 disable_web_page_preview=True
                             )
-                            log_with_user_info("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
+                            log_action("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
             except Exception:
                 # Fallback to normal PTB message if effects fail
                 await update.message.reply_text(
@@ -3652,7 +3652,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True
                 )
-                log_with_user_info("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
+                log_action("WARNING", f"⚠️ Buyers list sent without effects (fallback) with {len(purchases)} buyers", user_info)
         else:
             # Group chat - no effects, just normal message
             await update.message.reply_text(
@@ -3660,11 +3660,11 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
-            log_with_user_info("INFO", f"✅ Buyers list sent with {len(purchases)} buyers", user_info)
+            log_action("INFO", f"✅ Buyers list sent with {len(purchases)} buyers", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("ERROR", f"❌ Error in buyers command: {e}", user_info)
+        user_info = get_user_info(update.message)
+        log_action("ERROR", f"❌ Error in buyers command: {e}", user_info)
         await update.message.reply_text("❌ Something went wrong getting the buyers list. Try again later! 🔧")
 
 
@@ -3672,28 +3672,28 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Hidden owner command to show bot statistics with refresh functionality"""
     try:
-        user_info = extract_user_info(update.message)
+        user_info = get_user_info(update.message)
 
         # Check if user is owner
         if update.effective_user.id != OWNER_ID:
-            log_with_user_info("WARNING", "⚠️ Non-owner attempted /stats command", user_info)
+            log_action("WARNING", "⚠️ Non-owner attempted /stats command", user_info)
             return
 
-        log_with_user_info("INFO", "📊 /stats command received from owner", user_info)
+        log_action("INFO", "📊 /stats command received from owner", user_info)
 
         # Send stats with refresh button
-        await send_stats_message(update.message.chat.id, context, is_refresh=False)
+        await send_stats(update.message.chat.id, context, is_refresh=False)
 
-        log_with_user_info("INFO", "✅ Bot statistics sent to owner", user_info)
+        log_action("INFO", "✅ Bot statistics sent to owner", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(update.message)
-        log_with_user_info("ERROR", f"❌ Error in /stats command: {e}", user_info)
+        user_info = get_user_info(update.message)
+        log_action("ERROR", f"❌ Error in /stats command: {e}", user_info)
         await update.message.reply_text("❌ Something went wrong getting bot statistics!")
 
 
 # Sends the statistics message
-async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refresh: bool = False) -> None:
+async def send_stats(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refresh: bool = False) -> None:
     """Send or update stats message with current data"""
     try:
         # Calculate ping to Telegram servers
@@ -3806,7 +3806,7 @@ async def send_stats_message(chat_id: int, context: ContextTypes.DEFAULT_TYPE, i
 
 
 # Handles the refresh callback for the /stats command
-async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def stats_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle stats refresh button callback"""
     query = update.callback_query
     if query.message.chat.type in ['group', 'supergroup']:
@@ -3820,21 +3820,21 @@ async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
             return
 
     try:
-        user_info = extract_user_info(query.message)
+        user_info = get_user_info(query.message)
 
         # Check if user is owner
         if query.from_user.id != OWNER_ID:
-            log_with_user_info("WARNING", "⚠️ Non-owner attempted stats refresh", user_info)
+            log_action("WARNING", "⚠️ Non-owner attempted stats refresh", user_info)
             await query.answer("You're not authorized to use this 🚫", show_alert=True)
             return
 
-        log_with_user_info("INFO", "🔄 Stats refresh callback received from owner", user_info)
+        log_action("INFO", "🔄 Stats refresh callback received from owner", user_info)
 
         # Answer the callback
         await query.answer("🔄 Refreshing statistics...", show_alert=False)
 
         # Get updated stats
-        stats_message, reply_markup = await send_stats_message(query.message.chat.id, context, is_refresh=True)
+        stats_message, reply_markup = await send_stats(query.message.chat.id, context, is_refresh=True)
 
         # Update the message
         await query.edit_message_text(
@@ -3844,11 +3844,11 @@ async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
             disable_web_page_preview=True
         )
 
-        log_with_user_info("INFO", "✅ Stats refreshed successfully", user_info)
+        log_action("INFO", "✅ Stats refreshed successfully", user_info)
 
     except Exception as e:
-        user_info = extract_user_info(query.message) if query.message else {}
-        log_with_user_info("ERROR", f"❌ Error refreshing stats: {e}", user_info)
+        user_info = get_user_info(query.message) if query.message else {}
+        log_action("ERROR", f"❌ Error refreshing stats: {e}", user_info)
         try:
             await query.answer("❌ Error refreshing statistics!", show_alert=True)
         except:
@@ -3856,7 +3856,7 @@ async def stats_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # Retrieves user information from the database by user ID or username
-async def get_user_info_by_identifier(identifier: str) -> tuple:
+async def find_user(identifier: str) -> tuple:
     """Get user info by user ID or username from database"""
     if not db_pool:
         return None, None
@@ -3889,7 +3889,7 @@ async def get_user_info_by_identifier(identifier: str) -> tuple:
 
 
 # Handles the pre-checkout query for payments
-async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def precheckout_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Answer the PreCheckoutQuery."""
     query = update.pre_checkout_query
 
@@ -3903,18 +3903,18 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # Handles successful payments
-async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle successful payment - refund if 10 stars or less, otherwise process normally."""
     payment = update.message.successful_payment
     user_id = update.message.from_user.id
     amount = payment.total_amount
-    user_info = extract_user_info(update.message)
+    user_info = get_user_info(update.message)
 
-    log_with_user_info("INFO", f"💰 Payment received for {amount} stars", user_info)
+    log_action("INFO", f"💰 Payment received for {amount} stars", user_info)
 
     # Save purchase to database for amounts > 10 stars (not refunded)
     if amount > 10:
-        save_purchase_to_database_async(
+        save_purchase(
             user_id=user_id,
             username=user_info.get("username"),
             first_name=user_info.get("first_name"),
@@ -3925,7 +3925,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
 
     # Check if amount is 10 stars or less
     if amount <= 10:
-        log_with_user_info("INFO", f"🔄 Refunding payment of {amount} stars (kindness gesture)", user_info)
+        log_action("INFO", f"🔄 Refunding payment of {amount} stars (kindness gesture)", user_info)
 
         # Wait 4 seconds after payment
         await asyncio.sleep(4)
@@ -3972,27 +3972,27 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                         ) as response:
                             result = await response.json(loads=orjson.loads)
                             if result.get('ok'):
-                                log_with_user_info("INFO", "✨ Refund message with effects sent successfully", user_info)
+                                log_action("INFO", "✨ Refund message with effects sent successfully", user_info)
                             else:
                                 # Fallback to normal PTB message if effects fail
                                 await update.message.reply_text(refund_msg, reply_markup=reply_markup)
-                                log_with_user_info("WARNING", "⚠️ Refund message sent without effects (fallback)", user_info)
+                                log_action("WARNING", "⚠️ Refund message sent without effects (fallback)", user_info)
                 except Exception:
                     # Fallback to normal PTB message if effects fail
                     await update.message.reply_text(refund_msg, reply_markup=reply_markup)
-                    log_with_user_info("WARNING", "⚠️ Refund message sent without effects (fallback)", user_info)
+                    log_action("WARNING", "⚠️ Refund message sent without effects (fallback)", user_info)
             else:
                 # Group chat - no effects, just normal message
                 await update.message.reply_text(refund_msg, reply_markup=reply_markup)
 
-            log_with_user_info("INFO", "✅ Refund completed successfully", user_info)
+            log_action("INFO", "✅ Refund completed successfully", user_info)
 
         except Exception as e:
-            log_with_user_info("ERROR", f"❌ Error refunding payment: {e}", user_info)
+            log_action("ERROR", f"❌ Error refunding payment: {e}", user_info)
             await update.message.reply_text("❌ Sorry, there was an issue processing your refund. Please contact support.")
 
     else:
-        log_with_user_info("INFO", f"✅ Processing payment of {amount} stars (no refund)", user_info)
+        log_action("INFO", f"✅ Processing payment of {amount} stars (no refund)", user_info)
 
         # Wait 4 seconds after payment
         await asyncio.sleep(4)
@@ -4032,25 +4032,25 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                     ) as response:
                         result = await response.json(loads=orjson.loads)
                         if result.get('ok'):
-                            log_with_user_info("INFO", "✨ Thank you message with effects sent successfully", user_info)
+                            log_action("INFO", "✨ Thank you message with effects sent successfully", user_info)
                         else:
                             # Fallback to normal PTB message if effects fail
                             await update.message.reply_text(success_msg, reply_markup=reply_markup)
-                            log_with_user_info("WARNING", "⚠️ Thank you message sent without effects (fallback)", user_info)
+                            log_action("WARNING", "⚠️ Thank you message sent without effects (fallback)", user_info)
             except Exception:
                 # Fallback to normal PTB message if effects fail
                 await update.message.reply_text(success_msg, reply_markup=reply_markup)
-                log_with_user_info("WARNING", "⚠️ Thank you message sent without effects (fallback)", user_info)
+                log_action("WARNING", "⚠️ Thank you message sent without effects (fallback)", user_info)
         else:
             # Group chat - no effects, just normal message
             await update.message.reply_text(success_msg, reply_markup=reply_markup)
 
-        log_with_user_info("INFO", "✅ Payment processed successfully", user_info)
+        log_action("INFO", "✅ Payment processed successfully", user_info)
 
 
 # BOT SETUP FUNCTIONS
 # Sets up the bot's commands
-async def setup_bot_commands(application: Application) -> None:
+async def setup_commands(application: Application) -> None:
     """Setup bot commands menu"""
     try:
         await application.bot.set_my_commands(COMMANDS)
@@ -4078,24 +4078,24 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))
     application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_"))
     application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_|^get_flowers_again$"))
-    application.add_handler(CallbackQueryHandler(stats_refresh_callback, pattern="^refresh_stats$"))
+    application.add_handler(CallbackQueryHandler(stats_refresh, pattern="^refresh_stats$"))
 
     # Payment handlers
-    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
+    application.add_handler(PreCheckoutQueryHandler(precheckout_query))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
 
     # Message handler for all message types
     application.add_handler(MessageHandler(
         filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE |
         filters.PHOTO | filters.Document.ALL | filters.POLL & ~filters.COMMAND,
-        handle_all_messages
+        handle_messages
     ))
 
     # Chat member handler to track when bot is added/removed from chats
-    application.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
+    application.add_handler(ChatMemberHandler(handle_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
 
     # Error handler
-    application.add_error_handler(error_handler)
+    application.add_error_handler(handle_error)
 
     logger.info("✅ All handlers setup completed")
 
@@ -4119,22 +4119,22 @@ def run_bot() -> None:
         global cleanup_task
 
         # Initialize Valkey
-        valkey_success = await init_valkey()
+        valkey_success = await connect_cache()
         if not valkey_success:
             logger.warning("⚠️ Valkey initialization failed. Bot will continue with memory fallback.")
 
         # Initialize database
-        db_success = await init_database()
+        db_success = await connect_database()
         if not db_success:
             logger.error("❌ Database initialization failed. Bot will continue without persistence.")
 
         # Start Telethon effects client
-        await start_effects_client()
+        await start_effects()
 
-        await setup_bot_commands(app)
+        await setup_commands(app)
 
         # Start conversation cleanup task and store reference
-        cleanup_task = asyncio.create_task(cleanup_old_conversations())
+        cleanup_task = asyncio.create_task(cleanup_conversations())
 
         logger.info("🌸 Sakura Bot initialization completed!")
 
@@ -4154,8 +4154,8 @@ def run_bot() -> None:
                 logger.error(f"❌ Error cancelling cleanup task: {e}")
 
         await close_database()
-        await close_valkey()
-        await stop_effects_client()
+        await close_cache()
+        await stop_effects()
         logger.info("🌸 Sakura Bot shutdown completed!")
 
     application.post_init = post_init
@@ -4187,7 +4187,7 @@ class DummyHandler(BaseHTTPRequestHandler):
 
 
 # Starts the dummy HTTP server
-def start_dummy_server() -> None:
+def start_server() -> None:
     """Start dummy HTTP server for deployment platforms"""
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), DummyHandler)
@@ -4213,7 +4213,7 @@ def main() -> None:
         logger.info("🌸 Sakura Bot starting up...")
 
         # Start dummy server in background thread
-        threading.Thread(target=start_dummy_server, daemon=True).start()
+        threading.Thread(target=start_server, daemon=True).start()
 
         # Run the bot
         run_bot()
