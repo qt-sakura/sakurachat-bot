@@ -2349,7 +2349,7 @@ async def openrouter_poll(poll_question: str, poll_options: list, user_name: str
         log_action("DEBUG", f"📊 Analyzing poll with OpenRouter: '{poll_question[:50]}...'", user_info)
 
     try:
-        history = await get_conversation_history_list(user_id)
+        history = await get_history(user_id)
         messages = []
 
         # Determine which prompt to use
