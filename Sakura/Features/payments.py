@@ -4,15 +4,16 @@ import aiohttp
 import orjson
 from telegram import Update, LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 from Sakura.Core.config import BOT_TOKEN
-from Sakura.Core.helpers import fetch_user, log_action
+from Sakura.Core.helpers import fetch_user, log_action, get_error
 from Sakura.Core.logging import logger
 from Sakura.Features.tracking import track_user
 from Sakura.Interface.effects import animate_reaction, add_reaction, send_effect, EFFECTS
 from Sakura.Interface.reactions import EMOJI_REACT
 from Sakura.Interface.typing import send_typing
 from Sakura.Interface.messages import INVOICE_DESCRIPTIONS, THANK_YOU_MESSAGES, REFUND_MESSAGES
-from Sakura.Storage.database import save_purchase
+from Sakura.Storage.database import save_purchase, get_purchases
 from Sakura.Storage.storage import PAYMENT_STICKERS
 from Sakura import state
 
@@ -53,6 +54,52 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
+
+async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show all flower buyers with their donation amounts."""
+    try:
+        user_info = fetch_user(update.message)
+        log_action("INFO", "💝 /buyers command received", user_info)
+        track_user(update, user_info)
+
+        if EMOJI_REACT:
+            try:
+                random_emoji = random.choice(EMOJI_REACT)
+                if state.effects_client and update.effective_chat.type == "private":
+                    if not await animate_reaction(update.effective_chat.id, update.message.message_id, random_emoji):
+                        await add_reaction(context, update, random_emoji, user_info)
+                else:
+                    await add_reaction(context, update, random_emoji, user_info)
+            except Exception as e:
+                log_action("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
+
+        await send_typing(context, update.effective_chat.id, user_info)
+        purchases = await get_purchases()
+
+        if not purchases:
+            no_buyers_text = (
+                "🌸 <b>Flower Buyers</b>\n\n"
+                "No one has bought flowers yet! Be the first to support with /buy 💝"
+            )
+            await update.message.reply_text(no_buyers_text, parse_mode=ParseMode.HTML)
+            return
+
+        buyers_text = "🌸 <b>Flower Buyers</b>\n\n"
+        buyers_text += "💝 <i>Thank you to all our wonderful supporters!</i>\n\n"
+        for i, purchase in enumerate(purchases, 1):
+            user_mention = f'<a href="tg://user?id={purchase["user_id"]}">{purchase["first_name"] or "Anonymous"}</a>'
+            rank_emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+            buyers_text += f"{rank_emoji} {user_mention} - {purchase['total_amount']} ⭐"
+            if purchase['purchase_count'] > 1:
+                buyers_text += f" ({purchase['purchase_count']} purchases)"
+            buyers_text += "\n"
+        buyers_text += f"\n🌸 <i>Total buyers: {len(purchases)}</i>"
+        await update.message.reply_text(buyers_text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+
+    except Exception as e:
+        user_info = fetch_user(update.message)
+        log_action("ERROR", f"❌ Error in buyers command: {e}", user_info)
+        await update.message.reply_text(get_error())
 
 async def send_invoice(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: dict, amount: int):
     """Sends a payment invoice."""
