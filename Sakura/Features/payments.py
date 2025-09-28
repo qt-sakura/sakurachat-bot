@@ -81,7 +81,11 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "🌸 <b>Flower Buyers</b>\n\n"
                 "No one has bought flowers yet! Be the first to support with /buy 💝"
             )
-            await update.message.reply_text(no_buyers_text, parse_mode=ParseMode.HTML)
+            if update.message.chat.type == "private":
+                if not await send_effect(update.message.chat.id, no_buyers_text):
+                    await update.message.reply_text(no_buyers_text, parse_mode=ParseMode.HTML)
+            else:
+                await update.message.reply_text(no_buyers_text, parse_mode=ParseMode.HTML)
             return
 
         buyers_text = "🌸 <b>Flower Buyers</b>\n\n"
@@ -94,7 +98,12 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 buyers_text += f" ({purchase['purchase_count']} purchases)"
             buyers_text += "\n"
         buyers_text += f"\n🌸 <i>Total buyers: {len(purchases)}</i>"
-        await update.message.reply_text(buyers_text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+
+        if update.message.chat.type == "private":
+            if not await send_effect(update.message.chat.id, buyers_text):
+                await update.message.reply_text(buyers_text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        else:
+            await update.message.reply_text(buyers_text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
     except Exception as e:
         user_info = fetch_user(update.message)
