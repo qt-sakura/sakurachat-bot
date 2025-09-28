@@ -13,8 +13,8 @@ from Sakura import state
 from Sakura.Core.config import OWNER_ID
 from Sakura.Interface.commands import ping_command
 from Sakura.Interface.stickers import handle_sticker
-from Sakura.Interface.image_handler import handle_image
-from Sakura.Interface.poll_handler import handle_poll
+from Sakura.Interface.image import handle_image
+from Sakura.Interface.poll import handle_poll
 from Sakura.Features.tracking import track_user
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
