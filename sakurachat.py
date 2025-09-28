@@ -919,7 +919,7 @@ async def send_effect(chat_id: int, text: str, reply_markup=None) -> bool:
         return False
 
 # Sends an animated emoji reaction to a message
-async def send_big_reaction(chat_id: int, message_id: int, emoji: str) -> bool:
+async def animate_reaction(chat_id: int, message_id: int, emoji: str) -> bool:
     """Send animated emoji reaction using direct API call"""
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMessageReaction"
@@ -984,7 +984,7 @@ async def add_reaction(context, update, emoji: str, user_info: Dict[str, any]):
         log_action("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
 
 # Sends a photo with a random effect
-async def send_effect_photo(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
+async def photo_effect(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
     """Send photo message with random effect using direct API"""
     if not effects_client:
         logger.warning("⚠️ Telethon effects client not available")
@@ -1591,7 +1591,7 @@ async def remove_group(group_id: int):
 
 # UTILITY FUNCTIONS
 # Extracts user and chat information from a message
-def get_user_info(msg: Message) -> Dict[str, any]:
+def fetch_user(msg: Message) -> Dict[str, any]:
     """Extract user and chat information from message"""
     logger.debug("🔍 Extracting user information from message")
     u = msg.from_user
@@ -1675,7 +1675,7 @@ def validate_config() -> bool:
 
 
 # Updates the last response time for a user in Valkey
-async def update_response_time(user_id: int) -> None:
+async def log_response(user_id: int) -> None:
     """Update the last response time for user in Valkey"""
     if valkey_client:
         try:
@@ -1782,7 +1782,7 @@ async def handle_reaction(update: Update, user_info: Dict[str, any]):
             log_action("INFO", f"🥰 Selected emoji for reaction: {emoji_to_react}", user_info)
 
             # Send the animated reaction
-            await send_big_reaction(
+            await animate_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
                 emoji=emoji_to_react
@@ -1959,7 +1959,7 @@ async def get_response(user_message: str, user_name: str = "", user_info: Dict[s
         log_action("INFO", "🤖 Falling back to Gemini API", user_info)
         source_api = "Gemini"
         if image_bytes:
-            response = await analyze_image_gemini(image_bytes, user_message, user_name, user_info, user_id)
+            response = await analyze_image(image_bytes, user_message, user_name, user_info, user_id)
         else:
             response = await gemini_response(user_message, user_name, user_info, user_id)
 
@@ -2090,7 +2090,7 @@ async def gemini_response(user_message: str, user_name: str = "", user_info: Dic
 
 
 # Analyzes an image using the Gemini API
-async def analyze_image_gemini(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
+async def analyze_image(image_bytes: bytes, caption: str, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
     """Analyze image using Gemini 2.5 Flash with conversation context"""
     if user_info:
         log_action("DEBUG", f"🖼️ Analyzing image with Gemini: {len(image_bytes)} bytes", user_info)
@@ -2158,7 +2158,7 @@ Sakura's response:"""
 
 
 # Analyzes a poll that was referenced in a message
-async def analyze_poll_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
+async def reply_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent poll and handle it"""
     # Check if message contains requests for poll analysis
     message_lower = user_message.lower()
@@ -2177,13 +2177,13 @@ async def analyze_poll_reply(update: Update, context: ContextTypes.DEFAULT_TYPE,
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
             # React to the user's message
-            await send_big_reaction(
+            await animate_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
                 emoji=emoji_to_react
             )
             # React to the original poll message as well
-            await send_big_reaction(
+            await animate_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.reply_to_message.message_id,
                 emoji=emoji_to_react
@@ -2257,7 +2257,7 @@ async def analyze_poll(poll_question: str, poll_options: list, user_name: str = 
 
 
 # Analyzes an image that was referenced in a message
-async def analyze_image_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
+async def reply_image(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: Dict[str, any]) -> bool:
     """Check if user is asking to analyze a previously sent image and handle it"""
     # Check if message contains requests for image analysis
     message_lower = user_message.lower()
@@ -2276,13 +2276,13 @@ async def analyze_image_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["love"])
             # React to the user's message
-            await send_big_reaction(
+            await animate_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
                 emoji=emoji_to_react
             )
             # React to the original image message as well
-            await send_big_reaction(
+            await animate_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.reply_to_message.message_id,
                 emoji=emoji_to_react
@@ -2475,14 +2475,14 @@ async def send_typing(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_inf
 
 
 # Sends the "uploading photo" action in a chat
-async def send_photo_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
+async def photo_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send upload photo action"""
     log_action("DEBUG", "📷 Sending photo upload action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
 
 
 # Sends the "choosing sticker" action in a chat
-async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
+async def sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: Dict[str, any]) -> None:
     """Send choosing sticker action"""
     log_action("DEBUG", "🎭 Sending sticker choosing action", user_info)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.CHOOSE_STICKER)
@@ -2490,7 +2490,7 @@ async def send_sticker_action(context: ContextTypes.DEFAULT_TYPE, chat_id: int, 
 
 # KEYBOARD CREATION FUNCTIONS
 # Creates the initial keyboard for the /start command
-def create_start_menu() -> InlineKeyboardMarkup:
+def start_menu() -> InlineKeyboardMarkup:
     """Create initial start keyboard with Info and Hi buttons"""
     keyboard = [
         [
@@ -2502,7 +2502,7 @@ def create_start_menu() -> InlineKeyboardMarkup:
 
 
 # Creates the keyboard for the "info" section of the /start command
-def create_info_menu(bot_username: str) -> InlineKeyboardMarkup:
+def info_menu(bot_username: str) -> InlineKeyboardMarkup:
     """Create inline keyboard for start info (original start buttons)"""
     keyboard = [
         [
@@ -2518,19 +2518,19 @@ def create_info_menu(bot_username: str) -> InlineKeyboardMarkup:
 
 
 # Gets the initial caption for the /start command
-def get_start_text(user_mention: str) -> str:
+def start_text(user_mention: str) -> str:
     """Get initial caption text for start command with user mention"""
     return START_MESSAGES["initial_caption"].format(user_mention=user_mention)
 
 
 # Gets the caption for the "info" section of the /start command
-def get_info_text(user_mention: str) -> str:
+def info_text(user_mention: str) -> str:
     """Get info caption text for start command with user mention"""
     return START_MESSAGES["info_caption"].format(user_mention=user_mention)
 
 
 # Creates the keyboard for the /help command
-def create_help_menu(expanded: bool = False) -> InlineKeyboardMarkup:
+def help_menu(expanded: bool = False) -> InlineKeyboardMarkup:
     """Create help command keyboard"""
     if expanded:
         button_text = HELP_MESSAGES["button_texts"]["minimize"]
@@ -2544,7 +2544,7 @@ def create_help_menu(expanded: bool = False) -> InlineKeyboardMarkup:
 
 
 # Gets the text for the /help command
-def get_help_text(user_mention: str, expanded: bool = False) -> str:
+def help_text(user_mention: str, expanded: bool = False) -> str:
     """Get help text based on expansion state with user mention"""
     if expanded:
         return HELP_MESSAGES["expanded"].format(user_mention=user_mention)
@@ -2553,7 +2553,7 @@ def get_help_text(user_mention: str, expanded: bool = False) -> str:
 
 
 # Creates the keyboard for the /broadcast command
-def create_broadcast_menu() -> InlineKeyboardMarkup:
+def broadcast_menu() -> InlineKeyboardMarkup:
     """Create broadcast target selection keyboard"""
     keyboard = [
         [
@@ -2571,7 +2571,7 @@ def create_broadcast_menu() -> InlineKeyboardMarkup:
 
 
 # Gets the text for the /broadcast command
-def get_broadcast_text() -> str:
+def broadcast_text() -> str:
     """Get broadcast command text"""
     return BROADCAST_MESSAGES["select_target"].format(
         users_count=len(user_ids),
@@ -2584,7 +2584,7 @@ def get_broadcast_text() -> str:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command with two-step inline buttons and effects in private chat"""
     try:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("INFO", "🌸 /start command received", user_info)
 
         track_user(update, user_info)
@@ -2596,7 +2596,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_big_reaction(
+                    reaction_sent = await animate_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
@@ -2615,7 +2615,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         # Step 2: Send random sticker (only in private chat)
         if update.effective_chat.type == "private" and START_STICKERS:
-            await send_sticker_action(context, update.effective_chat.id, user_info)
+            await sticker_action(context, update.effective_chat.id, user_info)
 
             random_sticker = random.choice(START_STICKERS)
             log_action("DEBUG", f"🎭 Sending start sticker: {random_sticker}", user_info)
@@ -2627,19 +2627,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             log_action("INFO", "✅ Start sticker sent successfully", user_info)
 
         # Step 3: Send the initial welcome message with photo and two-step buttons
-        await send_photo_action(context, update.effective_chat.id, user_info)
+        await photo_action(context, update.effective_chat.id, user_info)
 
         random_image = random.choice(SAKURA_IMAGES)
-        keyboard = create_start_menu()
+        keyboard = start_menu()
         user_mention = get_mention(update.effective_user)
-        caption = get_start_text(user_mention)
+        caption = start_text(user_mention)
 
         log_action("DEBUG", f"📷 Sending initial start photo: {random_image[:50]}...", user_info)
 
         # Send with effects if in private chat
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main start message
-            effect_sent = await send_effect_photo(
+            effect_sent = await photo_effect(
                 update.effective_chat.id,
                 random_image,
                 caption,
@@ -2670,7 +2670,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         log_action("INFO", "✅ Start command completed successfully", user_info)
 
     except Exception as e:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error in start command: {e}", user_info)
         await update.message.reply_text(get_error())
 
@@ -2679,7 +2679,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /help command with random image and effects in private chat"""
     try:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("INFO", "ℹ️ /help command received", user_info)
 
         track_user(update, user_info)
@@ -2691,7 +2691,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_big_reaction(
+                    reaction_sent = await animate_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
@@ -2709,12 +2709,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 log_action("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
 
         # Step 2: Send photo action indicator
-        await send_photo_action(context, update.effective_chat.id, user_info)
+        await photo_action(context, update.effective_chat.id, user_info)
 
         # Step 3: Prepare help content
-        keyboard = create_help_menu(expanded=False)
+        keyboard = help_menu(expanded=False)
         user_mention = get_mention(update.effective_user)
-        help_text = get_help_text(user_mention, expanded=False)
+        help_text = help_text(user_mention, expanded=False)
 
         # Step 4: Send help message with random image
         random_image = random.choice(SAKURA_IMAGES)
@@ -2723,7 +2723,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # Send with effects if in private chat
         if update.effective_chat.type == "private":
             # Use Telethon effects for the main help message
-            effect_sent = await send_effect_photo(
+            effect_sent = await photo_effect(
                 update.effective_chat.id,
                 random_image,
                 help_text,
@@ -2754,7 +2754,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         log_action("INFO", "✅ Help command completed successfully", user_info)
 
     except Exception as e:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error in help command: {e}", user_info)
         await update.message.reply_text(get_error())
 
@@ -2762,7 +2762,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # Handles the /broadcast command (owner only)
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle broadcast command (owner only)"""
-    user_info = get_user_info(update.message)
+    user_info = fetch_user(update.message)
 
     if update.effective_user.id != OWNER_ID:
         log_action("WARNING", "⚠️ Non-owner attempted broadcast command", user_info)
@@ -2778,8 +2778,8 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_ids.update(db_users)
     group_ids.update(db_groups)
 
-    keyboard = create_broadcast_menu()
-    broadcast_text = get_broadcast_text()
+    keyboard = broadcast_menu()
+    broadcast_text = broadcast_text()
 
     await update.message.reply_text(
         broadcast_text,
@@ -2793,7 +2793,7 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # Handles the /ping command
 async def ping_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle ping command for everyone"""
-    user_info = get_user_info(update.message)
+    user_info = fetch_user(update.message)
     log_action("INFO", "🏓 Ping command received", user_info)
 
     start_time = time.time()
@@ -2832,7 +2832,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         query = update.callback_query
-        user_info = get_user_info(query.message)
+        user_info = fetch_user(query.message)
         log_action("INFO", f"🌸 Start callback received: {query.data}", user_info)
 
         user_mention = get_mention(update.effective_user)
@@ -2842,8 +2842,8 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await query.answer(START_MESSAGES["callback_answers"]["info"], show_alert=False)
 
             # Show info with original start buttons
-            keyboard = create_info_menu(context.bot.username)
-            caption = get_info_text(user_mention)
+            keyboard = info_menu(context.bot.username)
+            caption = info_text(user_mention)
 
             await query.edit_message_caption(
                 caption=caption,
@@ -2887,7 +2887,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             log_action("INFO", "✅ Hi message sent from Sakura", user_info)
 
     except Exception as e:
-        user_info = get_user_info(query.message) if query.message else {}
+        user_info = fetch_user(query.message) if query.message else {}
         log_action("ERROR", f"❌ Error in start callback: {e}", user_info)
         try:
             await query.answer("Something went wrong 😔", show_alert=True)
@@ -2910,7 +2910,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
 
     try:
-        user_info = get_user_info(query.message)
+        user_info = fetch_user(query.message)
         log_action("INFO", f"🔄 Help callback received: {query.data}", user_info)
 
         user_mention = get_mention(update.effective_user)
@@ -2925,8 +2925,8 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         else:
             return # Should not happen with the new pattern
 
-        keyboard = create_help_menu(expanded=expanded)
-        help_text = get_help_text(user_mention, expanded=expanded)
+        keyboard = help_menu(expanded=expanded)
+        help_text = help_text(user_mention, expanded=expanded)
 
         # Update the photo caption with new help text and keyboard
         await query.edit_message_caption(
@@ -2938,7 +2938,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         log_action("INFO", f"✅ Help message {'expanded' if expanded else 'minimized'}", user_info)
 
     except Exception as e:
-        user_info = get_user_info(query.message) if query.message else {}
+        user_info = fetch_user(query.message) if query.message else {}
         log_action("ERROR", f"❌ Error editing help message: {e}", user_info)
         # Fallback: answer the callback to prevent loading state
         try:
@@ -2961,7 +2961,7 @@ async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await query.answer("Add me first, my soul might be here but my body not! 🌸", show_alert=True)
             return
 
-    user_info = get_user_info(query.message)
+    user_info = fetch_user(query.message)
 
     # Handle "Buy flowers again" button - available for everyone
     if query.data == "get_flowers_again":
@@ -3130,10 +3130,10 @@ async def execute_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 # Handles incoming sticker messages
 async def handle_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle sticker messages"""
-    user_info = get_user_info(update.message)
+    user_info = fetch_user(update.message)
     log_action("INFO", "🎭 Sticker message received", user_info)
 
-    await send_sticker_action(context, update.effective_chat.id, user_info)
+    await sticker_action(context, update.effective_chat.id, user_info)
 
     random_sticker = random.choice(SAKURA_STICKERS)
     chat_type = update.effective_chat.type
@@ -3158,17 +3158,17 @@ async def handle_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 # Handles incoming text messages
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text and media messages with AI response and effects in private chat"""
-    user_info = get_user_info(update.message)
+    user_info = fetch_user(update.message)
     user_message = update.message.text or update.message.caption or "Media message"
 
     log_action("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
 
     # Check if user is asking to analyze a previously sent image
-    if await analyze_image_reply(update, context, user_message, user_info):
+    if await reply_image(update, context, user_message, user_info):
         return
 
     # Check if user is asking to analyze a previously sent poll
-    if await analyze_poll_reply(update, context, user_message, user_info):
+    if await reply_poll(update, context, user_message, user_info):
         return
 
     await send_typing(context, update.effective_chat.id, user_info)
@@ -3189,13 +3189,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 # Handles incoming image messages
 async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle image messages with AI analysis using Gemini 2.5 Flash"""
-    user_info = get_user_info(update.message)
+    user_info = fetch_user(update.message)
     log_action("INFO", "📷 Image message received", user_info)
 
     # React to the message to show the bot is "thinking"
     try:
         emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["love"])
-        await send_big_reaction(
+        await animate_reaction(
             chat_id=update.effective_chat.id,
             message_id=update.message.message_id,
             emoji=emoji_to_react
@@ -3239,13 +3239,13 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # Handles incoming poll messages
 async def handle_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle poll messages with AI analysis using Gemini 2.5 Flash"""
-    user_info = get_user_info(update.message)
+    user_info = fetch_user(update.message)
     log_action("INFO", "📊 Poll message received", user_info)
 
     # React to the message to show the bot is "thinking"
     try:
         emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
-        await send_big_reaction(
+        await animate_reaction(
             chat_id=update.effective_chat.id,
             message_id=update.message.message_id,
             emoji=emoji_to_react
@@ -3284,7 +3284,7 @@ async def handle_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all types of messages (text, stickers, voice, photos, etc.)"""
     try:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         user_id = update.effective_user.id
         chat_type = update.effective_chat.type
 
@@ -3337,18 +3337,18 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await handle_text(update, context)
 
         # Update response time after sending response
-        await update_response_time(user_id)
+        await log_response(user_id)
         log_action("DEBUG", "⏰ Updated user response time in Valkey", user_info)
 
     except Exception as e:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error handling message: {e}", user_info)
         if update.message.text:
             await update.message.reply_text(get_error())
 
 
 # Handles chat member updates (e.g., when the bot is blocked or removed from a group)
-async def handle_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle when a user blocks the bot or the bot is removed from a group."""
     result = update.my_chat_member
     if not result:
@@ -3375,13 +3375,13 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> No
     # Try to extract user info if update has a message
     if hasattr(update, 'message') and update.message:
         try:
-            user_info = get_user_info(update.message)
+            user_info = fetch_user(update.message)
             log_action("ERROR", f"💥 Exception occurred: {context.error}", user_info)
         except:
             logger.error(f"Could not extract user info for error: {context.error}")
     elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
         try:
-            user_info = get_user_info(update.callback_query.message)
+            user_info = fetch_user(update.callback_query.message)
             log_action("ERROR", f"💥 Callback query exception: {context.error}", user_info)
         except:
             logger.error(f"Could not extract user info for callback error: {context.error}")
@@ -3392,7 +3392,7 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> No
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send an invoice for sakura flowers."""
     try:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("INFO", "🌸 /buy command received", user_info)
 
         # Track user for broadcasting
@@ -3405,7 +3405,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_big_reaction(
+                    reaction_sent = await animate_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
@@ -3489,7 +3489,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             log_action("INFO", f"✅ Invoice sent for {amount} stars", user_info)
 
     except Exception as e:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
 
@@ -3497,7 +3497,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show all flower buyers with their donation amounts."""
     try:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("INFO", "💝 /buyers command received", user_info)
 
         # Track user for broadcasting
@@ -3510,7 +3510,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
                 # Use Telethon for animated emoji reactions
                 if effects_client and update.effective_chat.type == "private":
-                    reaction_sent = await send_big_reaction(
+                    reaction_sent = await animate_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
                         random_emoji
@@ -3663,7 +3663,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             log_action("INFO", f"✅ Buyers list sent with {len(purchases)} buyers", user_info)
 
     except Exception as e:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error in buyers command: {e}", user_info)
         await update.message.reply_text("❌ Something went wrong getting the buyers list. Try again later! 🔧")
 
@@ -3672,7 +3672,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Hidden owner command to show bot statistics with refresh functionality"""
     try:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
 
         # Check if user is owner
         if update.effective_user.id != OWNER_ID:
@@ -3687,7 +3687,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         log_action("INFO", "✅ Bot statistics sent to owner", user_info)
 
     except Exception as e:
-        user_info = get_user_info(update.message)
+        user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error in /stats command: {e}", user_info)
         await update.message.reply_text("❌ Something went wrong getting bot statistics!")
 
@@ -3820,7 +3820,7 @@ async def stats_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
 
     try:
-        user_info = get_user_info(query.message)
+        user_info = fetch_user(query.message)
 
         # Check if user is owner
         if query.from_user.id != OWNER_ID:
@@ -3847,7 +3847,7 @@ async def stats_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         log_action("INFO", "✅ Stats refreshed successfully", user_info)
 
     except Exception as e:
-        user_info = get_user_info(query.message) if query.message else {}
+        user_info = fetch_user(query.message) if query.message else {}
         log_action("ERROR", f"❌ Error refreshing stats: {e}", user_info)
         try:
             await query.answer("❌ Error refreshing statistics!", show_alert=True)
@@ -3908,7 +3908,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     payment = update.message.successful_payment
     user_id = update.message.from_user.id
     amount = payment.total_amount
-    user_info = get_user_info(update.message)
+    user_info = fetch_user(update.message)
 
     log_action("INFO", f"💰 Payment received for {amount} stars", user_info)
 
@@ -4092,7 +4092,7 @@ def setup_handlers(application: Application) -> None:
     ))
 
     # Chat member handler to track when bot is added/removed from chats
-    application.add_handler(ChatMemberHandler(handle_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
+    application.add_handler(ChatMemberHandler(handle_member, ChatMemberHandler.MY_CHAT_MEMBER))
 
     # Error handler
     application.add_error_handler(handle_error)
