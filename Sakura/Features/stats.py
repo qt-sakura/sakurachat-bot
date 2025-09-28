@@ -5,9 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from Sakura.Core.helpers import fetch_user, log_action
 from Sakura.Core.config import OWNER_ID
-from Sakura.Storage.database import db_pool
-from Sakura.application import user_ids, group_ids, conversation_history
-
+from Sakura import state
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Hidden owner command to show bot statistics with refresh functionality"""
@@ -25,7 +23,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         user_info = fetch_user(update.message)
         log_action("ERROR", f"❌ Error in /stats command: {e}", user_info)
         await update.message.reply_text("❌ Something went wrong getting bot statistics!")
-
 
 async def send_stats(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refresh: bool = False):
     """Send or update stats message with current data"""
@@ -50,16 +47,16 @@ async def send_stats(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refres
         memory = psutil.virtual_memory()
 
         db_stats = {
-            'users_count': len(user_ids),
-            'groups_count': len(group_ids),
+            'users_count': len(state.user_ids),
+            'groups_count': len(state.group_ids),
             'total_purchases': 0,
             'total_revenue': 0,
-            'active_conversations': len(conversation_history)
+            'active_conversations': len(state.conversation_history)
         }
 
-        if db_pool:
+        if state.db_pool:
             try:
-                async with db_pool.acquire() as conn:
+                async with state.db_pool.acquire() as conn:
                     purchase_stats = await conn.fetchrow("""
                         SELECT COUNT(*) as total_purchases, COALESCE(SUM(amount), 0) as total_revenue
                         FROM purchases

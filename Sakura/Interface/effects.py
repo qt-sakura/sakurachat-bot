@@ -6,7 +6,7 @@ from telethon import TelegramClient
 from telegram import ReactionTypeEmoji
 from Sakura.Core.config import BOT_TOKEN, API_ID, API_HASH
 from Sakura.Core.logging import logger
-from Sakura.application import effects_client
+from Sakura import state
 
 EFFECTS = [
     "5104841245755180586",
@@ -15,18 +15,17 @@ EFFECTS = [
 
 def initialize_effects_client():
     """Initialize Telethon client for effects"""
-    global effects_client
     if os.path.exists('sakura_effects.session'):
         os.remove('sakura_effects.session')
     try:
-        effects_client = TelegramClient('sakura_effects', API_ID, API_HASH)
+        state.effects_client = TelegramClient('sakura_effects', API_ID, API_HASH)
         logger.info("✅ Telethon effects client initialized")
     except Exception as e:
         logger.error(f"❌ Failed to initialize Telethon effects client: {e}")
 
 async def send_effect(chat_id: int, text: str, reply_markup=None) -> bool:
     """Send message with random effect using Telethon"""
-    if not effects_client:
+    if not state.effects_client:
         logger.warning("⚠️ Telethon effects client not available")
         return False
 
@@ -85,11 +84,12 @@ async def add_reaction(context, update, emoji: str, user_info: dict):
             reaction=reaction
         )
     except Exception as e:
-        logger.warning(f"⚠️ PTB reaction fallback failed: {e}", user_info)
+        from Sakura.Core.helpers import log_action
+        log_action("WARNING", f"⚠️ PTB reaction fallback failed: {e}", user_info)
 
 async def photo_effect(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
     """Send photo message with random effect using direct API"""
-    if not effects_client:
+    if not state.effects_client:
         logger.warning("⚠️ Telethon effects client not available")
         return False
 
@@ -119,21 +119,19 @@ async def photo_effect(chat_id: int, photo_url: str, caption: str, reply_markup=
 
 async def start_effects():
     """Start Telethon effects client"""
-    global effects_client
-    if effects_client:
+    if state.effects_client:
         try:
-            await effects_client.start(bot_token=BOT_TOKEN)
+            await state.effects_client.start(bot_token=BOT_TOKEN)
             logger.info("✅ Telethon effects client started successfully")
         except Exception as e:
             logger.error(f"❌ Failed to start Telethon effects client: {e}")
-            effects_client = None
+            state.effects_client = None
 
 async def stop_effects():
     """Stop Telethon effects client"""
-    global effects_client
-    if effects_client:
+    if state.effects_client:
         try:
-            await effects_client.disconnect()
+            await state.effects_client.disconnect()
             logger.info("✅ Telethon effects client stopped")
         except Exception as e:
             logger.error(f"❌ Error stopping Telethon effects client: {e}")

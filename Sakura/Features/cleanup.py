@@ -2,7 +2,7 @@ import asyncio
 import time
 from Sakura.Core.logging import logger
 from Sakura.Core.config import OLD_CHAT, CHAT_CLEANUP
-from Sakura.application import conversation_history, user_last_response_time
+from Sakura import state
 
 async def cleanup_conversations():
     """Clean up old conversation histories and response times periodically"""
@@ -14,21 +14,21 @@ async def cleanup_conversations():
             conversations_cleaned = 0
 
             expired_users = [
-                user_id for user_id, last_response_time in user_last_response_time.items()
+                user_id for user_id, last_response_time in state.user_last_response_time.items()
                 if current_time - last_response_time > OLD_CHAT
             ]
 
             for user_id in expired_users:
-                if user_id in conversation_history:
-                    del conversation_history[user_id]
+                if user_id in state.conversation_history:
+                    del state.conversation_history[user_id]
                     conversations_cleaned += 1
-                if user_id in user_last_response_time:
-                    del user_last_response_time[user_id]
+                if user_id in state.user_last_response_time:
+                    del state.user_last_response_time[user_id]
 
             if conversations_cleaned > 0:
                 logger.info(f"🧹 Cleaned {conversations_cleaned} old conversations")
 
-            logger.debug(f"📊 Active conversations: {len(conversation_history)}")
+            logger.debug(f"📊 Active conversations: {len(state.conversation_history)}")
 
         except asyncio.CancelledError:
             logger.info("🧹 Cleanup task cancelled - shutting down gracefully")

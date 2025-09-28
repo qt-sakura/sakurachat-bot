@@ -1,7 +1,7 @@
 from telegram import Update
 from Sakura.Core.helpers import log_action
 from Sakura.Storage.database import save_user, save_group
-from Sakura.application import user_ids, group_ids
+from Sakura import state
 
 def track_user(update: Update, user_info: dict) -> None:
     """Track user and chat IDs for broadcasting (fast memory + async database)"""
@@ -10,8 +10,8 @@ def track_user(update: Update, user_info: dict) -> None:
     chat_type = user_info["chat_type"]
 
     if chat_type == "private":
-        is_new_user = user_id not in user_ids
-        user_ids.add(user_id)
+        is_new_user = user_id not in state.user_ids
+        state.user_ids.add(user_id)
         save_user(
             user_id,
             user_info.get("username"),
@@ -22,8 +22,8 @@ def track_user(update: Update, user_info: dict) -> None:
             log_action("INFO", f"👤 New user tracked for broadcasting", user_info)
 
     elif chat_type in ['group', 'supergroup']:
-        is_new_group = chat_id not in group_ids
-        group_ids.add(chat_id)
+        is_new_group = chat_id not in state.group_ids
+        state.group_ids.add(chat_id)
         save_group(
             chat_id,
             user_info.get("chat_title"),

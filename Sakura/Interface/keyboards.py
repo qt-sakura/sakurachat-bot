@@ -1,7 +1,7 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from Sakura.Interface.messages import START_MESSAGES, HELP_MESSAGES, BROADCAST_MESSAGES
 from Sakura.Core.config import UPDATE_LINK, SUPPORT_LINK
-from Sakura.application import user_ids, group_ids
+from Sakura import state
 
 def start_menu() -> InlineKeyboardMarkup:
     """Create initial start keyboard with Info and Hi buttons"""
@@ -44,11 +44,11 @@ def broadcast_menu() -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["users"].format(count=len(user_ids)),
+                BROADCAST_MESSAGES["button_texts"]["users"].format(count=len(state.user_ids)),
                 callback_data="bc_users"
             ),
             InlineKeyboardButton(
-                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=len(group_ids)),
+                BROADCAST_MESSAGES["button_texts"]["groups"].format(count=len(state.group_ids)),
                 callback_data="bc_groups"
             )
         ]
