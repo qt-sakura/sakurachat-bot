@@ -4,9 +4,9 @@ import aiohttp
 import orjson
 from telegram import Update, LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-
 from Sakura.Core.config import BOT_TOKEN
 from Sakura.Core.helpers import fetch_user, log_action
+from Sakura.Core.logging import logger
 from Sakura.Features.tracking import track_user
 from Sakura.Interface.effects import animate_reaction, add_reaction, send_effect, EFFECTS
 from Sakura.Interface.reactions import EMOJI_REACT
@@ -14,21 +14,19 @@ from Sakura.Interface.typing import send_typing
 from Sakura.Interface.messages import INVOICE_DESCRIPTIONS, THANK_YOU_MESSAGES, REFUND_MESSAGES
 from Sakura.Storage.database import save_purchase
 from Sakura.Storage.storage import PAYMENT_STICKERS
-from Sakura.application import effects_client, payment_storage
-
+from Sakura import state
 
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send an invoice for sakura flowers."""
     try:
         user_info = fetch_user(update.message)
         log_action("INFO", "🌸 /buy command received", user_info)
-
         track_user(update, user_info)
 
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
-                if effects_client and update.effective_chat.type == "private":
+                if state.effects_client and update.effective_chat.type == "private":
                     await animate_reaction(
                         update.effective_chat.id,
                         update.message.message_id,
@@ -56,11 +54,10 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         log_action("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
 
-
 async def send_invoice(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_info: dict, amount: int):
     """Sends a payment invoice."""
     try:
-        if user_info["chat_type"] == "private":
+        if user_info["chat_type"] == "private" and state.effects_client:
             try:
                 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice"
                 payload = {
@@ -80,7 +77,7 @@ async def send_invoice(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_in
                             log_action("INFO", f"✨ Invoice with effects sent for {amount} stars", user_info)
                             return
             except Exception:
-                pass
+                log_action("WARNING", "⚠️ Invoice with effects failed, falling back to normal.", user_info)
 
         await context.bot.send_invoice(
             chat_id=chat_id,
@@ -97,7 +94,6 @@ async def send_invoice(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_in
         log_action("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await context.bot.send_message(chat_id, "❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
 
-
 async def precheckout_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Answer the PreCheckoutQuery."""
     query = update.pre_checkout_query
@@ -106,7 +102,6 @@ async def precheckout_query(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         ok=True
     )
     logger.info(f"💳 Pre-checkout approved for user {query.from_user.id}")
-
 
 async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle successful payment - refund if 10 stars or less, otherwise process normally."""
@@ -130,7 +125,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if amount <= 10:
         log_action("INFO", f"🔄 Refunding payment of {amount} stars (kindness gesture)", user_info)
         await asyncio.sleep(4)
-        payment_storage[payment.telegram_payment_charge_id] = {
+        state.payment_storage[payment.telegram_payment_charge_id] = {
             'user_id': user_id,
             'amount': amount,
             'charge_id': payment.telegram_payment_charge_id
