@@ -2714,7 +2714,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # Step 3: Prepare help content
         keyboard = help_menu(expanded=False)
         user_mention = get_mention(update.effective_user)
-        help_text = help_text(user_mention, expanded=False)
+        caption = help_text(user_mention, expanded=False)
 
         # Step 4: Send help message with random image
         random_image = random.choice(SAKURA_IMAGES)
@@ -2726,7 +2726,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             effect_sent = await photo_effect(
                 update.effective_chat.id,
                 random_image,
-                help_text,
+                caption,
                 keyboard
             )
             if effect_sent:
@@ -2736,7 +2736,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 await context.bot.send_photo(
                     chat_id=update.effective_chat.id,
                     photo=random_image,
-                    caption=help_text,
+                    caption=caption,
                     parse_mode=ParseMode.HTML,
                     reply_markup=keyboard
                 )
@@ -2746,7 +2746,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await context.bot.send_photo(
                 chat_id=update.effective_chat.id,
                 photo=random_image,
-                caption=help_text,
+                caption=caption,
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard
             )
@@ -2926,11 +2926,11 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return # Should not happen with the new pattern
 
         keyboard = help_menu(expanded=expanded)
-        help_text = help_text(user_mention, expanded=expanded)
+        caption = help_text(user_mention, expanded=expanded)
 
         # Update the photo caption with new help text and keyboard
         await query.edit_message_caption(
-            caption=help_text,
+            caption=caption,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard
         )
