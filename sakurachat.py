@@ -13,7 +13,6 @@ import logging
 import asyncpg
 import datetime
 import threading
-import traceback
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -22,7 +21,7 @@ from telegram import (
     Message,
     ReactionTypeEmoji,
     LabeledPrice,
-    ChatMember,
+    ChatMember
 )
 from telegram.ext import (
     Application,
@@ -32,14 +31,7 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
     ContextTypes,
     filters,
-    ChatMemberHandler,
-)
-from telegram.error import (
-    TelegramError,
-    Forbidden,
-    BadRequest,
-    Conflict,
-    NetworkError,
+    ChatMemberHandler
 )
 from google import genai
 from openai import OpenAI
@@ -48,6 +40,7 @@ from telethon import TelegramClient, events
 from valkey.asyncio import Valkey as AsyncValkey
 from telegram.constants import ParseMode, ChatAction
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from telegram.error import TelegramError, Forbidden, BadRequest
 
 # CONFIGURATION
 API_ID = int(os.getenv("API_ID", "0"))
@@ -821,24 +814,6 @@ class Colors:
     RESET = '\033[0m'      # Reset color
     BOLD = '\033[1m'       # Bold text
 
-# Custom filter to suppress Conflict errors from traceback
-class ConflictFilter(logging.Filter):
-    """
-    Filters out log records for telegram.error.Conflict to prevent spammy tracebacks.
-    The `handle_error` function will still log a clean, single-line warning.
-    """
-    def filter(self, record: logging.LogRecord) -> bool:
-        # Check if the log record was created from an exception
-        if record.exc_info:
-            # Extract the exception type
-            exc_type, exc_value, _ = record.exc_info
-            # If the exception is a Conflict error, suppress the log record
-            if isinstance(exc_value, Conflict):
-                return False  # False means "do not log this record"
-        # For all other log records, allow them to be logged
-        return True
-
-
 # Custom formatter for colored logs
 class ColoredFormatter(logging.Formatter):
     """Custom formatter to add colors to entire log messages"""
@@ -866,13 +841,8 @@ class ColoredFormatter(logging.Formatter):
 
 # Configure logging with colors
 def setup_logging():
-    """Setup colored logging configuration and add a filter for Conflict errors."""
-    # Get the logger used by the `python-telegram-bot` library's updater
-    ptb_ext_logger = logging.getLogger("telegram.ext.Updater")
-    # Add our custom filter to it to suppress Conflict error tracebacks
-    ptb_ext_logger.addFilter(ConflictFilter())
-
     # Sets up a colored logger for the bot
+    """Setup colored logging configuration"""
     logger = logging.getLogger("SAKURA 🌸")
     logger.setLevel(logging.INFO)
 
@@ -2379,7 +2349,7 @@ async def openrouter_poll(poll_question: str, poll_options: list, user_name: str
         log_action("DEBUG", f"📊 Analyzing poll with OpenRouter: '{poll_question[:50]}...'", user_info)
 
     try:
-        history = await get_history(user_id)
+        history = await get_conversation_history_list(user_id)
         messages = []
 
         # Determine which prompt to use
@@ -3399,39 +3369,22 @@ async def handle_member_update(update: Update, context: ContextTypes.DEFAULT_TYP
 # ERROR HANDLER
 # The main error handler for the bot
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Log errors caused by updates and provide clean, informative feedback.
-    Handles specific Telegram errors gracefully and logs detailed tracebacks for others.
-    """
-    err = context.error
+    """Handle errors"""
+    logger.error(f"Exception while handling an update: {context.error}")
 
-    # Handle common Telegram API errors with clean, single-line logs
-    if isinstance(err, Conflict):
-        logger.warning(f"⚠️ Conflict Error: {err}. The bot might be running on another instance.")
-        return
-    if isinstance(err, Forbidden):
-        logger.warning(f"⚠️ Forbidden Error: {err}. Bot may be blocked or kicked from a chat.")
-        return
-    if isinstance(err, BadRequest):
-        logger.warning(f"⚠️ BadRequest Error: {err}. The request was malformed.")
-        return
-    if isinstance(err, NetworkError):
-        logger.warning(f"⚠️ Network Error: {err}. A network issue occurred during the request.")
-        return
-
-    # For all other exceptions, log the full traceback for detailed debugging
-    tb_list = traceback.format_exception(None, err, err.__traceback__)
-    tb_string = "".join(tb_list)
-    logger.error(f"❌ An unhandled exception occurred:\n{tb_string}")
-
-    # Try to extract user info for additional context if possible
-    user_info_str = "N/A"
-    if hasattr(update, "effective_user") and update.effective_user:
-        user_info_str = f"User: {update.effective_user.id}"
-    if hasattr(update, "effective_chat") and update.effective_chat:
-        user_info_str += f", Chat: {update.effective_chat.id} ({update.effective_chat.type})"
-
-    logger.error(f"💥 Exception context: Update={update}, Context={user_info_str}")
+    # Try to extract user info if update has a message
+    if hasattr(update, 'message') and update.message:
+        try:
+            user_info = get_user_info(update.message)
+            log_action("ERROR", f"💥 Exception occurred: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for error: {context.error}")
+    elif hasattr(update, 'callback_query') and update.callback_query and update.callback_query.message:
+        try:
+            user_info = get_user_info(update.callback_query.message)
+            log_action("ERROR", f"💥 Callback query exception: {context.error}", user_info)
+        except:
+            logger.error(f"Could not extract user info for callback error: {context.error}")
 
 
 # STAR PAYMENT FUNCTIONS
@@ -4147,105 +4100,72 @@ def setup_handlers(application: Application) -> None:
     logger.info("✅ All handlers setup completed")
 
 
-# MAIN FUNCTION
-async def main() -> None:
-    """Main asynchronous function to run the bot."""
+# Runs the bot
+def run_bot() -> None:
+    """Run the bot"""
     if not validate_config():
         return
 
     logger.info("🚀 Initializing Sakura Bot...")
 
-    # Start dummy server in a background thread for keep-alive
-    threading.Thread(target=start_server, daemon=True).start()
-
-    # --- Step 1: Initialize services before starting the bot ---
-    # This ensures database connections are ready and data is loaded.
-    logger.info("🔗 Connecting to services...")
-    if not await connect_cache():
-        logger.warning("⚠️ Valkey initialization failed. Bot will continue with memory fallback.")
-
-    # This call is now awaited, so we know it's finished before proceeding.
-    # connect_database() also calls load_data() internally.
-    if not await connect_database():
-        logger.error("❌ Database initialization failed. Bot cannot continue.")
-        return
-
-    await start_effects()
-    logger.info("✅ Services connected successfully.")
-
-    # --- Step 2: Set up the bot application ---
+    # Create application
     application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
 
-    # We are no longer using post_init/post_shutdown as we control the lifecycle directly.
-    application.post_init = None
-    application.post_shutdown = None
-
-    # Register all handlers (commands, messages, etc.)
+    # Setup handlers
     setup_handlers(application)
 
-    cleanup_task = None
-    try:
-        # The `async with` block handles application.initialize() and application.shutdown()
-        async with application:
-            # --- Step 3: Start background tasks and polling ---
-            await setup_commands(application)
+    # Setup bot commands and database using post_init
+    async def post_init(app):
+        global cleanup_task
 
-            # Start the background task for cleaning up old conversations
-            cleanup_task = asyncio.create_task(cleanup_conversations())
+        # Initialize Valkey
+        valkey_success = await connect_cache()
+        if not valkey_success:
+            logger.warning("⚠️ Valkey initialization failed. Bot will continue with memory fallback.")
 
-            # Pre-flight check to detect critical errors before polling
-            logger.info("📡 Performing pre-flight check...")
-            try:
-                await application.bot.get_updates(limit=1)
-                logger.info("✅ Pre-flight check successful.")
-            except Conflict as e:
-                logger.warning(f"⚠️ Conflict Error: {e}. Another instance of the bot is already running.")
-                return
-            except Forbidden as e:
-                logger.warning(f"⚠️ Forbidden Error: {e}. The bot token is invalid or expired.")
-                return
-            except NetworkError as e:
-                logger.warning(f"⚠️ NetworkError on startup: {e}. Check your internet connection.")
-                return
-            except Exception as e:
-                logger.error(f"❌ An unexpected error occurred during pre-flight check: {e}")
-                return
+        # Initialize database
+        db_success = await connect_database()
+        if not db_success:
+            logger.error("❌ Database initialization failed. Bot will continue without persistence.")
 
-            logger.info("🌸 Sakura Bot is starting polling...")
-            try:
-                await application.start()
-                await application.updater.start_polling(
-                    allowed_updates=Update.ALL_TYPES,
-                    drop_pending_updates=True
-                )
-            except Exception as e:
-                logger.error(f"❌ Failed to start polling: {e}")
-                return
+        # Start Telethon effects client
+        await start_effects()
 
-            # Keep the script running until interrupted
-            await asyncio.Future()
+        await setup_commands(app)
 
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        logger.info("🛑 Bot shutdown initiated by user...")
+        # Start conversation cleanup task and store reference
+        cleanup_task = asyncio.create_task(cleanup_conversations())
 
-    finally:
-        # --- Step 4: Graceful shutdown ---
-        logger.info("🔌 Shutting down services...")
-        if application.updater and application.updater.is_running:
-            await application.updater.stop()
-        if application.running:
-            await application.stop()
+        logger.info("🌸 Sakura Bot initialization completed!")
+
+    # Setup shutdown handler
+    async def post_shutdown(app):
+        global cleanup_task
+
+        # Cancel cleanup task gracefully
         if cleanup_task and not cleanup_task.done():
+            logger.info("🛑 Cancelling cleanup task...")
             cleanup_task.cancel()
             try:
                 await cleanup_task
             except asyncio.CancelledError:
-                pass  # This is expected.
+                logger.info("✅ Cleanup task cancelled successfully")
+            except Exception as e:
+                logger.error(f"❌ Error cancelling cleanup task: {e}")
 
         await close_database()
         await close_cache()
         await stop_effects()
         logger.info("🌸 Sakura Bot shutdown completed!")
+
+    application.post_init = post_init
+    application.post_shutdown = post_shutdown
+
+    logger.info("🌸 Sakura Bot is starting...")
+
+    # Run the bot with polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
 
 # HTTP SERVER FOR DEPLOYMENT
 # A dummy HTTP handler for keep-alive purposes on deployment platforms
@@ -4275,19 +4195,34 @@ def start_server() -> None:
     server.serve_forever()
 
 
-if __name__ == "__main__":
-    # Install uvloop for better performance if available
+# MAIN FUNCTION
+# The main function to run the bot
+def main() -> None:
+    """Main function"""
     try:
-        uvloop.install()
-        logger.info("🚀 uvloop installed successfully")
-    except ImportError:
-        logger.warning("⚠️ uvloop not available, running with default asyncio loop")
-    except Exception as e:
-        logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # Install uvloop for better performance - ADD THESE 6 LINES
+        try:
+            uvloop.install()
+            logger.info("🚀 uvloop installed successfully")
+        except ImportError:
+            logger.warning("⚠️ uvloop not available")
+        except Exception as e:
+            logger.warning(f"⚠️ uvloop setup failed: {e}")
+        # END OF UVLOOP SETUP
 
-    try:
-        asyncio.run(main())
+        logger.info("🌸 Sakura Bot starting up...")
+
+        # Start dummy server in background thread
+        threading.Thread(target=start_server, daemon=True).start()
+
+        # Run the bot
+        run_bot()
+
     except KeyboardInterrupt:
-        logger.info("🛑 Bot stopped by user.")
+        logger.info("🛑 Bot stopped by user")
     except Exception as e:
-        logger.error(f"💥 Fatal error in main execution: {e}")
+        logger.error(f"💥 Fatal error: {e}")
+
+
+if __name__ == "__main__":
+    main()
