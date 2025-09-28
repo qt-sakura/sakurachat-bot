@@ -22,8 +22,6 @@ from Sakura.Interface.commands import (
     help_command,
     broadcast_command,
     ping_command,
-    buy_command,
-    buyers_command,
     stats_command,
     COMMANDS,
 )
@@ -33,7 +31,12 @@ from Sakura.Interface.callbacks import (
     broadcast_callback,
     stats_refresh,
 )
-from Sakura.Features.payments import precheckout_query, successful_payment
+from Sakura.Features.payments import (
+    precheckout_query,
+    successful_payment,
+    buy_command,
+    buyers_command,
+)
 from Sakura.Interface.handlers import handle_messages
 from Sakura.Interface.updates import handle_member
 from Sakura.AI.gemini import initialize_gemini_client
