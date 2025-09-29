@@ -17,8 +17,8 @@ async def cleanup_conversations():
             for user_id in list(state.conversation_history.keys()):
                 last_response_time = state.user_last_response_time.get(user_id)
 
-                # Clean up if no response time is recorded or if it's expired
-                if last_response_time is None or \
+                # Clean up if response time is recorded and it's expired
+                if last_response_time is not None and \
                    (current_time - last_response_time > OLD_CHAT):
                     if user_id in state.conversation_history:
                         del state.conversation_history[user_id]
