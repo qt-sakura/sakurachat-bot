@@ -77,13 +77,14 @@ def setup_handlers(application: Application) -> None:
     message_filters = (filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE |
                        filters.PHOTO | filters.Document.ALL | filters.POLL) & ~filters.COMMAND
 
-    # AFK handler runs before the main message handler but doesn't block it
-    application.add_handler(MessageHandler(message_filters, afk_handler, block=False))
+    # Group 0: Pre-processing handlers like AFK
+    application.add_handler(MessageHandler(message_filters, afk_handler), group=0)
 
+    # Group 1: Main message processing
     application.add_handler(MessageHandler(
         message_filters,
         handle_messages
-    ))
+    ), group=1)
 
     application.add_handler(ChatMemberHandler(handle_member, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_error_handler(handle_error)
