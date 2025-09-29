@@ -13,6 +13,9 @@ from Sakura.Storage.valkey import update_last_seen, get_all_last_seen
 from Sakura.Storage.storage import BACK_MESSAGES, AFK_NOTICES
 from Sakura import state
 
+# --- AFK Feature Configuration ---
+INACTIVITY_TIMEOUT_MINUTES = 1  # Inactivity period in minutes
+
 def format_duration(delta: timedelta) -> str:
     """Format time delta into a human-readable string."""
     seconds = int(delta.total_seconds())
@@ -111,8 +114,8 @@ async def check_inactive():
                 if afk_status:
                     continue
 
-                # Mark as AFK if inactive for more than 60 minutes
-                if now - last_time > timedelta(minutes=60):
+                # Mark as AFK if inactive for more than the configured time
+                if now - last_time > timedelta(minutes=INACTIVITY_TIMEOUT_MINUTES):
                     await set_afk(chat_id, user_id, last_time)
                     logger.info(f"😴 Auto-set user {user_id} in chat {chat_id} as AFK due to inactivity.")
 
