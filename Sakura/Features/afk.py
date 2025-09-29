@@ -14,7 +14,7 @@ from Sakura.Storage.storage import BACK_MESSAGES, AFK_NOTICES
 from Sakura import state
 
 # --- AFK Feature Configuration ---
-INACTIVITY_TIMEOUT_MINUTES = 1  # Inactivity period in minutes
+INACTIVITY_TIMEOUT_MINUTES = 60  # Inactivity period in minutes
 
 def format_duration(delta: timedelta) -> str:
     """Format time delta into a human-readable string."""
