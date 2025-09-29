@@ -8,13 +8,11 @@ from telegram.constants import ParseMode
 from Sakura.Core.logging import logger
 from Sakura.Core.utils import delete_keyboard, delete_delayed
 from Sakura.Core.helpers import fetch_user, log_action
+from Sakura.Core.config import AFK_TIME
 from Sakura.Storage.database import get_afk, set_afk, remove_afk
 from Sakura.Storage.valkey import update_last_seen, get_all_last_seen
 from Sakura.Storage.storage import BACK_MESSAGES, AFK_NOTICES
 from Sakura import state
-
-# --- AFK Feature Configuration ---
-INACTIVITY_TIMEOUT_MINUTES = 60  # Inactivity period in minutes
 
 def format_duration(delta: timedelta) -> str:
     """Format time delta into a human-readable string."""
@@ -115,7 +113,7 @@ async def check_inactive():
                     continue
 
                 # Mark as AFK if inactive for more than the configured time
-                if now - last_time > timedelta(minutes=INACTIVITY_TIMEOUT_MINUTES):
+                if now - last_time > timedelta(minutes=AFK_TIME):
                     await set_afk(chat_id, user_id, last_time)
                     logger.info(f"😴 Auto-set user {user_id} in chat {chat_id} as AFK due to inactivity.")
 
