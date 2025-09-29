@@ -11,6 +11,22 @@ from Sakura.Features.payments import send_invoice
 from Sakura import state
 from Sakura.Core.config import OWNER_ID
 
+async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle delete button callback"""
+    query = update.callback_query
+    user_info = fetch_user(query.message)
+
+    log_action("INFO", "🗑️ Delete button pressed", user_info)
+
+    try:
+        await query.message.delete()
+        await query.answer("🗑️ Message deleted!", show_alert=False)
+        log_action("INFO", "✅ Message successfully deleted", user_info)
+    except Exception as e:
+        log_action("ERROR", f"❌ Failed to delete message: {e}", user_info)
+        await query.answer("💬 Failed to delete message!", show_alert=True)
+
+
 async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle start command inline button callbacks"""
     query = update.callback_query

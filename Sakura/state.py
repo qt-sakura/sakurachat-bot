@@ -12,6 +12,7 @@ user_last_response_time: Dict[int, float] = {}
 conversation_history: Dict[int, list] = {}
 db_pool = None
 cleanup_task = None
+inactivity_task = None
 valkey_client: Optional[AsyncValkey] = None
 payment_storage: Dict[str, dict] = {}
 effects_client: Optional[TelegramClient] = None

@@ -1,3 +1,7 @@
+import asyncio
+from telegram import Update, Message, User, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ContextTypes
+
 from Sakura.Core.logging import logger
 from Sakura.Core.config import (
     BOT_TOKEN,
@@ -29,3 +33,18 @@ def validate_config() -> bool:
         logger.error("❌ API_HASH not found in environment variables")
         return False
     return True
+
+def delete_keyboard() -> InlineKeyboardMarkup:
+    """Create an inline keyboard with a single delete button"""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🗑️", callback_data="delete_message")]
+    ])
+
+async def delete_delayed(message: Message, delay: int):
+    """Delete a message after a specified delay."""
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+        logger.debug(f"🗑️ Automatically deleted message {message.message_id} after {delay} seconds.")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not auto-delete message {message.message_id}: {e}")
