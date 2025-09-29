@@ -1,18 +1,20 @@
 import asyncio
 import random
 from datetime import datetime, timezone, timedelta
-from telegram import Update
-from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
 
-from Sakura.Core.logging import logger
-from Sakura.Core.utils import delete_keyboard, delete_delayed
-from Sakura.Core.helpers import fetch_user, log_action
-from Sakura.Core.config import AFK_TIME
-from Sakura.Storage.database import get_afk, set_afk, remove_afk
-from Sakura.Storage.valkey import update_last_seen, get_all_last_seen
-from Sakura.Storage.storage import BACK_MESSAGES, AFK_NOTICES
+from telegram import Update
+from telegram.constants import ChatType, ParseMode
+from telegram.ext import ContextTypes
+
 from Sakura import state
+from Sakura.AI.response import get_response
+from Sakura.Core.config import AFK_TIME
+from Sakura.Core.helpers import fetch_user, log_action
+from Sakura.Core.logging import logger
+from Sakura.Core.utils import delete_delayed, delete_keyboard
+from Sakura.Storage.database import get_afk, remove_afk, set_afk
+from Sakura.Storage.storage import AFK_NOTICES, BACK_MESSAGES
+from Sakura.Storage.valkey import get_all_last_seen, update_last_seen
 
 def format_duration(delta: timedelta) -> str:
     """Format time delta into a human-readable string."""
@@ -41,12 +43,44 @@ async def afk_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     chat_id = update.effective_chat.id
     user = update.effective_user
+    chat_type = update.effective_chat.type
 
     if not user or user.is_bot:
         return
 
     user_info = fetch_user(update.message)
     now = datetime.now(timezone.utc)
+
+    # --- New Logic: Handle replies to AFK notices and welcome messages ---
+    if update.message.reply_to_message:
+        replied_msg_id = update.message.reply_to_message.message_id
+
+        # Cancel deletion task if someone replies to an AFK notice in a group
+        if replied_msg_id in state.afk_deletion_tasks:
+            deletion_task = state.afk_deletion_tasks.pop(replied_msg_id)
+            deletion_task.cancel()
+            log_action("INFO", f"🗣️ AFK notice deletion cancelled for message {replied_msg_id} due to reply.", user_info)
+
+        # AI response if a user replies to their "welcome back" message
+        if replied_msg_id in state.welcome_back_messages:
+            if state.welcome_back_messages[replied_msg_id] == user.id:
+                original_message = update.message.reply_to_message.text
+                user_reply = update.message.text
+
+                prompt = (
+                    "You are a friendly and slightly playful assistant. "
+                    f"The user was just welcomed back from being AFK with the message: '{original_message}'. "
+                    f"They have now replied: '{user_reply}'. "
+                    "Generate a short, natural, and context-aware response to their reply."
+                )
+
+                ai_response = await get_response(prompt, user.full_name, user_info, user.id)
+                if ai_response:
+                    await update.message.reply_text(ai_response)
+
+                # Clean up to prevent re-triggering
+                del state.welcome_back_messages[replied_msg_id]
+                return
 
     # Update user's last seen time on every message
     await update_last_seen(chat_id, user.id, now)
@@ -62,13 +96,22 @@ async def afk_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             duration=format_duration(delta)
         )
 
-        sent_message = await update.message.reply_text(
-            text=message_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=delete_keyboard()
-        )
+        # --- Modified Logic: Handle private vs group "welcome back" messages ---
+        if chat_type == ChatType.PRIVATE:
+            sent_message = await update.message.reply_text(
+                text=message_text,
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            sent_message = await update.message.reply_text(
+                text=message_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=delete_keyboard()
+            )
+            asyncio.create_task(delete_delayed(sent_message, 60))
+
+        state.welcome_back_messages[sent_message.message_id] = user.id
         log_action("INFO", f"🔙 User returned from AFK after {format_duration(delta)}", user_info)
-        asyncio.create_task(delete_delayed(sent_message, 60))
 
     # Check if the message is a reply to an AFK user
     if update.message.reply_to_message and update.message.reply_to_message.from_user:
@@ -83,13 +126,22 @@ async def afk_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     duration=format_duration(delta)
                 )
 
-                sent_message = await update.message.reply_text(
-                    text=message_text,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=delete_keyboard()
-                )
+                # --- Modified Logic: Handle private vs group AFK notices ---
+                if chat_type == ChatType.PRIVATE:
+                    await update.message.reply_text(
+                        text=message_text,
+                        parse_mode=ParseMode.HTML,
+                    )
+                else:
+                    sent_message = await update.message.reply_text(
+                        text=message_text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=delete_keyboard()
+                    )
+                    deletion_task = asyncio.create_task(delete_delayed(sent_message, 60))
+                    state.afk_deletion_tasks[sent_message.message_id] = deletion_task
+
                 log_action("INFO", f"🗣️ Notified user about AFK status of {replied_user.full_name}", user_info)
-                asyncio.create_task(delete_delayed(sent_message, 60))
 
 
 async def check_inactive():

@@ -18,3 +18,5 @@ payment_storage: Dict[str, dict] = {}
 effects_client: Optional[TelegramClient] = None
 gemini_client = None
 openrouter_client = None
+afk_deletion_tasks: Dict[int, asyncio.Task] = {}
+welcome_back_messages: Dict[int, int] = {}
