@@ -30,7 +30,9 @@ from Sakura.Interface.callbacks import (
     help_callback,
     broadcast_callback,
     stats_refresh,
+    delete_callback,
 )
+from Sakura.Features.afk import afk_handler, check_inactive
 from Sakura.Features.payments import (
     precheckout_query,
     successful_payment,
@@ -67,13 +69,19 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CallbackQueryHandler(help_callback, pattern="^help_"))
     application.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^bc_|^get_flowers_again$"))
     application.add_handler(CallbackQueryHandler(stats_refresh, pattern="^refresh_stats$"))
+    application.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete_message$"))
 
     application.add_handler(PreCheckoutQueryHandler(precheckout_query))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
 
+    message_filters = (filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE |
+                       filters.PHOTO | filters.Document.ALL | filters.POLL) & ~filters.COMMAND
+
+    # AFK handler runs before the main message handler but doesn't block it
+    application.add_handler(MessageHandler(message_filters, afk_handler, block=False))
+
     application.add_handler(MessageHandler(
-        (filters.TEXT | filters.Sticker.ALL | filters.VOICE | filters.VIDEO_NOTE |
-        filters.PHOTO | filters.Document.ALL | filters.POLL) & ~filters.COMMAND,
+        message_filters,
         handle_messages
     ))
 
@@ -107,6 +115,7 @@ def run_bot() -> None:
         await start_effects()
         await setup_commands(app)
         state.cleanup_task = asyncio.create_task(cleanup_conversations())
+        state.inactivity_task = asyncio.create_task(check_inactive())
         logger.info("🌸 Sakura Bot initialization completed!")
 
     async def post_shutdown(app):
@@ -117,6 +126,15 @@ def run_bot() -> None:
                 await state.cleanup_task
             except asyncio.CancelledError:
                 logger.info("✅ Cleanup task cancelled successfully")
+
+        if state.inactivity_task and not state.inactivity_task.done():
+            logger.info("🛑 Cancelling inactivity checker task...")
+            state.inactivity_task.cancel()
+            try:
+                await state.inactivity_task
+            except asyncio.CancelledError:
+                logger.info("✅ Inactivity checker task cancelled successfully")
+
         await close_database()
         await close_cache()
         await stop_effects()

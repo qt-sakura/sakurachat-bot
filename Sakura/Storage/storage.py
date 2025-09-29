@@ -34,6 +34,29 @@ START_STICKERS = [
     "CAACAgUAAxkBAAEPJzFonedaEsY_x_cVxB5i5WHRmYDfZwACdBgAAnTX8VThqO2DUegdyjYE"
 ]
 
+# AFK FEATURE MESSAGES
+BACK_MESSAGES = [
+    "Welcome back {user}! You were AFK for {duration}.",
+    "{user} is back! Was away for {duration}.",
+    "{user} has returned after being AFK for {duration}.",
+    "Hey {user}! You're back after {duration} of being away.",
+    "{user} is online again! Was AFK for {duration}.",
+    "Good to see you back {user}! You were away for {duration}.",
+    "{user} has rejoined us after {duration} of AFK time.",
+    "Welcome back {user}! Your AFK lasted {duration}."
+]
+
+AFK_NOTICES = [
+    "{user} is currently away. Been offline for {duration}",
+    "{user} stepped away. Inactive for {duration}",
+    "{user} is AFK. Last seen {duration} ago",
+    "{user} left temporarily. Away for {duration}",
+    "{user} is taking time off. Been gone for {duration}",
+    "{user} went offline. Unavailable for {duration}",
+    "{user} is unreachable. Missing for {duration}",
+    "{user} stepped out. Been away for {duration}"
+]
+
 # Sakura stickers list
 SAKURA_STICKERS = [
     "CAACAgUAAxkBAAEPHYZomHbXHoaO5ZgAAWfmDG76TNdc0SgAAlMXAALQK6hV0eIcUy6BTnw2BA",

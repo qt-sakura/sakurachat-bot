@@ -1,5 +1,6 @@
 import asyncio
 import asyncpg
+from datetime import datetime, timezone
 from Sakura.Core.config import DATABASE_URL
 from Sakura.Core.logging import logger
 from Sakura import state
@@ -57,6 +58,17 @@ async def connect_database():
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_groups_created_at ON groups(created_at)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchases_user_id ON purchases(user_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchases_created_at ON purchases(created_at)")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS afk_status (
+                    id SERIAL PRIMARY KEY,
+                    chat_id BIGINT NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    since TIMESTAMPTZ NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(chat_id, user_id)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_afk_status_chat_user ON afk_status (chat_id, user_id)")
 
         logger.info("✅ Database tables created/verified successfully")
         await load_data()
@@ -186,6 +198,53 @@ async def get_purchases():
     except Exception as e:
         logger.error(f"❌ Failed to get purchases from database: {e}")
         return []
+
+async def set_afk(chat_id: int, user_id: int, since: datetime):
+    """Set user as AFK in the database."""
+    if not state.db_pool:
+        return
+    try:
+        async with state.db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO afk_status (chat_id, user_id, since)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (chat_id, user_id)
+                DO UPDATE SET since = $3, created_at = NOW()
+            """, chat_id, user_id, since)
+        logger.debug(f"⏰ AFK status set for user {user_id} in chat {chat_id}")
+    except Exception as e:
+        logger.error(f"❌ Error setting AFK for user {user_id}: {e}")
+
+async def get_afk(chat_id: int, user_id: int):
+    """Get AFK status for a user from the database."""
+    if not state.db_pool:
+        return None
+    try:
+        async with state.db_pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT since FROM afk_status
+                WHERE chat_id = $1 AND user_id = $2
+            """, chat_id, user_id)
+        if not row:
+            return None
+        return {"since": row["since"].replace(tzinfo=timezone.utc)}
+    except Exception as e:
+        logger.error(f"❌ Error getting AFK status for user {user_id}: {e}")
+        return None
+
+async def remove_afk(chat_id: int, user_id: int):
+    """Remove user from AFK status in the database."""
+    if not state.db_pool:
+        return
+    try:
+        async with state.db_pool.acquire() as conn:
+            await conn.execute("""
+                DELETE FROM afk_status
+                WHERE chat_id = $1 AND user_id = $2
+            """, chat_id, user_id)
+        logger.debug(f"🔄 AFK status removed for user {user_id} in chat {chat_id}")
+    except Exception as e:
+        logger.error(f"❌ Error removing AFK for user {user_id}: {e}")
 
 async def close_database():
     """Close database connection pool"""
