@@ -8,6 +8,5 @@ asyncpg
 requests
 tgcrypto
 telethon
-google-genai
 aiohttp[speedups]
 python-telegram-bot
