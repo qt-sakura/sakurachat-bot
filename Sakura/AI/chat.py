@@ -4,11 +4,11 @@ from typing import Optional, Dict
 
 from openai import OpenAI
 
-from Sakura.Core.config import OWNER_ID, MODEL, MODEL2, OPENROUTER_API_KEY
+from Sakura.Core.config import OWNER_ID, MODEL, OPENROUTER_API_KEY
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Storage.conversation import get_history
-from Sakura.AI.prompts import LOVELY_SAKURA_PROMPT, SAKURA_PROMPT
+from Sakura.AI.prompts import SAKURA_PROMPT
 from Sakura import state
 
 def initialize_chat_client():
@@ -40,8 +40,8 @@ async def chat_response(
 
     try:
         is_owner = (user_id == OWNER_ID)
-        model_to_use = MODEL if is_owner else MODEL2
-        prompt_to_use = LOVELY_SAKURA_PROMPT if is_owner else SAKURA_PROMPT
+        model_to_use = MODEL
+        prompt_to_use = SAKURA_PROMPT
 
         if user_info:
             log_action("INFO", f"🧠 Using model: {model_to_use}", user_info)
