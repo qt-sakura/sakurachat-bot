@@ -2,12 +2,12 @@ import base64
 import hashlib
 from typing import Dict
 from google import genai
-from Sakura.Core.config import GEMINI_API_KEY, OWNER_ID, CACHE_TTL
+from Sakura.Core.config import GEMINI_API_KEY, CACHE_TTL
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Storage.conversation import get_context
 from Sakura.Storage.cache import get_cache, set_cache
-from Sakura.AI.prompts import SAKURA_PROMPT, LOVELY_SAKURA_PROMPT
+from Sakura.AI.prompts import SAKURA_PROMPT
 from Sakura import state
 
 def initialize_gemini_client():
@@ -35,11 +35,7 @@ async def gemini_response(user_message: str, user_name: str = "", user_info: Dic
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
 
-        active_prompt = SAKURA_PROMPT
-        if user_id == OWNER_ID:
-            active_prompt = LOVELY_SAKURA_PROMPT
-
-        prompt = f"{active_prompt}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
+        prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{context}\nCurrent user message: {user_message}\n\nSakura's response:"
 
         cache_key = None
         if len(user_message) <= 50 and not context and user_id:
@@ -89,11 +85,7 @@ async def analyze_image(image_bytes: bytes, caption: str, user_name: str = "", u
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
 
-        active_prompt = SAKURA_PROMPT
-        if user_id == OWNER_ID:
-            active_prompt = LOVELY_SAKURA_PROMPT
-
-        image_prompt = f"""{active_prompt}
+        image_prompt = f"""{SAKURA_PROMPT}
 
 User name: {user_name}{context}
 
