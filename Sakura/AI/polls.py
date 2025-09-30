@@ -1,16 +1,15 @@
 import random
 import asyncio
-from typing import Optional, Dict
+from typing import Dict
 from telegram import Update
 from telegram.ext import ContextTypes
-from Sakura.AI.prompts import SAKURA_PROMPT, LOVELY_SAKURA_PROMPT
-from Sakura.Core.config import OWNER_ID, MODEL
+
 from Sakura.Core.helpers import log_action
 from Sakura.Interface.effects import animate_reaction
 from Sakura.Interface.reactions import CONTEXTUAL_REACTIONS
 from Sakura.Interface.typing import send_typing
-from Sakura.Storage.conversation import add_history, get_history
-from Sakura import state
+from Sakura.Storage.conversation import add_history
+from Sakura.AI.chat import chat_response
 
 POLL_ANALYSIS_TRIGGERS = [
     "poll", "polls", "question", "questions", "query", "queries", "quiz", "quiz question",
@@ -58,9 +57,9 @@ async def reply_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_me
             poll = update.message.reply_to_message.poll
             poll_question = poll.question
             poll_options = [option.text for option in poll.options]
-            user_name = update.effective_user.first_name or ""
+
             response = await analyze_poll(
-                poll_question, poll_options, user_name, user_info, user_info["user_id"]
+                poll_question, poll_options, user_info, user_info["user_id"]
             )
             await update.message.reply_text(response)
             log_action("INFO", "✅ Referenced poll analyzed successfully", user_info)
@@ -72,51 +71,15 @@ async def reply_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_me
             return True
     return False
 
-async def analyze_poll(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
-    """Analyzes a poll based on the user type."""
-    response = None
-
-    # Route to OpenRouter for the owner
-    if user_id == OWNER_ID and state.openrouter_client:
-        log_action("INFO", "🤖 Routing owner to OpenRouter for poll analysis...", user_info)
-        try:
-            response = await openrouter_poll(poll_question, poll_options, user_name, user_info, user_id)
-            if response:
-                log_action("INFO", f"✅ OpenRouter poll analysis generated: '{response[:50]}...'", user_info)
-        except Exception as e:
-            log_action("ERROR", f"❌ OpenRouter poll analysis error for owner: {e}", user_info)
-    # Route to Gemini for everyone else
-    else:
-        log_action("INFO", "🤖 Routing user to Gemini for poll analysis", user_info)
-        try:
-            response = await gemini_poll(poll_question, poll_options, user_name, user_info, user_id)
-            if response:
-                log_action("INFO", f"✅ Gemini poll analysis generated: '{response[:50]}...'", user_info)
-        except Exception as e:
-            log_action("ERROR", f"❌ Gemini poll analysis error for user: {e}", user_info)
-
-    if response and user_id:
-        poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
-        await add_history(user_id, poll_description, is_user=True)
-        await add_history(user_id, response, is_user=False)
-        log_action("INFO", "✅ Poll analysis completed and saved to history", user_info)
-
-    return response if response else "Poll analyze nahi kar paa rahi 😕"
-
-async def openrouter_poll(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> Optional[str]:
-    """Analyze poll using OpenRouter API to suggest the correct answer."""
-    if not state.openrouter_client:
-        return None
-
+async def analyze_poll(poll_question: str, poll_options: list, user_info: Dict[str, any], user_id: int) -> str:
+    """Analyzes a poll using the unified chat AI."""
     if user_info:
-        log_action("DEBUG", f"📊 Analyzing poll with OpenRouter: '{poll_question[:50]}...'", user_info)
+        log_action("DEBUG", f"📊 Analyzing poll: '{poll_question[:50]}...'", user_info)
 
     try:
-        history = await get_history(user_id)
-        messages = [{"role": "system", "content": LOVELY_SAKURA_PROMPT}]
-        messages.extend(history)
         options_text = "\n".join([f"{i + 1}. {option}" for i, option in enumerate(poll_options)])
-        poll_prompt = f"""User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
+
+        poll_prompt_message = f"""User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
 
 Poll Question: "{poll_question}"
 
@@ -126,64 +89,22 @@ Options:
 Analyze this poll question and respond in Sakura's style about which option you think is correct and why. Keep it to one or two lines as per your character rules. Be helpful and give a quick reason.
 
 Sakura's response:"""
-        messages.append({"role": "user", "content": poll_prompt})
 
-        completion = await asyncio.to_thread(
-            state.openrouter_client.chat.completions.create,
-            extra_headers={"HTTP-Referer": "https://t.me/SakuraHarunoBot", "X-Title": "Sakura Bot"},
-            model=MODEL,
-            messages=messages
+        response = await chat_response(
+            user_message=poll_prompt_message,
+            user_id=user_id,
+            user_info=user_info
         )
-        ai_response = completion.choices[0].message.content
-        if ai_response:
-            if user_info:
-                log_action("INFO", f"✅ OpenRouter poll analysis completed: '{ai_response[:50]}...'", user_info)
-            return ai_response.strip()
-        return None
-    except Exception as e:
-        if user_info:
-            log_action("ERROR", f"❌ OpenRouter poll analysis error: {e}", user_info)
-        return None
 
-async def gemini_poll(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
-    """Analyze poll using Gemini 2.5 Flash to suggest the correct answer"""
-    if user_info:
-        log_action("DEBUG", f"📊 Analyzing poll with Gemini: '{poll_question[:50]}...'", user_info)
+        if response:
+            poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
+            await add_history(user_id, poll_description, is_user=True)
+            await add_history(user_id, response, is_user=False)
+            log_action("INFO", "✅ Poll analysis completed and saved to history", user_info)
+            return response
+        else:
+            return "Poll analyze nahi kar paa rahi 😕"
 
-    if not state.gemini_client:
-        if user_info:
-            log_action("WARNING", "❌ Gemini client not available for poll analysis", user_info)
-        return "Poll samjh nahi paa rahi 😔"
-
-    try:
-        context = ""
-        if user_id:
-            context = await get_context(user_id)
-            if context:
-                context = f"\n\nPrevious conversation:\n{context}\n"
-        options_text = "\n".join([f"{i + 1}. {option}" for i, option in enumerate(poll_options)])
-        poll_prompt = f"""{SAKURA_PROMPT}
-
-User name: {user_name}{context}
-
-User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
-
-Poll Question: "{poll_question}"
-
-Options:
-{options_text}
-
-Analyze this poll question and respond in Sakura's style about which option you think is correct and why. Keep it to one or two lines as per your character rules. Be helpful and give a quick reason.
-
-Sakura's response:"""
-        response = await state.gemini_client.aio.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=poll_prompt
-        )
-        ai_response = response.text.strip() if response.text else "Poll ka answer samjh nahi aaya 😅"
-        if user_info:
-            log_action("INFO", f"✅ Gemini poll analysis completed: '{ai_response[:50]}...'", user_info)
-        return ai_response
     except Exception as e:
         if user_info:
             log_action("ERROR", f"❌ Poll analysis error: {e}", user_info)

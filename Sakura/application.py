@@ -39,8 +39,7 @@ from Sakura.Features.payments import (
 )
 from Sakura.Interface.handlers import handle_messages
 from Sakura.Interface.updates import handle_member
-from Sakura.AI.gemini import initialize_gemini_client
-from Sakura.AI.openrouter import initialize_openrouter_client
+from Sakura.AI.chat import initialize_chat_client
 from Sakura import state
 
 async def setup_commands(application: Application) -> None:
@@ -90,8 +89,7 @@ def run_bot() -> None:
     logger.info("🚀 Initializing Sakura Bot...")
 
     initialize_effects_client()
-    initialize_gemini_client()
-    initialize_openrouter_client()
+    initialize_chat_client()
 
     application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
 

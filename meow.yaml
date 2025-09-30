@@ -10,8 +10,9 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - VALKEY_URL=valkey://valkey:6379
       - DATABASE_URL=postgresql://user:password@db:5432/sakuradb
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - MODEL=${MODEL}
+      - MODEL2=${MODEL2}
       - OWNER_ID=${OWNER_ID}
       - SUPPORT_LINK=${SUPPORT_LINK}
       - UPDATE_LINK=${UPDATE_LINK}
