@@ -73,29 +73,33 @@ async def reply_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_me
     return False
 
 async def analyze_poll(poll_question: str, poll_options: list, user_name: str = "", user_info: Dict[str, any] = None, user_id: int = None) -> str:
-    """Analyze a poll, trying OpenRouter first and falling back to Gemini."""
+    """Analyzes a poll based on the user type."""
     response = None
-    source_api = None
 
-    if state.openrouter_client:
-        log_action("INFO", "🤖 Trying OpenRouter API for poll analysis...", user_info)
+    # Route to OpenRouter for the owner
+    if user_id == OWNER_ID and state.openrouter_client:
+        log_action("INFO", "🤖 Routing owner to OpenRouter for poll analysis...", user_info)
         try:
             response = await openrouter_poll(poll_question, poll_options, user_name, user_info, user_id)
             if response:
-                source_api = "OpenRouter"
+                log_action("INFO", f"✅ OpenRouter poll analysis generated: '{response[:50]}...'", user_info)
         except Exception as e:
-            log_action("ERROR", f"❌ OpenRouter poll analysis error: {e}. Falling back to Gemini.", user_info)
-
-    if not response:
-        log_action("INFO", "🤖 Falling back to Gemini API for poll analysis", user_info)
-        source_api = "Gemini"
-        response = await gemini_poll(poll_question, poll_options, user_name, user_info, user_id)
+            log_action("ERROR", f"❌ OpenRouter poll analysis error for owner: {e}", user_info)
+    # Route to Gemini for everyone else
+    else:
+        log_action("INFO", "🤖 Routing user to Gemini for poll analysis", user_info)
+        try:
+            response = await gemini_poll(poll_question, poll_options, user_name, user_info, user_id)
+            if response:
+                log_action("INFO", f"✅ Gemini poll analysis generated: '{response[:50]}...'", user_info)
+        except Exception as e:
+            log_action("ERROR", f"❌ Gemini poll analysis error for user: {e}", user_info)
 
     if response and user_id:
         poll_description = f"[Poll: {poll_question}] Options: {', '.join(poll_options)}"
         await add_history(user_id, poll_description, is_user=True)
         await add_history(user_id, response, is_user=False)
-        log_action("INFO", f"✅ Poll analysis via {source_api} completed and saved to history", user_info)
+        log_action("INFO", "✅ Poll analysis completed and saved to history", user_info)
 
     return response if response else "Poll analyze nahi kar paa rahi 😕"
 
@@ -109,11 +113,7 @@ async def openrouter_poll(poll_question: str, poll_options: list, user_name: str
 
     try:
         history = await get_history(user_id)
-        messages = []
-        active_prompt = SAKURA_PROMPT
-        if user_id == OWNER_ID:
-            active_prompt = LOVELY_SAKURA_PROMPT
-        messages.append({"role": "system", "content": active_prompt})
+        messages = [{"role": "system", "content": LOVELY_SAKURA_PROMPT}]
         messages.extend(history)
         options_text = "\n".join([f"{i + 1}. {option}" for i, option in enumerate(poll_options)])
         poll_prompt = f"""User has sent a poll or asked about a poll question. Analyze this question and suggest which option might be the correct answer.
@@ -162,10 +162,7 @@ async def gemini_poll(poll_question: str, poll_options: list, user_name: str = "
             if context:
                 context = f"\n\nPrevious conversation:\n{context}\n"
         options_text = "\n".join([f"{i + 1}. {option}" for i, option in enumerate(poll_options)])
-        active_prompt = SAKURA_PROMPT
-        if user_id == OWNER_ID:
-            active_prompt = LOVELY_SAKURA_PROMPT
-        poll_prompt = f"""{active_prompt}
+        poll_prompt = f"""{SAKURA_PROMPT}
 
 User name: {user_name}{context}
 
