@@ -31,8 +31,7 @@ async def handle_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         poll_options = [option.text for option in poll.options]
         log_action("DEBUG", f"📊 Poll question: '{poll_question}' with {len(poll_options)} options", user_info)
 
-        user_name = update.effective_user.first_name or ""
-        response = await analyze_poll(poll_question, poll_options, user_name, user_info, update.effective_user.id)
+        response = await analyze_poll(poll_question, poll_options, user_info, update.effective_user.id)
 
         log_action("DEBUG", f"📤 Sending poll analysis: '{response[:50]}...'", user_info)
         await update.message.reply_text(response)
