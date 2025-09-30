@@ -22,7 +22,7 @@ Whether you’re looking to:
 
 ## ✨ Features
 
-- **Contextual AI-Powered Conversations** — Powered by **OpenRouter (Grok)** and **Google Gemini**, Sakura provides thoughtful, context-aware responses tailored to the conversation.
+- **Contextual AI-Powered Conversations** — Powered by **OpenRouter**, Sakura provides thoughtful, context-aware responses tailored to the conversation.
 - **Image & Poll Analysis** — Send an image or poll, and Sakura will analyze and comment on it.
 - **Contextual Emoji Reactions** — The bot automatically reacts to messages with animated emojis that match the context of the conversation.
 - **Sticker-Reply Support** — Reply to Sakura’s messages with a sticker, and she’ll send one back.
@@ -48,7 +48,7 @@ Whether you’re looking to:
 
 - **Language:** Python 3.8+
 - **Core Libraries:** `python-telegram-bot`, `telethon`
-- **AI APIs:** OpenRouter (Grok), Google Gemini
+- **AI APIs:** OpenRouter
 - **Database:** PostgreSQL (via `asyncpg`)
 - **Caching:** Valkey (a high-performance Redis fork)
 - **Performance:** `uvloop` (for asyncio event loop), `orjson` (for fast JSON processing)
@@ -92,8 +92,7 @@ sakurachat-bot/
     ├── AI/                # AI integrations and responses
     │   ├── __init__.py
     │   ├── response.py    # Main AI response coordination
-    │   ├── gemini.py      # Google Gemini AI client
-    │   ├── openrouter.py  # OpenRouter AI client
+    │   ├── chat.py        # Unified AI chat client
     │   ├── prompts.py     # Character prompts and AI instructions
     │   ├── images.py      # Image analysis and processing
     │   └── polls.py       # Poll analysis functionality
