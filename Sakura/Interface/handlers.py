@@ -1,6 +1,8 @@
 import asyncio
+import random
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram.constants import ChatAction
 from Sakura.Core.helpers import fetch_user, log_action, should_reply, get_error, log_response
 from Sakura.Features.limiter import check_limit
 from Sakura.Interface.reactions import handle_reaction
@@ -8,6 +10,8 @@ from Sakura.AI.images import reply_image
 from Sakura.AI.polls import reply_poll
 from Sakura.Interface.typing import send_typing
 from Sakura.AI.response import get_response
+from Sakura.AI.voice import generate_voice
+from Sakura.Storage.cache import set_last_message, get_last_message
 from Sakura.Features.broadcast import execute_broadcast
 from Sakura import state
 from Sakura.Core.config import OWNER_ID
@@ -20,8 +24,24 @@ from Sakura.Features.tracking import track_user
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text and media messages with AI response"""
     user_info = fetch_user(update.message)
+    user_id = update.effective_user.id
     user_message = update.message.text or update.message.caption or "Media message"
     log_action("INFO", f"💬 Text/media message received: '{user_message[:100]}...'", user_info)
+
+    # On-demand voice request
+    if "in your voice" in user_message.lower():
+        last_message = await get_last_message(user_id)
+        if last_message:
+            log_action("INFO", "🎤 User requested last message in voice", user_info)
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.RECORD_VOICE)
+            voice_data = await generate_voice(last_message)
+            if voice_data:
+                await update.message.reply_voice(voice=voice_data)
+                log_action("INFO", "✅ On-demand voice message sent successfully", user_info)
+                return
+        else:
+            log_action("WARNING", "🤷‍♀️ No last message found to send in voice", user_info)
+            # Fall through to generate a new response
 
     if await reply_image(update, context, user_message, user_info):
         return
@@ -31,9 +51,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await send_typing(context, update.effective_chat.id, user_info)
     user_name = update.effective_user.first_name or ""
     response = await get_response(user_message, user_name, user_info, update.effective_user.id)
+
+    # Cache the bot's response for on-demand voice requests
+    await set_last_message(user_id, response)
+
     log_action("DEBUG", f"📤 Sending response: '{response[:50]}...'", user_info)
-    await update.message.reply_text(response)
-    log_action("INFO", "✅ Text message response sent successfully", user_info)
+
+    # Randomly send voice message
+    voice_data = None
+    if random.random() < 0.1:  # 10% chance
+        log_action("INFO", "🎤 Attempting to send response as voice (10% chance)", user_info)
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.RECORD_VOICE)
+        voice_data = await generate_voice(response)
+
+    if voice_data:
+        await update.message.reply_voice(voice=voice_data)
+        log_action("INFO", "✅ Voice message response sent successfully", user_info)
+    else:
+        await update.message.reply_text(response)
+        log_action("INFO", "✅ Text message response sent successfully", user_info)
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle all types of messages"""
