@@ -10,4 +10,3 @@ tgcrypto
 telethon
 aiohttp[speedups]
 python-telegram-bot
-elevenlabs
