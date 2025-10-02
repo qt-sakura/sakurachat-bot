@@ -25,7 +25,7 @@ async def generate_voice(text: str) -> bytes | None:
         audio_stream = client.text_to_speech.convert(
             text=text,
             voice_id=VOICE_ID,
-            model_id="eleven_multilingual_v2"
+            model_id="eleven_v3"
         )
 
         audio_bytes = b""
