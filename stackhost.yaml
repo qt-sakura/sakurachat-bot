@@ -1,0 +1,27 @@
+user:
+  name: qt-sakura
+  github: qt-sakura
+
+language: "python"
+python_version: "3.13"
+
+commands:
+  build:
+    - "python -m pip install --upgrade pip"
+    - "pip install -r requirements.txt"
+  start:
+    - "python3 uwu.py"
+
+env:
+  - "API_ID="
+  - "API_HASH="
+  - "BOT_TOKEN="
+  - "VALKEY_URL="
+  - "DATABASE_URL="
+  - "OPENROUTER_API_KEY="
+  - "MODEL="
+  - "ELEVENLABS_API_KEY="
+  - "OWNER_ID="
+  - "SUPPORT_LINK="
+  - "UPDATE_LINK="
+  - "PING_LINK="
