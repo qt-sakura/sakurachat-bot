@@ -3,6 +3,7 @@ from Sakura.Core.logging import logger
 from Sakura.application import run_bot
 from Sakura.Core.server import start_server_thread
 
+
 def main() -> None:
     """Main function"""
     try:
