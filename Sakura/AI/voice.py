@@ -22,11 +22,15 @@ async def generate_voice(text: str) -> bytes | None:
 
     try:
         logger.info(f"Generating voice for text: '{text[:30]}...'")
-        audio_bytes = await client.text_to_speech.convert(
+        audio_stream = client.text_to_speech.convert(
             text=text,
             voice_id=VOICE_ID,
             model_id="eleven_multilingual_v2"
         )
+
+        audio_bytes = b""
+        async for chunk in audio_stream:
+            audio_bytes += chunk
 
         logger.info("Voice generation successful.")
         return audio_bytes
