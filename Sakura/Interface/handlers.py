@@ -41,7 +41,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 return
         else:
             log_action("WARNING", "🤷‍♀️ No last message found to send in voice", user_info)
-            # Fall through to generate a new response
+            await update.message.reply_text("I don't have a recent message to say in my voice. Please let me respond to something first!")
+            return
 
     if await reply_image(update, context, user_message, user_info):
         return
