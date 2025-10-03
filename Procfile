@@ -1,1 +1,1 @@
-web: python uwu.py
+start: python kawai.py
