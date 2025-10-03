@@ -17,11 +17,11 @@ from Sakura.Storage.database import save_purchase, get_purchases
 from Sakura.Storage.storage import PAYMENT_STICKERS
 from Sakura import state
 
-async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def meow_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send an invoice for sakura flowers."""
     try:
         user_info = fetch_user(update.message)
-        log_action("INFO", "🌸 /buy command received", user_info)
+        log_action("INFO", "🌸 /meow command received", user_info)
         track_user(update, user_info)
 
         if EMOJI_REACT:
@@ -55,11 +55,11 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         log_action("ERROR", f"❌ Error sending invoice: {e}", user_info)
         await update.message.reply_text("❌ Oops! Something went wrong creating the invoice. Try again later! 🔧")
 
-async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def fams_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show all flower buyers with their donation amounts."""
     try:
         user_info = fetch_user(update.message)
-        log_action("INFO", "💝 /buyers command received", user_info)
+        log_action("INFO", "💝 /fams command received", user_info)
         track_user(update, user_info)
 
         if EMOJI_REACT:
@@ -79,7 +79,7 @@ async def buyers_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if not purchases:
             no_buyers_text = (
                 "🌸 <b>Flower Buyers</b>\n\n"
-                "No one has bought flowers yet! Be the first to support with /buy 💝"
+                "No one has bought flowers yet! Be the first to support with /meow 💝"
             )
             if update.message.chat.type == "private":
                 if not await send_effect(update.message.chat.id, no_buyers_text):

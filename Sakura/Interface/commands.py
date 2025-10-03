@@ -20,8 +20,8 @@ from Sakura import state
 
 COMMANDS = [
     BotCommand("start", "👋 Wake me up"),
-    BotCommand("buy", "🌸 Get flowers"),
-    BotCommand("buyers", "💝 Flower buyers"),
+    BotCommand("meow", "🌸 Get flowers"),
+    BotCommand("fams", "💝 Flower buyers"),
     BotCommand("help", "💬 A short guide")
 ]
 
