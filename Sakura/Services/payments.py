@@ -8,7 +8,7 @@ from telegram.constants import ParseMode
 from Sakura.Core.config import BOT_TOKEN
 from Sakura.Core.helpers import fetch_user, log_action, get_error
 from Sakura.Core.logging import logger
-from Sakura.Features.tracking import track_user
+from Sakura.Services.tracking import track_user
 from Sakura.Interface.effects import animate_reaction, add_reaction, send_effect, EFFECTS
 from Sakura.Interface.reactions import EMOJI_REACT
 from Sakura.Interface.typing import send_typing

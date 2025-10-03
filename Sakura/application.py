@@ -16,7 +16,7 @@ from Sakura.Core.errors import handle_error
 from Sakura.Database.database import connect_database, close_database
 from Sakura.Database.valkey import connect_cache, close_cache
 from Sakura.Interface.effects import start_effects, stop_effects, initialize_effects_client
-from Sakura.Features.cleanup import cleanup_conversations
+from Sakura.Services.cleanup import cleanup_conversations
 from Sakura.Interface.commands import (
     start_command,
     help_command,
@@ -31,7 +31,7 @@ from Sakura.Interface.callbacks import (
     broadcast_callback,
     stats_refresh,
 )
-from Sakura.Features.payments import (
+from Sakura.Services.payments import (
     precheckout_query,
     successful_payment,
     meow_command,
