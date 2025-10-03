@@ -60,7 +60,7 @@ Whether you’re looking to:
 
 ```
 sakurachat-bot/
-├── uwu.py                 # Main entry point
+├── kawai.py                 # Main entry point
 ├── requirements.txt       # Dependencies
 ├── Dockerfile            # Docker container configuration
 ├── Meow.yaml             # Deployment configuration
