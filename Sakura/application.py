@@ -34,8 +34,8 @@ from Sakura.Interface.callbacks import (
 from Sakura.Features.payments import (
     precheckout_query,
     successful_payment,
-    buy_command,
-    buyers_command,
+    meow_command,
+    fams_command,
 )
 from Sakura.Interface.handlers import handle_messages
 from Sakura.Interface.updates import handle_member
@@ -58,8 +58,8 @@ def setup_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("ping", ping_command))
-    application.add_handler(CommandHandler("buy", buy_command))
-    application.add_handler(CommandHandler("buyers", buyers_command))
+    application.add_handler(CommandHandler("meow", meow_command))
+    application.add_handler(CommandHandler("fams", fams_command))
     application.add_handler(CommandHandler("stats", stats_command))
 
     application.add_handler(CallbackQueryHandler(start_callback, pattern="^start_"))

@@ -28,8 +28,8 @@ Whether you're looking to:
 - **Image & Poll Analysis** — Send an image or poll, and Sakura will analyze and comment on it.
 - **Contextual Emoji Reactions** — The bot automatically reacts to messages with animated emojis that match the context of the conversation.
 - **Sticker-Reply Support** — Reply to Sakura's messages with a sticker, and she'll send one back.
-- **Telegram Stars Integration** — Support the bot using Telegram Stars with the `/buy` command.
-- **Supporter Leaderboard** — View the top supporters with the `/buyers` command.
+- **Telegram Stars Integration** — Support the bot using Telegram Stars with the `/meow` command.
+- **Supporter Leaderboard** — View the top supporters with the `/fams` command.
 - **Group / Private Chats** — Sakura responds in private DMs or when "Sakura" is mentioned or replied to in a group.
 - **Enhanced Performance** — A robust backend with a **PostgreSQL** database and a **Valkey** cache ensures a fast and persistent user experience.
 
@@ -41,8 +41,8 @@ Whether you're looking to:
 |--------------|-----------------------------------------------|
 | `/start`     | Wake up Sakura and get a welcome message 🌸    |
 | `/help`      | Show usage instructions and a short guide 💁   |
-| `/buy`       | Support the bot by buying flowers with Telegram Stars ⭐ |
-| `/buyers`    | View the list of top supporters 🏆             |
+| `/meow`       | Support the bot by buying flowers with Telegram Stars ⭐ |
+| `/fams`    | View the list of top supporters 🏆             |
 
 ---
 
