@@ -5,7 +5,7 @@ from Sakura.Core.helpers import fetch_user, log_action, get_mention
 from Sakura.Interface.keyboards import info_menu, help_menu
 from Sakura.Interface.messages import START_MESSAGES, HELP_MESSAGES, BROADCAST_MESSAGES
 from Sakura.Interface.typing import send_typing
-from Sakura.AI.response import get_response
+from Sakura.Chat.response import get_response
 from Sakura.Interface.effects import send_effect
 from Sakura.Features.payments import send_invoice
 from Sakura import state

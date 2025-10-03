@@ -1,6 +1,6 @@
 from typing import Optional, Dict
 
-from Sakura.AI.chat import chat_response
+from Sakura.Chat.chat import chat_response
 from Sakura.Core.helpers import get_error, log_action
 from Sakura.Storage.conversation import add_history
 
