@@ -1,7 +1,7 @@
 # 🌸 Sakura - A Telegram Bot  
 [![Telegram Bot](https://img.shields.io/badge/Chat%20Now-@SluttySakuraBot-fd79a8?logo=telegram&style=for-the-badge)](https://t.me/SluttySakuraBot)  
 [![GitHub Created At](https://img.shields.io/github/created-at/qt-sakura/sakurachat-bot?style=for-the-badge&logo=github&label=Created&color=orange)](https://github.com/qt-sakura/sakurachat-bot)
-[![Repository Age](https://img.shields.io/github/created-at/qt-sakura/sakurachat-bot?style=for-the-badge&logo=github&label=Age&color=blue)](https://github.com/qt-sakura/sakurachat-bot)
+[![Repository Age](https://img.shields.io/badge/Age-4%20months-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/qt-sakura/sakurachat-bot)
 
 **Sakura Bot** is your soft, helpful, and caring conversational partner, embodying Sakura Haruno's supportive and gentle persona.
 From heartfelt check-ins to playful sticker replies — Sakura's got you covered.
