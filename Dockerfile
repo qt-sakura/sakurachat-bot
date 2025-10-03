@@ -1,8 +1,11 @@
 # Use an official Python runtime as a parent image
-FROM python:3.8-slim
+FROM python:3.14
 
 # Set the working directory in the container
 WORKDIR /app
+
+# Upgrade pip to the latest version
+RUN pip install --upgrade pip
 
 # Copy the dependencies file to the working directory
 COPY requirements.txt .
