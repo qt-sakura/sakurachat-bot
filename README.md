@@ -25,7 +25,7 @@ Whether you're looking to:
 ## ✨ Features
 
 - **Contextual AI-Powered Conversations** — Powered by **OpenRouter**, Sakura provides thoughtful, context-aware responses tailored to the conversation.
-- **Image & Poll Analysis** — Send an image or poll, and Sakura will analyze and comment on it.
+- **Image, Poll, and Voice Message Analysis** — Send an image, poll, or voice message, and Sakura will analyze and comment on it.
 - **Contextual Emoji Reactions** — The bot automatically reacts to messages with animated emojis that match the context of the conversation.
 - **Sticker-Reply Support** — Reply to Sakura's messages with a sticker, and she'll send one back.
 - **Telegram Stars Integration** — Support the bot using Telegram Stars with the `/meow` command.
@@ -41,7 +41,8 @@ Whether you're looking to:
 |--------------|-----------------------------------------------|
 | `/start`     | Wake up Sakura and get a welcome message 🌸    |
 | `/help`      | Show usage instructions and a short guide 💁   |
-| `/meow`       | Support the bot by buying flowers with Telegram Stars ⭐ |
+| `/ping`      | Check the bot's response time 🏓               |
+| `/meow`       | Support the bot with Telegram Stars ⭐        |
 | `/fams`    | View the list of top supporters 🏆             |
 
 ---
@@ -63,63 +64,63 @@ Whether you're looking to:
 ```
 sakurachat-bot/
 ├── kawai.py                 # Main entry point
-├── requirements.txt       # Dependencies
-├── Dockerfile            # Docker container configuration
-├── Procfile              # Process file for deployment
-├── README.md             # Project documentation
-└── Sakura/               # Core bot package
-    ├── __init__.py        # Package initialization and exports
-    ├── application.py     # Main application setup and initialization
+├── requirements.txt         # Dependencies
+├── Dockerfile               # Docker container configuration
+├── Procfile                 # Process file for deployment
+├── README.md                # Project documentation
+└── Sakura/                  # Core bot package
+    ├── __init__.py          # Package initialization and exports
+    ├── application.py       # Main application setup and initialization
     │
-    ├── Core/              # Core functionality and utilities
+    ├── Core/                # Core functionality and utilities
     │   ├── __init__.py
-    │   ├── config.py      # Configuration and environment variables
-    │   ├── logging.py     # Custom colored logging setup
-    │   ├── utils.py       # General utility functions
-    │   ├── helpers.py     # Bot-specific helper functions
-    │   ├── errors.py      # Error handling and custom exceptions
-    │   ├── server.py      # Dummy HTTP server for deployment
+    │   ├── config.py        # Configuration and environment variables
+    │   ├── logging.py       # Custom colored logging setup
+    │   ├── utils.py         # General utility functions
+    │   ├── helpers.py       # Bot-specific helper functions
+    │   ├── errors.py        # Error handling and custom exceptions
+    │   ├── server.py        # Dummy HTTP server for deployment
     │   └── authentication.py # Owner/user authentication
     │
-    ├── Storage/           # Data management and persistence
+    ├── Database/            # Data management and persistence
     │   ├── __init__.py
-    │   ├── database.py    # PostgreSQL database operations
-    │   ├── valkey.py      # Valkey/Redis cache operations
-    │   ├── sessions.py    # User session management
-    │   ├── cache.py       # Caching layer and utilities
-    │   ├── storage.py     # Data constants and storage utilities
-    │   └── conversation.py # Conversation history management
+    │   ├── database.py      # PostgreSQL database operations
+    │   ├── valkey.py        # Valkey/Redis cache operations
+    │   ├── sessions.py      # User session management
+    │   ├── cache.py         # Caching layer and utilities
+    │   ├── storage.py       # Data constants and storage utilities
+    │   └── conversation.py  # Conversation history management
     │
-    ├── AI/                # AI integrations and responses
+    ├── Chat/                # AI integrations and responses
     │   ├── __init__.py
-    │   ├── response.py    # Main AI response coordination
-    │   ├── chat.py        # Unified AI chat client
-    │   ├── prompts.py     # Character prompts and AI instructions
-    │   ├── images.py      # Image analysis and processing
-    │   └── polls.py       # Poll analysis functionality
+    │   ├── response.py      # Main AI response coordination
+    │   ├── chat.py          # Unified AI chat client
+    │   ├── prompts.py       # Character prompts and AI instructions
+    │   ├── images.py        # Image analysis and processing
+    │   ├── polls.py         # Poll analysis functionality
+    │   └── voice.py         # Voice message processing
     │
-    ├── Modules/         # User interface and interactions
+    ├── Modules/             # User interface and interactions
     │   ├── __init__.py
-    │   ├── handlers.py    # Message and update handlers
-    │   ├── commands.py    # Command implementations
-    │   ├── callbacks.py   # Callback query handlers
-    │   ├── keyboards.py   # Inline keyboard creation
-    │   ├── buttons.py     # Button layouts and configurations
-    │   ├── messages.py    # Message templates and constants
-    │   ├── reactions.py   # Emoji reactions and contextual responses
-    │   ├── stickers.py    # Sticker handling and responses
-    │   ├── effects.py     # Telethon effects and animations
-    │   ├── typing.py      # Chat action indicators
-    │   └── updates.py     # Update processing and routing
+    │   ├── handlers.py      # Message and update handlers
+    │   ├── commands.py      # Command implementations
+    │   ├── callbacks.py     # Callback query handlers
+    │   ├── keyboards.py     # Inline keyboard creation
+    │   ├── messages.py      # Message templates and constants
+    │   ├── reactions.py     # Emoji reactions and contextual responses
+    │   ├── stickers.py      # Sticker handling and responses
+    │   ├── effects.py       # Telethon effects and animations
+    │   ├── typing.py        # Chat action indicators
+    │   └── updates.py       # Update processing and routing
     │
-    └── Services/          # Bot services and specialized functions
+    └── Services/            # Bot services and specialized functions
         ├── __init__.py
-        ├── broadcast.py   # Broadcasting to users/groups
-        ├── payments.py    # Telegram Stars payment handling
-        ├── tracking.py    # User and chat tracking
-        ├── limiter.py     # Rate limiting and spam protection
-        ├── cleanup.py     # Memory and data cleanup tasks
-        └── stats.py       # Bot statistics and monitoring
+        ├── broadcast.py     # Broadcasting to users/groups
+        ├── payments.py      # Telegram Stars payment handling
+        ├── tracking.py      # User and chat tracking
+        ├── limiter.py       # Rate limiting and spam protection
+        ├── cleanup.py       # Memory and data cleanup tasks
+        └── stats.py         # Bot statistics and monitoring
 ```
 
 ---
