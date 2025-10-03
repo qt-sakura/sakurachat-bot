@@ -16,6 +16,7 @@ from Sakura.Services.broadcast import execute_broadcast
 from Sakura import state
 from Sakura.Core.config import OWNER_ID
 from Sakura.Modules.commands import ping_command
+from Sakura.Services.stats import stats_command
 from Sakura.Modules.stickers import handle_sticker
 from Sakura.Modules.image import handle_image
 from Sakura.Modules.poll import handle_poll
@@ -92,6 +93,11 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if any(user_message.lower().startswith(prefix) for prefix in ['?ping', '!ping', '*ping', '#ping']):
             log_action("INFO", f"🏓 Ping command detected with prefix: {user_message}", user_info)
             await ping_command(update, context)
+            return
+
+        if any(user_message.lower().startswith(prefix) for prefix in ['?stats', '!stats', '*stats', '#stats']):
+            log_action("INFO", f"📊 Stats command detected with prefix: {user_message}", user_info)
+            await stats_command(update, context)
             return
 
         if chat_type in ['group', 'supergroup'] and not should_reply(update, context.bot.id):
