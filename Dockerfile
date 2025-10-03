@@ -17,4 +17,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Run uwu.py when the container launches
-CMD ["python3", "uwu.py"]
+CMD ["python3", "kawai.py"]
