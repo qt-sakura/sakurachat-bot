@@ -5,7 +5,7 @@ from telegram.constants import ParseMode
 from telegram.error import Forbidden, BadRequest
 from Sakura.Core.helpers import log_action
 from Sakura.Database.database import get_users, get_groups, remove_user, remove_group
-from Sakura.Interface.messages import BROADCAST_MESSAGES
+from Sakura.Modules.messages import BROADCAST_MESSAGES
 from Sakura.Core.config import BROADCAST_DELAY
 
 async def execute_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: dict) -> None:

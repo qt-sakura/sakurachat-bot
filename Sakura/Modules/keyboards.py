@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from Sakura.Interface.messages import START_MESSAGES, HELP_MESSAGES, BROADCAST_MESSAGES
+from Sakura.Modules.messages import START_MESSAGES, HELP_MESSAGES, BROADCAST_MESSAGES
 from Sakura.Core.config import UPDATE_LINK, SUPPORT_LINK
 from Sakura import state
 

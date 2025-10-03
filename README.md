@@ -98,7 +98,7 @@ sakurachat-bot/
     │   ├── images.py      # Image analysis and processing
     │   └── polls.py       # Poll analysis functionality
     │
-    ├── Interface/         # User interface and interactions
+    ├── Modules/         # User interface and interactions
     │   ├── __init__.py
     │   ├── handlers.py    # Message and update handlers
     │   ├── commands.py    # Command implementations

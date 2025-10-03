@@ -2,7 +2,7 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes
 from Sakura.Core.helpers import fetch_user, log_action
-from Sakura.Interface.typing import sticker_action
+from Sakura.Modules.typing import sticker_action
 from Sakura.Database.storage import SAKURA_STICKERS
 
 async def handle_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

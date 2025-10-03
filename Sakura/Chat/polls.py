@@ -5,9 +5,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from Sakura.Core.helpers import log_action
-from Sakura.Interface.effects import animate_reaction
-from Sakura.Interface.reactions import CONTEXTUAL_REACTIONS
-from Sakura.Interface.typing import send_typing
+from Sakura.Modules.effects import animate_reaction
+from Sakura.Modules.reactions import CONTEXTUAL_REACTIONS
+from Sakura.Modules.typing import send_typing
 from Sakura.Database.conversation import add_history
 from Sakura.Chat.chat import chat_response
 
