@@ -65,7 +65,6 @@ sakurachat-bot/
 ├── kawai.py                 # Main entry point
 ├── requirements.txt       # Dependencies
 ├── Dockerfile            # Docker container configuration
-├── Meow.yaml             # Deployment configuration
 ├── Procfile              # Process file for deployment
 ├── README.md             # Project documentation
 └── Sakura/               # Core bot package
