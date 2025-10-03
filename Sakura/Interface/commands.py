@@ -21,7 +21,7 @@ from Sakura import state
 COMMANDS = [
     BotCommand("start", "👋 Wake me up"),
     BotCommand("meow", "🌸 Get flowers"),
-    BotCommand("fams", "💝 Flower buyers"),
+    BotCommand("fams", "🎀 Pookie homies"),
     BotCommand("help", "💬 A short guide")
 ]
 
