@@ -8,7 +8,7 @@ from Sakura.Core.helpers import log_action
 from Sakura.Interface.effects import animate_reaction
 from Sakura.Interface.reactions import CONTEXTUAL_REACTIONS
 from Sakura.Interface.typing import send_typing
-from Sakura.Storage.conversation import add_history
+from Sakura.Database.conversation import add_history
 from Sakura.Chat.chat import chat_response
 
 POLL_ANALYSIS_TRIGGERS = [

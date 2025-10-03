@@ -2,7 +2,7 @@ from typing import Optional, Dict
 
 from Sakura.Chat.chat import chat_response
 from Sakura.Core.helpers import get_error, log_action
-from Sakura.Storage.conversation import add_history
+from Sakura.Database.conversation import add_history
 
 
 async def get_response(

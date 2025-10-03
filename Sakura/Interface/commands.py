@@ -8,10 +8,10 @@ from Sakura.Features.tracking import track_user
 from Sakura.Interface.reactions import EMOJI_REACT
 from Sakura.Interface.effects import animate_reaction, add_reaction, photo_effect
 from Sakura.Interface.typing import sticker_action, photo_action
-from Sakura.Storage.storage import START_STICKERS, SAKURA_IMAGES
+from Sakura.Database.storage import START_STICKERS, SAKURA_IMAGES
 from Sakura.Interface.keyboards import start_menu, help_menu
 from Sakura.Core.config import PING_LINK, OWNER_ID
-from Sakura.Storage.database import get_users, get_groups
+from Sakura.Database.database import get_users, get_groups
 from Sakura.Interface.messages import (
     START_MESSAGES,
     HELP_MESSAGES,
