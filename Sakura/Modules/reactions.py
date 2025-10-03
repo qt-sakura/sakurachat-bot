@@ -2,7 +2,7 @@ import random
 from typing import Dict
 from telegram import Update
 from Sakura.Core.helpers import log_action
-from Sakura.Interface.effects import animate_reaction
+from Sakura.Modules.effects import animate_reaction
 
 # EMOJI REACTIONS
 EMOJI_REACT = [

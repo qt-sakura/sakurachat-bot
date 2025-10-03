@@ -2,9 +2,9 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes
 from Sakura.Core.helpers import fetch_user, log_action, get_error
-from Sakura.Interface.reactions import CONTEXTUAL_REACTIONS
-from Sakura.Interface.effects import animate_reaction
-from Sakura.Interface.typing import send_typing
+from Sakura.Modules.reactions import CONTEXTUAL_REACTIONS
+from Sakura.Modules.effects import animate_reaction
+from Sakura.Modules.typing import send_typing
 from Sakura.Chat.polls import analyze_poll
 
 async def handle_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

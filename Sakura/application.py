@@ -15,9 +15,9 @@ from Sakura.Core.utils import validate_config
 from Sakura.Core.errors import handle_error
 from Sakura.Database.database import connect_database, close_database
 from Sakura.Database.valkey import connect_cache, close_cache
-from Sakura.Interface.effects import start_effects, stop_effects, initialize_effects_client
+from Sakura.Modules.effects import start_effects, stop_effects, initialize_effects_client
 from Sakura.Services.cleanup import cleanup_conversations
-from Sakura.Interface.commands import (
+from Sakura.Modules.commands import (
     start_command,
     help_command,
     broadcast_command,
@@ -25,7 +25,7 @@ from Sakura.Interface.commands import (
     stats_command,
     COMMANDS,
 )
-from Sakura.Interface.callbacks import (
+from Sakura.Modules.callbacks import (
     start_callback,
     help_callback,
     broadcast_callback,
@@ -37,8 +37,8 @@ from Sakura.Services.payments import (
     meow_command,
     fams_command,
 )
-from Sakura.Interface.handlers import handle_messages
-from Sakura.Interface.updates import handle_member
+from Sakura.Modules.handlers import handle_messages
+from Sakura.Modules.updates import handle_member
 from Sakura.Chat.chat import initialize_chat_client
 from Sakura import state
 

@@ -5,14 +5,14 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from Sakura.Core.helpers import fetch_user, log_action, get_mention, get_error
 from Sakura.Services.tracking import track_user
-from Sakura.Interface.reactions import EMOJI_REACT
-from Sakura.Interface.effects import animate_reaction, add_reaction, photo_effect
-from Sakura.Interface.typing import sticker_action, photo_action
+from Sakura.Modules.reactions import EMOJI_REACT
+from Sakura.Modules.effects import animate_reaction, add_reaction, photo_effect
+from Sakura.Modules.typing import sticker_action, photo_action
 from Sakura.Database.storage import START_STICKERS, SAKURA_IMAGES
-from Sakura.Interface.keyboards import start_menu, help_menu
+from Sakura.Modules.keyboards import start_menu, help_menu
 from Sakura.Core.config import PING_LINK, OWNER_ID
 from Sakura.Database.database import get_users, get_groups
-from Sakura.Interface.messages import (
+from Sakura.Modules.messages import (
     START_MESSAGES,
     HELP_MESSAGES,
 )
@@ -138,8 +138,8 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     state.user_ids.update(await get_users())
     state.group_ids.update(await get_groups())
 
-    from Sakura.Interface.keyboards import broadcast_menu
-    from Sakura.Interface.messages import BROADCAST_MESSAGES
+    from Sakura.Modules.keyboards import broadcast_menu
+    from Sakura.Modules.messages import BROADCAST_MESSAGES
 
     keyboard = broadcast_menu()
     text = BROADCAST_MESSAGES["select_target"].format(
