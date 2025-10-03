@@ -5,7 +5,7 @@ from Sakura.Core.helpers import fetch_user, log_action, get_error
 from Sakura.Interface.reactions import CONTEXTUAL_REACTIONS
 from Sakura.Interface.effects import animate_reaction
 from Sakura.Interface.typing import send_typing
-from Sakura.AI.response import get_response
+from Sakura.Chat.response import get_response
 
 async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle image messages with AI analysis"""

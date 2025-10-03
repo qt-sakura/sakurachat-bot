@@ -5,7 +5,7 @@ from Sakura.Core.helpers import log_action
 from Sakura.Interface.reactions import CONTEXTUAL_REACTIONS
 from Sakura.Interface.effects import animate_reaction
 from Sakura.Interface.typing import send_typing
-from Sakura.AI.response import get_response
+from Sakura.Chat.response import get_response
 from Sakura import state
 
 IMAGE_ANALYSIS_TRIGGERS = [

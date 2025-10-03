@@ -6,11 +6,11 @@ from telegram.constants import ChatAction
 from Sakura.Core.helpers import fetch_user, log_action, should_reply, get_error, log_response
 from Sakura.Features.limiter import check_limit
 from Sakura.Interface.reactions import handle_reaction
-from Sakura.AI.images import reply_image
-from Sakura.AI.polls import reply_poll
+from Sakura.Chat.images import reply_image
+from Sakura.Chat.polls import reply_poll
 from Sakura.Interface.typing import send_typing
-from Sakura.AI.response import get_response
-from Sakura.AI.voice import generate_voice
+from Sakura.Chat.response import get_response
+from Sakura.Chat.voice import generate_voice
 from Sakura.Storage.cache import set_last_message, get_last_message
 from Sakura.Features.broadcast import execute_broadcast
 from Sakura import state

@@ -8,7 +8,7 @@ from Sakura.Core.config import OWNER_ID, MODEL, OPENROUTER_API_KEY
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Storage.conversation import get_history
-from Sakura.AI.prompts import SAKURA_PROMPT
+from Sakura.Chat.prompts import SAKURA_PROMPT
 from Sakura import state
 
 def initialize_chat_client():

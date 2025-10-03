@@ -39,7 +39,7 @@ from Sakura.Features.payments import (
 )
 from Sakura.Interface.handlers import handle_messages
 from Sakura.Interface.updates import handle_member
-from Sakura.AI.chat import initialize_chat_client
+from Sakura.Chat.chat import initialize_chat_client
 from Sakura import state
 
 async def setup_commands(application: Application) -> None:
