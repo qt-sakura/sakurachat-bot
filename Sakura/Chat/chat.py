@@ -1,8 +1,7 @@
-import asyncio
 import base64
 from typing import Optional, Dict
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from Sakura.Core.config import OWNER_ID, MODEL, OPENROUTER_API_KEY
 from Sakura.Core.logging import logger
@@ -15,7 +14,7 @@ def initialize_chat_client():
     """Initialize OpenRouter client for chat"""
     if OPENROUTER_API_KEY:
         try:
-            state.openrouter_client = OpenAI(
+            state.openrouter_client = AsyncOpenAI(
                 base_url="https://openrouter.ai/api/v1",
                 api_key=OPENROUTER_API_KEY,
             )
@@ -71,8 +70,7 @@ async def chat_response(
 
         messages.append({"role": "user", "content": current_message_content})
 
-        completion = await asyncio.to_thread(
-            state.openrouter_client.chat.completions.create,
+        completion = await state.openrouter_client.chat.completions.create(
             extra_headers={
                 "HTTP-Referer": "https://t.me/SakuraHarunoBot",
                 "X-Title": "Sakura Bot",
