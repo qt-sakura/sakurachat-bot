@@ -88,7 +88,7 @@ sakurachat-bot/
     │   ├── valkey.py        # Valkey/Redis cache operations
     │   ├── sessions.py      # User session management
     │   ├── cache.py         # Caching layer and utilities
-    │   ├── storage.py       # Data constants and storage utilities
+    │   ├── constants.py     # Data constants and storage utilities
     │   └── conversation.py  # Conversation history management
     │
     ├── Chat/                # AI integrations and responses
