@@ -1,5 +1,5 @@
 psutil
-openai
+openai>=1.0.0
 cryptg
 uvloop
 valkey
