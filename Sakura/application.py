@@ -13,8 +13,8 @@ from Sakura.Core.config import BOT_TOKEN
 from Sakura.Core.logging import logger
 from Sakura.Core.utils import validate_config
 from Sakura.Core.errors import handle_error
-from Sakura.Storage.database import connect_database, close_database
-from Sakura.Storage.valkey import connect_cache, close_cache
+from Sakura.Database.database import connect_database, close_database
+from Sakura.Database.valkey import connect_cache, close_cache
 from Sakura.Interface.effects import start_effects, stop_effects, initialize_effects_client
 from Sakura.Features.cleanup import cleanup_conversations
 from Sakura.Interface.commands import (

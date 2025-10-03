@@ -11,7 +11,7 @@ from Sakura.Chat.polls import reply_poll
 from Sakura.Interface.typing import send_typing
 from Sakura.Chat.response import get_response
 from Sakura.Chat.voice import generate_voice
-from Sakura.Storage.cache import set_last_message, get_last_message
+from Sakura.Database.cache import set_last_message, get_last_message
 from Sakura.Features.broadcast import execute_broadcast
 from Sakura import state
 from Sakura.Core.config import OWNER_ID
