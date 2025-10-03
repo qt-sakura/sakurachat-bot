@@ -4,7 +4,7 @@ from telegram import Update, BotCommand
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from Sakura.Core.helpers import fetch_user, log_action, get_mention, get_error
-from Sakura.Features.tracking import track_user
+from Sakura.Services.tracking import track_user
 from Sakura.Interface.reactions import EMOJI_REACT
 from Sakura.Interface.effects import animate_reaction, add_reaction, photo_effect
 from Sakura.Interface.typing import sticker_action, photo_action
@@ -171,7 +171,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             log_action("WARNING", "⚠️ Non-owner attempted /stats command", user_info)
             return
         log_action("INFO", "📊 /stats command received from owner", user_info)
-        from Sakura.Features.stats import send_stats
+        from Sakura.Services.stats import send_stats
         await send_stats(update.message.chat.id, context, is_refresh=False)
         log_action("INFO", "✅ Bot statistics sent to owner", user_info)
     except Exception as e:

@@ -112,7 +112,7 @@ sakurachat-bot/
     │   ├── typing.py      # Chat action indicators
     │   └── updates.py     # Update processing and routing
     │
-    └── Features/          # Bot features and specialized functions
+    └── Services/          # Bot services and specialized functions
         ├── __init__.py
         ├── broadcast.py   # Broadcasting to users/groups
         ├── payments.py    # Telegram Stars payment handling
