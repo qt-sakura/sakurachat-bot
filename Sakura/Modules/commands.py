@@ -8,7 +8,7 @@ from Sakura.Services.tracking import track_user
 from Sakura.Modules.reactions import EMOJI_REACT
 from Sakura.Modules.effects import animate_reaction, add_reaction, photo_effect
 from Sakura.Modules.typing import sticker_action, photo_action
-from Sakura.Database.storage import START_STICKERS, SAKURA_IMAGES
+from Sakura.Database.constants import START_STICKERS, SAKURA_IMAGES
 from Sakura.Modules.keyboards import start_menu, help_menu
 from Sakura.Core.config import PING_LINK, OWNER_ID
 from Sakura.Database.database import get_users, get_groups

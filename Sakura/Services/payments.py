@@ -14,7 +14,7 @@ from Sakura.Modules.reactions import EMOJI_REACT
 from Sakura.Modules.typing import send_typing
 from Sakura.Modules.messages import INVOICE_DESCRIPTIONS, THANK_YOU_MESSAGES, REFUND_MESSAGES
 from Sakura.Database.database import save_purchase, get_purchases
-from Sakura.Database.storage import PAYMENT_STICKERS
+from Sakura.Database.constants import PAYMENT_STICKERS
 from Sakura import state
 
 async def meow_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
