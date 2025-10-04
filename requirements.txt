@@ -1,5 +1,5 @@
 psutil
-openai>=1.0.0
+openai
 cryptg
 uvloop
 valkey
@@ -8,6 +8,6 @@ asyncpg
 requests
 tgcrypto
 telethon
+elevenlabs
 aiohttp[speedups]
 python-telegram-bot
-elevenlabs
