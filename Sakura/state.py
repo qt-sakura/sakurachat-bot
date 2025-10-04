@@ -1,6 +1,7 @@
 from typing import Dict, Set, Optional, List
 from telethon import TelegramClient
 from valkey.asyncio import Valkey as AsyncValkey
+from openai import AsyncOpenAI
 
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
