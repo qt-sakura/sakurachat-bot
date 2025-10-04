@@ -1,6 +1,6 @@
 from typing import Optional, Dict
 
-from Sakura.Chat.chat import get_response
+from Sakura.Chat.chat import get_response as _get_chat_response
 from Sakura.Core.helpers import get_error, log_action
 from Sakura.Database.conversation import add_history
 
@@ -14,7 +14,7 @@ async def get_response(
 ) -> str:
     """Gets a response from the AI."""
     try:
-        response = await get_response(user_message, user_id, user_info, image_bytes)
+        response = await _get_chat_response(user_message, user_id, user_info, image_bytes)
 
         if response:
             history_user_message = user_message
