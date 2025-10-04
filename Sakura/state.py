@@ -15,4 +15,5 @@ cleanup_task = None
 valkey_client: Optional[AsyncValkey] = None
 payment_storage: Dict[str, dict] = {}
 effects_client: Optional[TelegramClient] = None
-openrouter_client = None
+openrouter_clients = []
+current_key_index = 0
