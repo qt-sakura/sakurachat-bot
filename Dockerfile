@@ -1,20 +1,27 @@
-# Use an official Python runtime as a parent image
-FROM python:3.13
+FROM python:3.13-slim
 
-# Set the working directory in the container
+# Install system dependencies for building Python packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libffi-dev \
+    libpq-dev \
+    libssl-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
 
-# Upgrade pip to the latest version
+# Upgrade pip
 RUN pip install --upgrade pip
 
-# Copy the dependencies file to the working directory
+# Install Python dependencies
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install any needed packages specified in requirements.txt
-RUN pip install -r requirements.txt
-
-# Copy the rest of the application's code
+# Copy app code
 COPY . .
 
-# Run uwu.py when the container launches
+# Run your bot
 CMD ["python3", "kawai.py"]
