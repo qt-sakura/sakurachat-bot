@@ -9,7 +9,7 @@ from Sakura.Modules.effects import animate_reaction
 from Sakura.Modules.reactions import CONTEXTUAL_REACTIONS
 from Sakura.Modules.typing import send_typing
 from Sakura.Database.conversation import add_history
-from Sakura.Chat.chat import chat_response
+from Sakura.Chat.chat import get_response
 
 POLL_ANALYSIS_TRIGGERS = [
     "poll", "polls", "question", "questions", "query", "queries", "quiz", "quiz question",
@@ -90,7 +90,7 @@ Analyze this poll question and respond in Sakura's style about which option you 
 
 Sakura's response:"""
 
-        response = await chat_response(
+        response = await get_response(
             user_message=poll_prompt_message,
             user_id=user_id,
             user_info=user_info

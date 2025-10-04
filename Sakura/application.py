@@ -39,7 +39,7 @@ from Sakura.Services.payments import (
 )
 from Sakura.Modules.handlers import handle_messages
 from Sakura.Modules.updates import handle_member
-from Sakura.Chat.chat import initialize_chat_client
+from Sakura.Chat.chat import init_client
 from Sakura import state
 
 async def setup_commands(application: Application) -> None:
@@ -89,7 +89,7 @@ def run_bot() -> None:
     logger.info("🚀 Initializing Sakura Bot...")
 
     initialize_effects_client()
-    initialize_chat_client()
+    init_client()
 
     application = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
 
