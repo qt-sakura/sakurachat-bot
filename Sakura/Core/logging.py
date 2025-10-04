@@ -53,8 +53,7 @@ def setup_logging():
 
     # Create colored formatter with enhanced format
     formatter = ColoredFormatter(
-        fmt='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        fmt='%(name)s - [%(levelname)s] - %(message)s'
     )
     console_handler.setFormatter(formatter)
 
