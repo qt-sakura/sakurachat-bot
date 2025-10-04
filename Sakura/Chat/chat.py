@@ -3,7 +3,7 @@ from typing import Optional, Dict
 
 from openai import AsyncOpenAI
 
-from Sakura.Core.config import OWNER_ID, MODEL, OPENROUTER_API_KEY
+from Sakura.Core.config import OWNER_ID, MODEL, OPENROUTER_API_KEYS
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Database.conversation import get_history
@@ -11,16 +11,25 @@ from Sakura.Chat.prompts import SAKURA_PROMPT
 from Sakura import state
 
 def initialize_chat_client():
-    """Initialize OpenRouter client for chat"""
-    if OPENROUTER_API_KEY:
+    """Initialize OpenRouter clients for chat."""
+    if not OPENROUTER_API_KEYS:
+        logger.warning("⚠️ No OpenRouter API keys found, chat functionality will be disabled.")
+        return
+
+    for api_key in OPENROUTER_API_KEYS:
         try:
-            state.openrouter_client = AsyncOpenAI(
+            client = AsyncOpenAI(
                 base_url="https://openrouter.ai/api/v1",
-                api_key=OPENROUTER_API_KEY,
+                api_key=api_key,
             )
-            logger.info("✅ Chat client (OpenRouter) initialized successfully")
+            state.openrouter_clients.append(client)
         except Exception as e:
-            logger.error(f"❌ Failed to initialize chat client: {e}")
+            logger.error(f"❌ Failed to initialize chat client for a key: {e}")
+
+    if state.openrouter_clients:
+        logger.info(f"✅ {len(state.openrouter_clients)} chat client(s) (OpenRouter) initialized successfully")
+    else:
+        logger.error("❌ No chat clients could be initialized.")
 
 async def chat_response(
     user_message: str,
@@ -32,12 +41,16 @@ async def chat_response(
     if user_info:
         log_action("DEBUG", f"🤖 Getting AI response for message: '{user_message[:50]}...'", user_info)
 
-    if not hasattr(state, 'openrouter_client') or not state.openrouter_client:
+    if not state.openrouter_clients:
         if user_info:
-            log_action("WARNING", "❌ Chat client not available, using fallback response", user_info)
+            log_action("WARNING", "❌ Chat clients not available, using fallback response", user_info)
         return get_fallback()
 
     try:
+        # Round-robin key selection
+        client_to_use = state.openrouter_clients[state.current_key_index]
+        state.current_key_index = (state.current_key_index + 1) % len(state.openrouter_clients)
+
         is_owner = (user_id == OWNER_ID)
         model_to_use = MODEL
         prompt_to_use = SAKURA_PROMPT
@@ -63,14 +76,13 @@ async def chat_response(
             })
 
         if not current_message_content:
-             if user_info:
+            if user_info:
                 log_action("WARNING", "🤷‍♀️ No message content to send to AI.", user_info)
-             return get_fallback()
-
+            return get_fallback()
 
         messages.append({"role": "user", "content": current_message_content})
 
-        completion = await state.openrouter_client.chat.completions.create(
+        completion = await client_to_use.chat.completions.create(
             extra_headers={
                 "HTTP-Referer": "https://t.me/SakuraHarunoBot",
                 "X-Title": "Sakura Bot",
