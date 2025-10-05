@@ -7,7 +7,7 @@ orjson
 asyncpg
 requests
 tgcrypto
-telethon
+pyrogram
 elevenlabs
 aiohttp[speedups]
 python-telegram-bot

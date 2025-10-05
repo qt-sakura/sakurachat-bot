@@ -2,7 +2,7 @@ import os
 import random
 import aiohttp
 import orjson
-from telethon import TelegramClient
+from pyrogram import Client
 from telegram import ReactionTypeEmoji
 from Sakura.Core.config import BOT_TOKEN, API_ID, API_HASH
 from Sakura.Core.logging import logger
@@ -14,19 +14,24 @@ EFFECTS = [
 ]
 
 def initialize_effects_client():
-    """Initialize Telethon client for effects"""
+    """Initialize Pyrogram client for effects"""
     if os.path.exists('sakura_effects.session'):
         os.remove('sakura_effects.session')
     try:
-        state.effects_client = TelegramClient('sakura_effects', API_ID, API_HASH)
-        logger.info("✅ Telethon effects client initialized")
+        state.effects_client = Client(
+            'sakura_effects',
+            api_id=API_ID,
+            api_hash=API_HASH,
+            bot_token=BOT_TOKEN
+        )
+        logger.info("✅ Pyrogram effects client initialized")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Telethon effects client: {e}")
+        logger.error(f"❌ Failed to initialize Pyrogram effects client: {e}")
 
 async def send_effect(chat_id: int, text: str, reply_markup=None) -> bool:
-    """Send message with random effect using Telethon"""
+    """Send message with random effect using Pyrogram"""
     if not state.effects_client:
-        logger.warning("⚠️ Telethon effects client not available")
+        logger.warning("⚠️ Pyrogram effects client not available")
         return False
 
     try:
@@ -90,7 +95,7 @@ async def add_reaction(context, update, emoji: str, user_info: dict):
 async def photo_effect(chat_id: int, photo_url: str, caption: str, reply_markup=None) -> bool:
     """Send photo message with random effect using direct API"""
     if not state.effects_client:
-        logger.warning("⚠️ Telethon effects client not available")
+        logger.warning("⚠️ Pyrogram effects client not available")
         return False
 
     try:
@@ -118,20 +123,20 @@ async def photo_effect(chat_id: int, photo_url: str, caption: str, reply_markup=
         return False
 
 async def start_effects():
-    """Start Telethon effects client"""
+    """Start Pyrogram effects client"""
     if state.effects_client:
         try:
-            await state.effects_client.start(bot_token=BOT_TOKEN)
-            logger.info("✅ Telethon effects client started successfully")
+            await state.effects_client.start()
+            logger.info("✅ Pyrogram effects client started successfully")
         except Exception as e:
-            logger.error(f"❌ Failed to start Telethon effects client: {e}")
+            logger.error(f"❌ Failed to start Pyrogram effects client: {e}")
             state.effects_client = None
 
 async def stop_effects():
-    """Stop Telethon effects client"""
+    """Stop Pyrogram effects client"""
     if state.effects_client:
         try:
-            await state.effects_client.disconnect()
-            logger.info("✅ Telethon effects client stopped")
+            await state.effects_client.stop()
+            logger.info("✅ Pyrogram effects client stopped")
         except Exception as e:
-            logger.error(f"❌ Error stopping Telethon effects client: {e}")
+            logger.error(f"❌ Error stopping Pyrogram effects client: {e}")
