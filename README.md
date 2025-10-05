@@ -50,7 +50,7 @@ Whether you're looking to:
 ## ⚙️ Tech Stack
 
 - **Language:** Python 3.8+
-- **Core Libraries:** `python-telegram-bot`, `telethon`
+- **Core Libraries:** `python-telegram-bot`, `pyrogram`
 - **AI APIs:** OpenRouter
 - **Database:** PostgreSQL (via `asyncpg`)
 - **Caching:** Valkey (a high-performance Redis fork)
@@ -109,7 +109,7 @@ sakurachat-bot/
     │   ├── messages.py      # Message templates and constants
     │   ├── reactions.py     # Emoji reactions and contextual responses
     │   ├── stickers.py      # Sticker handling and responses
-    │   ├── effects.py       # Telethon effects and animations
+    │   ├── effects.py       # Pyrogram effects and animations
     │   ├── typing.py        # Chat action indicators
     │   └── updates.py       # Update processing and routing
     │

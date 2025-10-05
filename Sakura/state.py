@@ -1,5 +1,5 @@
 from typing import Dict, Set, Optional, List
-from telethon import TelegramClient
+from pyrogram import Client
 from valkey.asyncio import Valkey as AsyncValkey
 from openai import AsyncOpenAI
 
@@ -15,5 +15,5 @@ db_pool = None
 cleanup_task = None
 valkey_client: Optional[AsyncValkey] = None
 payment_storage: Dict[str, dict] = {}
-effects_client: Optional[TelegramClient] = None
+effects_client: Optional[Client] = None
 openrouter_clients: List[AsyncOpenAI] = []
