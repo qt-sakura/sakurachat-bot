@@ -3,7 +3,7 @@ from typing import Optional, Dict
 
 from openai import AsyncOpenAI
 
-from Sakura.Core.config import OWNER_ID, MODEL, OPENROUTER_API_KEYS
+from Sakura.Core.config import OWNER_ID, OPENROUTER_MODEL, OPENROUTER_API_KEYS
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Database.conversation import get_history
@@ -59,7 +59,7 @@ async def get_response(
 
         try:
             is_owner = (user_id == OWNER_ID)
-            model_to_use = MODEL
+            model_to_use = OPENROUTER_MODEL
             prompt_to_use = SAKURA_PROMPT
 
             if user_info:
