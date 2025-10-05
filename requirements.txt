@@ -1,13 +1,12 @@
 psutil
 openai
-cryptg
 uvloop
 valkey
 orjson
 asyncpg
 requests
 tgcrypto
-pyrogram
+kurigram
 elevenlabs
 aiohttp[speedups]
 python-telegram-bot
