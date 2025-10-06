@@ -8,7 +8,7 @@ from Sakura.Modules.messages import START_MESSAGES, HELP_MESSAGES, BROADCAST_MES
 from Sakura.Modules.typing import send_typing
 from Sakura.Chat.response import get_response
 from Sakura.Modules.effects import send_effect
-from Sakura.Services.payments import send_invoice
+from Sakura.Modules.payments import send_invoice
 from Sakura import state
 from Sakura.Core.config import OWNER_ID
 
