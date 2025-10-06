@@ -43,7 +43,9 @@ async def send_effect(chat_id: int, text: str, reply_markup=None) -> bool:
             'parse_mode': 'HTML'
         }
         if reply_markup:
-            payload['reply_markup'] = reply_markup.to_dict()
+            payload['reply_markup'] = {
+                "inline_keyboard": reply_markup.inline_keyboard
+            }
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -103,7 +105,9 @@ async def photo_effect(chat_id: int, photo_url: str, caption: str, reply_markup=
             'parse_mode': 'HTML'
         }
         if reply_markup:
-            payload['reply_markup'] = reply_markup.to_dict()
+            payload['reply_markup'] = {
+                "inline_keyboard": reply_markup.inline_keyboard
+            }
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
