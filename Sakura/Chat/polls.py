@@ -1,9 +1,7 @@
 import random
-import asyncio
 from typing import Dict
-from telegram import Update
-from telegram.ext import ContextTypes
-
+from pyrogram import Client
+from pyrogram.types import Message
 from Sakura.Core.helpers import log_action
 from Sakura.Modules.effects import animate_reaction
 from Sakura.Modules.reactions import CONTEXTUAL_REACTIONS
@@ -22,7 +20,7 @@ POLL_ANALYSIS_TRIGGERS = [
     "kaunsa galat", "kaunsa option", "kaunsa choice"
 ]
 
-async def reply_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_message: str, user_info: dict) -> bool:
+async def reply_poll(client: Client, message: Message, user_message: str, user_info: dict) -> bool:
     """Check if user is asking to analyze a previously sent poll and handle it"""
     message_lower = user_message.lower()
     contains_poll_request = any(trigger in message_lower for trigger in POLL_ANALYSIS_TRIGGERS)
@@ -32,42 +30,44 @@ async def reply_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, user_me
 
     log_action("DEBUG", "🔍 Detected potential poll analysis request", user_info)
 
-    if update.message.reply_to_message and update.message.reply_to_message.poll:
+    if message.reply_to_message and message.reply_to_message.poll:
         log_action("INFO", "🔍 User asking about replied poll", user_info)
 
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
             await animate_reaction(
-                chat_id=update.effective_chat.id,
-                message_id=update.message.message_id,
+                client,
+                chat_id=message.chat.id,
+                message_id=message.id,
                 emoji=emoji_to_react
             )
             await animate_reaction(
-                chat_id=update.effective_chat.id,
-                message_id=update.message.reply_to_message.message_id,
+                client,
+                chat_id=message.chat.id,
+                message_id=message.reply_to_message.id,
                 emoji=emoji_to_react
             )
             log_action("INFO", f"🤔 Sent analysis reaction '{emoji_to_react}' for replied poll", user_info)
         except Exception as e:
             log_action("WARNING", f"⚠️ Could not send analysis reaction for replied poll: {e}", user_info)
 
-        await send_typing(context, update.effective_chat.id, user_info)
+        await send_typing(client, message.chat.id, user_info)
 
         try:
-            poll = update.message.reply_to_message.poll
+            poll = message.reply_to_message.poll
             poll_question = poll.question
             poll_options = [option.text for option in poll.options]
 
             response = await analyze_poll(
                 poll_question, poll_options, user_info, user_info["user_id"]
             )
-            await update.message.reply_text(response)
+            await message.reply_text(response)
             log_action("INFO", "✅ Referenced poll analyzed successfully", user_info)
             return True
         except Exception as e:
             log_action("ERROR", f"❌ Error analyzing referenced poll: {e}", user_info)
             error_response = "Poll analyze nahi kar paa rahi 😔"
-            await update.message.reply_text(error_response)
+            await message.reply_text(error_response)
             return True
     return False
 

@@ -1,7 +1,7 @@
 import random
 import time
 from typing import Dict
-from telegram import Message, Update
+from pyrogram.types import Message, User
 from Sakura.Core.logging import logger
 from Sakura.Modules.messages import RESPONSES, ERROR
 from Sakura import state
@@ -19,7 +19,7 @@ def fetch_user(msg: Message) -> Dict[str, any]:
         "first_name": u.first_name,
         "last_name": u.last_name,
         "chat_id": c.id,
-        "chat_type": c.type,
+        "chat_type": str(c.type).split('.')[-1].lower(),
         "chat_title": c.title or c.first_name or "",
         "chat_username": f"@{c.username}" if c.username else "No Username",
         "chat_link": f"https://t.me/{c.username}" if c.username else "No Link",
@@ -51,17 +51,18 @@ def log_action(level: str, message: str, user_info: Dict[str, any]) -> None:
     else:
         logger.info(full_message)
 
-def should_reply(update: Update, bot_id: int) -> bool:
+def should_reply(message: Message, bot_id: int) -> bool:
     """Determine if bot should respond in group chat"""
-    user_message = update.message.text or update.message.caption or ""
+    user_message = message.text or message.caption or ""
     if "sakura" in user_message.lower():
         return True
-    if (update.message.reply_to_message and
-        update.message.reply_to_message.from_user.id == bot_id):
+    if (message.reply_to_message and
+        message.reply_to_message.from_user and
+        message.reply_to_message.from_user.id == bot_id):
         return True
     return False
 
-def get_mention(user) -> str:
+def get_mention(user: User) -> str:
     """Create user mention for HTML parsing using first name"""
     first_name = user.first_name or "Friend"
     return f'<a href="tg://user?id={user.id}">{first_name}</a>'

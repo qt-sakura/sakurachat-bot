@@ -1,35 +1,18 @@
 import time
 import psutil
 import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-from Sakura.Core.helpers import fetch_user, log_action
-from Sakura.Core.config import OWNER_ID
+from pyrogram import Client
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.enums import ParseMode
+from Sakura.Core.helpers import log_action
 from Sakura import state
 
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Hidden owner command to show bot statistics with refresh functionality"""
-    try:
-        user_info = fetch_user(update.message)
-        if update.effective_user.id != OWNER_ID:
-            log_action("WARNING", "⚠️ Non-owner attempted /stats command", user_info)
-            return
-
-        log_action("INFO", "📊 /stats command received from owner", user_info)
-        await send_stats(update.message.chat.id, context, is_refresh=False)
-        log_action("INFO", "✅ Bot statistics sent to owner", user_info)
-
-    except Exception as e:
-        user_info = fetch_user(update.message)
-        log_action("ERROR", f"❌ Error in /stats command: {e}", user_info)
-        await update.message.reply_text("❌ Something went wrong getting bot statistics!")
-
-async def send_stats(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refresh: bool = False):
+async def send_stats(chat_id: int, client: Client, is_refresh: bool = False):
     """Send or update stats message with current data"""
     try:
         ping_start = time.time()
         try:
-            await context.bot.get_me()
+            await client.get_me()
             ping_ms = round((time.time() - ping_start) * 1000, 2)
         except Exception:
             ping_ms = "Error"
@@ -105,10 +88,10 @@ async def send_stats(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refres
         if is_refresh:
             return stats_message, reply_markup
         else:
-            await context.bot.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=stats_message,
-                parse_mode="HTML",
+                parse_mode=ParseMode.HTML,
                 reply_markup=reply_markup,
                 disable_web_page_preview=True
             )
@@ -116,4 +99,4 @@ async def send_stats(chat_id: int, context: ContextTypes.DEFAULT_TYPE, is_refres
     except Exception as e:
         log_action("ERROR", f"❌ Error generating stats message: {e}", {})
         if not is_refresh:
-            await context.bot.send_message(chat_id, "❌ Error generating statistics!")
+            await client.send_message(chat_id, "❌ Error generating statistics!")
