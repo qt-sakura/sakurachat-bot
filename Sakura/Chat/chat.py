@@ -17,7 +17,7 @@ def init_client():
         logger.warning("⚠️ No OpenRouter API keys found, chat functionality will be disabled.")
         return
 
-    logger.info(f"Initializing {len(OPENROUTER_API_KEYS)} OpenRouter API key(s).")
+    logger.info(f"🫡 Initializing {len(OPENROUTER_API_KEYS)} OpenRouter API key(s).")
     for api_key in OPENROUTER_API_KEYS:
         try:
             client = AsyncOpenAI(
