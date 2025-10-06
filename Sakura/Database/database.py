@@ -49,9 +49,20 @@ async def connect_database():
                     first_name TEXT,
                     last_name TEXT,
                     amount INTEGER NOT NULL,
-                    telegram_payment_charge_id TEXT UNIQUE,
+                    charge_id TEXT UNIQUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+            await conn.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'purchases' AND column_name = 'telegram_payment_charge_id'
+                    ) THEN
+                        ALTER TABLE purchases RENAME COLUMN telegram_payment_charge_id TO charge_id;
+                    END IF;
+                END $$;
             """)
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_groups_created_at ON groups(created_at)")
@@ -162,9 +173,9 @@ async def _save_purchase(user_id: int, username: str, first_name: str, last_name
     try:
         async with state.db_pool.acquire() as conn:
             await conn.execute("""
-                INSERT INTO purchases (user_id, username, first_name, last_name, amount, telegram_payment_charge_id)
+                INSERT INTO purchases (user_id, username, first_name, last_name, amount, charge_id)
                 VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (telegram_payment_charge_id) DO NOTHING
+                ON CONFLICT (charge_id) DO NOTHING
             """, user_id, username, first_name, last_name, amount, charge_id)
         logger.debug(f"💾 Purchase saved to database: user {user_id}, amount {amount}")
     except Exception as e:
