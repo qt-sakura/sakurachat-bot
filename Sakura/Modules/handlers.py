@@ -71,7 +71,7 @@ async def handle_messages(client: Client, message: Message) -> None:
             last_bot_message = await get_last_message(user_id)
             if last_bot_message:
                 log_action("INFO", "🎤 User requested last message in voice", user_info)
-                await client.send_chat_action(chat_id=message.chat.id, action=ChatAction.RECORD_VOICE)
+                await client.send_chat_action(chat_id=message.chat.id, action=ChatAction.RECORD_AUDIO)
                 voice_data = await generate_voice(last_bot_message)
                 if voice_data:
                     await message.reply_voice(voice=voice_data)
@@ -98,7 +98,7 @@ async def handle_messages(client: Client, message: Message) -> None:
         voice_data = None
         if random.random() < 0.1:  # 10% chance
             log_action("INFO", "🎤 Attempting to send response as voice (10% chance)", user_info)
-            await client.send_chat_action(chat_id=message.chat.id, action=ChatAction.RECORD_VOICE)
+            await client.send_chat_action(chat_id=message.chat.id, action=ChatAction.RECORD_AUDIO)
             voice_data = await generate_voice(ai_response)
 
         if voice_data:
