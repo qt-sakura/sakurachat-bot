@@ -1,14 +1,14 @@
 import asyncio
-from telegram import Update
-from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
-from telegram.error import Forbidden, BadRequest
+from pyrogram import Client
+from pyrogram.types import Message
+from pyrogram.enums import ParseMode
+from pyrogram.errors import UserIsBlocked, PeerIdInvalid, ChatAdminRequired, FloodWait
 from Sakura.Core.helpers import log_action
 from Sakura.Database.database import get_users, get_groups, remove_user, remove_group
 from Sakura.Modules.messages import BROADCAST_MESSAGES
 from Sakura.Core.config import BROADCAST_DELAY
 
-async def execute_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_type: str, user_info: dict) -> None:
+async def execute_broadcast(message: Message, client: Client, target_type: str, user_info: dict) -> None:
     """Execute broadcast with the current message"""
     try:
         if target_type == "users":
@@ -24,17 +24,17 @@ async def execute_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         log_action("INFO", f"🚀 Starting broadcast to {len(target_list)} {target_name}", user_info)
 
         if not target_list:
-            await update.message.reply_text(
+            await message.reply_text(
                 BROADCAST_MESSAGES["no_targets"].format(target_type=target_name)
             )
             log_action("WARNING", f"⚠️ No {target_name} found for broadcast", user_info)
             return
 
-        is_forwarded = update.message.forward_origin is not None
-        broadcast_method = "forward" if is_forwarded else "copy"
+        is_forward = message.forward_from or message.forward_from_chat
+        broadcast_method = "forward" if is_forward else "copy"
         log_action("INFO", f"📤 Using {broadcast_method} method for broadcast", user_info)
 
-        status_msg = await update.message.reply_text(
+        status_msg = await message.reply_text(
             BROADCAST_MESSAGES["progress"].format(count=len(target_list), target_type=target_name)
         )
 
@@ -43,41 +43,36 @@ async def execute_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         for i, target_id in enumerate(target_list, 1):
             try:
-                if is_forwarded:
-                    await context.bot.forward_message(
+                if is_forward:
+                    await client.forward_messages(
                         chat_id=target_id,
-                        from_chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id
+                        from_chat_id=message.chat.id,
+                        message_ids=message.id
                     )
                 else:
-                    await context.bot.copy_message(
-                        chat_id=target_id,
-                        from_chat_id=update.effective_chat.id,
-                        message_id=update.message.message_id
-                    )
+                    await message.copy(chat_id=target_id)
                 broadcast_count += 1
                 if i % 10 == 0:
                     log_action("DEBUG", f"📡 Broadcast progress: {i}/{len(target_list)} using {broadcast_method}", user_info)
                 await asyncio.sleep(BROADCAST_DELAY)
 
-            except Forbidden:
+            except FloodWait as e:
+                log_action("WARNING", f"⏳ Flood wait of {e.value} seconds requested. Pausing broadcast.", user_info)
+                await asyncio.sleep(e.value)
+                if is_forward:
+                    await client.forward_messages(chat_id=target_id, from_chat_id=message.chat.id, message_ids=message.id)
+                else:
+                    await message.copy(chat_id=target_id)
+                broadcast_count += 1
+            except (UserIsBlocked, PeerIdInvalid):
                 failed_count += 1
                 if target_name == "users":
                     await remove_user(target_id)
                 elif target_name == "groups":
                     await remove_group(target_id)
-            except BadRequest as e:
+            except (ChatAdminRequired, Exception) as e:
                 failed_count += 1
-                if "chat not found" in str(e).lower():
-                    if target_name == "users":
-                        await remove_user(target_id)
-                    else:
-                        await remove_group(target_id)
-                else:
-                    log_action("ERROR", f"❌ Broadcast failed for {target_id}: {e}", user_info)
-            except Exception as e:
-                failed_count += 1
-                log_action("ERROR", f"❌ Unhandled broadcast error for {target_id}: {e}", user_info)
+                log_action("ERROR", f"❌ Broadcast failed for {target_id}: {e}", user_info)
 
         await status_msg.edit_text(
             BROADCAST_MESSAGES["completed"].format(
@@ -92,6 +87,6 @@ async def execute_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     except Exception as e:
         log_action("ERROR", f"❌ Broadcast error: {e}", user_info)
-        await update.message.reply_text(
+        await message.reply_text(
             BROADCAST_MESSAGES["failed"].format(error=str(e))
         )

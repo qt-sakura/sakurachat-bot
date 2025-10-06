@@ -1,6 +1,7 @@
 import random
 from typing import Dict
-from telegram import Update
+from pyrogram import Client
+from pyrogram.types import Message
 from Sakura.Core.helpers import log_action
 from Sakura.Modules.effects import animate_reaction
 
@@ -135,7 +136,7 @@ REACTION_KEYWORDS = {
     ]
 }
 
-async def handle_reaction(update: Update, user_info: Dict[str, any]):
+async def handle_reaction(client: Client, message: Message, user_info: Dict[str, any]):
     """
     Analyzes the message text and sends a contextual, animated emoji reaction
     with a certain probability.
@@ -144,7 +145,7 @@ async def handle_reaction(update: Update, user_info: Dict[str, any]):
         if random.random() > 0.3:
             return
 
-        message_text = (update.message.text or "").lower()
+        message_text = (message.text or "").lower()
         if not message_text:
             return
 
@@ -162,8 +163,9 @@ async def handle_reaction(update: Update, user_info: Dict[str, any]):
             log_action("INFO", f"🥰 Selected emoji for reaction: {emoji_to_react}", user_info)
 
             await animate_reaction(
-                chat_id=update.effective_chat.id,
-                message_id=update.message.message_id,
+                client,
+                chat_id=message.chat.id,
+                message_id=message.id,
                 emoji=emoji_to_react
             )
             log_action("INFO", f"🚀 Sent animated reaction '{emoji_to_react}' successfully", user_info)
