@@ -1,5 +1,4 @@
 psutil
-openai
 uvloop
 valkey
 orjson
@@ -9,3 +8,4 @@ tgcrypto
 kurigram
 elevenlabs
 aiohttp[speedups]
+sambanova
