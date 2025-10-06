@@ -1,12 +1,15 @@
 import random
 import asyncio
+import aiohttp
+import orjson
 from pyrogram import Client, filters
 from pyrogram.types import Message, LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup, PreCheckoutQuery, LinkPreviewOptions
 from pyrogram.enums import ParseMode, ChatType
+from Sakura.Core.config import BOT_TOKEN
 from Sakura.Core.helpers import fetch_user, log_action, get_error
 from Sakura.Core.logging import logger
 from Sakura.Services.tracking import track_user
-from Sakura.Modules.effects import animate_reaction, add_reaction, send_effect
+from Sakura.Modules.effects import animate_reaction, add_reaction, send_effect, EFFECTS
 from Sakura.Modules.reactions import EMOJI_REACT
 from Sakura.Modules.typing import send_typing
 from Sakura.Modules.messages import INVOICE_DESCRIPTIONS, THANK_YOU_MESSAGES, REFUND_MESSAGES
@@ -42,7 +45,10 @@ async def meow_command_handler(client: Client, message: Message) -> None:
             elif amount < 1:
                 amount = 1
 
-        await send_invoice(client, message.chat.id, user_info, amount)
+        if message.chat.type == ChatType.PRIVATE:
+            await send_invoice(client, message.chat.id, user_info, amount, message_effect_id=random.choice(EFFECTS))
+        else:
+            await send_invoice(client, message.chat.id, user_info, amount)
 
     except Exception as e:
         user_info = fetch_user(message)
@@ -102,18 +108,38 @@ async def fams_command_handler(client: Client, message: Message) -> None:
         log_action("ERROR", f"❌ Error in buyers command: {e}", user_info)
         await message.reply_text(get_error())
 
-async def send_invoice(client: Client, chat_id: int, user_info: dict, amount: int):
+async def send_invoice(client: Client, chat_id: int, user_info: dict, amount: int, message_effect_id: str = None):
     """Sends a payment invoice."""
     try:
-        await client.send_invoice(
-            chat_id=chat_id,
-            title="Flowers 🌸",
-            description=random.choice(INVOICE_DESCRIPTIONS),
-            payload=f"sakura_star_{user_info['user_id']}",
-            provider_token="",  # provider_token is not needed for Stars
-            currency="XTR",
-            prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
-        )
+        if message_effect_id:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice"
+            payload = {
+                'chat_id': chat_id,
+                'title': "Flowers 🌸",
+                'description': random.choice(INVOICE_DESCRIPTIONS),
+                'payload': f"sakura_star_{user_info['user_id']}",
+                'provider_token': "",
+                'currency': "XTR",
+                'prices': orjson.dumps([{'label': '✨ Sakura Star', 'amount': amount}]),
+                'message_effect_id': message_effect_id
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=payload) as response:
+                    result = await response.json()
+                    if not result.get('ok'):
+                        log_action("ERROR", f"❌ API Error sending invoice with effect: {result.get('description')}", user_info)
+                        # Fallback to regular invoice
+                        await send_invoice(client, chat_id, user_info, amount)
+        else:
+            await client.send_invoice(
+                chat_id=chat_id,
+                title="Flowers 🌸",
+                description=random.choice(INVOICE_DESCRIPTIONS),
+                payload=f"sakura_star_{user_info['user_id']}",
+                provider_token="",  # provider_token is not needed for Stars
+                currency="XTR",
+                prices=[LabeledPrice(label='✨ Sakura Star', amount=amount)]
+            )
         log_action("INFO", f"✅ Invoice sent for {amount} stars", user_info)
     except Exception as e:
         log_action("ERROR", f"❌ Error sending invoice: {e}", user_info)
