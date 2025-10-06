@@ -24,7 +24,7 @@ Whether you're looking to:
 
 ## ✨ Features
 
-- **Contextual AI-Powered Conversations** — Powered by **OpenRouter**, Sakura provides thoughtful, context-aware responses tailored to the conversation.
+- **Contextual AI-Powered Conversations** — Powered by **SambaNova**, Sakura provides thoughtful, context-aware responses tailored to the conversation.
 - **Image, Poll, and Voice Message Analysis** — Send an image, poll, or voice message, and Sakura will analyze and comment on it.
 - **Contextual Emoji Reactions** — The bot automatically reacts to messages with animated emojis that match the context of the conversation.
 - **Sticker-Reply Support** — Reply to Sakura's messages with a sticker, and she'll send one back.
@@ -50,8 +50,8 @@ Whether you're looking to:
 ## ⚙️ Tech Stack
 
 - **Language:** Python 3.8+
-- **Core Libraries:** `python-telegram-bot`, `pyrogram`
-- **AI APIs:** OpenRouter
+- **Core Libraries:** `Pyrogram`, `aiohttp`
+- **AI APIs:** SambaNova
 - **Database:** PostgreSQL (via `asyncpg`)
 - **Caching:** Valkey (a high-performance Redis fork)
 - **Performance:** `uvloop` (for asyncio event loop), `orjson` (for fast JSON processing)
@@ -63,14 +63,13 @@ Whether you're looking to:
 
 ```
 sakurachat-bot/
-├── kawai.py                 # Main entry point
+├── sakura.py                # Main entry point
 ├── requirements.txt         # Dependencies
 ├── Dockerfile               # Docker container configuration
 ├── Procfile                 # Process file for deployment
 ├── README.md                # Project documentation
 └── Sakura/                  # Core bot package
     ├── __init__.py          # Package initialization and exports
-    ├── application.py       # Main application setup and initialization
     │
     ├── Core/                # Core functionality and utilities
     │   ├── __init__.py
