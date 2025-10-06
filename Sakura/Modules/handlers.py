@@ -48,7 +48,7 @@ async def handle_messages(client: Client, message: Message) -> None:
             log_action("WARNING", "⏱️ Rate limited - ignoring message", user_info)
             return
 
-        asyncio.create_task(handle_reaction(message, user_info))
+        asyncio.create_task(handle_reaction(client, message, user_info))
 
         if message.sticker:
             await handle_sticker(client, message)
