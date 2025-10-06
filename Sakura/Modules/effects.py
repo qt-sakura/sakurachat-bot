@@ -3,7 +3,8 @@ import random
 import aiohttp
 import orjson
 from pyrogram import Client
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup
+
 from Sakura.Core.config import BOT_TOKEN, API_ID, API_HASH
 from Sakura.Core.logging import logger
 from Sakura import state
@@ -12,6 +13,24 @@ EFFECTS = [
     "5104841245755180586",
     "5159385139981059251"
 ]
+
+def serialize_reply_markup(reply_markup):
+    if not reply_markup:
+        return None
+    if isinstance(reply_markup, InlineKeyboardMarkup):
+        keyboard = []
+        for row in reply_markup.inline_keyboard:
+            new_row = []
+            for button in row:
+                new_button = {"text": button.text}
+                if button.callback_data:
+                    new_button["callback_data"] = button.callback_data
+                if button.url:
+                    new_button["url"] = button.url
+                new_row.append(new_button)
+            keyboard.append(new_row)
+        return {"inline_keyboard": keyboard}
+    return None
 
 def initialize_effects_client():
     """Initialize Pyrogram client for effects"""
@@ -43,9 +62,7 @@ async def send_effect(chat_id: int, text: str, reply_markup=None) -> bool:
             'parse_mode': 'HTML'
         }
         if reply_markup:
-            payload['reply_markup'] = {
-                "inline_keyboard": reply_markup.inline_keyboard
-            }
+            payload['reply_markup'] = serialize_reply_markup(reply_markup)
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -105,9 +122,7 @@ async def photo_effect(chat_id: int, photo_url: str, caption: str, reply_markup=
             'parse_mode': 'HTML'
         }
         if reply_markup:
-            payload['reply_markup'] = {
-                "inline_keyboard": reply_markup.inline_keyboard
-            }
+            payload['reply_markup'] = serialize_reply_markup(reply_markup)
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
