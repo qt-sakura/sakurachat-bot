@@ -20,7 +20,7 @@ async def meow_command_handler(client: Client, message: Message) -> None:
     try:
         user_info = fetch_user(message)
         log_action("INFO", "🌸 /meow command received", user_info)
-        track_user(message, user_info)
+        await track_user(message, user_info)
 
         if EMOJI_REACT:
             try:
@@ -55,7 +55,7 @@ async def fams_command_handler(client: Client, message: Message) -> None:
     try:
         user_info = fetch_user(message)
         log_action("INFO", "💝 /fams command received", user_info)
-        track_user(message, user_info)
+        await track_user(message, user_info)
 
         if EMOJI_REACT:
             try:

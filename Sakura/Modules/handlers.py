@@ -32,7 +32,7 @@ async def handle_messages(client: Client, message: Message) -> None:
         chat_type = message.chat.type.name.lower()
         log_action("DEBUG", f"📨 Processing message in {chat_type}", user_info)
 
-        track_user(message, user_info)
+        await track_user(message, user_info)
 
         if user_id == OWNER_ID and user_id in state.broadcast_mode:
             log_action("INFO", f"📢 Executing broadcast to {state.broadcast_mode[user_id]}", user_info)
