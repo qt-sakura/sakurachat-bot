@@ -163,7 +163,6 @@ async def handle_reaction(client: Client, message: Message, user_info: Dict[str,
             log_action("INFO", f"🥰 Selected emoji for reaction: {emoji_to_react}", user_info)
 
             await animate_reaction(
-                client,
                 chat_id=message.chat.id,
                 message_id=message.id,
                 emoji=emoji_to_react

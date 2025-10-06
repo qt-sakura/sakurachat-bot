@@ -37,7 +37,7 @@ async def start_command_handler(client: Client, message: Message) -> None:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 if message.chat.type == ChatType.PRIVATE:
-                    await animate_reaction(client, message.chat.id, message.id, random_emoji)
+                    await animate_reaction(message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
             except Exception as e:
@@ -56,7 +56,7 @@ async def start_command_handler(client: Client, message: Message) -> None:
         caption = START_MESSAGES["initial_caption"].format(user_mention=user_mention)
 
         if message.chat.type == ChatType.PRIVATE:
-            await photo_effect(client, message.chat.id, random_image, caption, keyboard)
+            await photo_effect(message.chat.id, random_image, caption, keyboard)
         else:
             await client.send_photo(
                 chat_id=message.chat.id,
@@ -84,7 +84,7 @@ async def help_command_handler(client: Client, message: Message) -> None:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 if message.chat.type == ChatType.PRIVATE:
-                    await animate_reaction(client, message.chat.id, message.id, random_emoji)
+                    await animate_reaction(message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
             except Exception as e:
@@ -97,7 +97,7 @@ async def help_command_handler(client: Client, message: Message) -> None:
         random_image = random.choice(SAKURA_IMAGES)
 
         if message.chat.type == ChatType.PRIVATE:
-            await photo_effect(client, message.chat.id, random_image, caption, keyboard)
+            await photo_effect(message.chat.id, random_image, caption, keyboard)
         else:
             await client.send_photo(
                 chat_id=message.chat.id,

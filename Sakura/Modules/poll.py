@@ -15,7 +15,6 @@ async def handle_poll(client: Client, message: Message) -> None:
     try:
         emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
         await animate_reaction(
-            client,
             chat_id=message.chat.id,
             message_id=message.id,
             emoji=emoji_to_react
