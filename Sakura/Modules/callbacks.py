@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.types import CallbackQuery
+from pyrogram.types import CallbackQuery, LinkPreviewOptions
 from pyrogram.enums import ParseMode, ChatMemberStatus
 from pyrogram.errors import BadRequest, Forbidden
 from Sakura.Core.helpers import fetch_user, log_action, get_mention
@@ -168,7 +168,7 @@ async def stats_refresh_handler(client: Client, callback_query: CallbackQuery) -
         await callback_query.edit_message_text(
             text=stats_message,
             reply_markup=reply_markup,
-            disable_web_page_preview=True,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
             parse_mode=ParseMode.HTML
         )
         log_action("INFO", "✅ Stats refreshed successfully", user_info)
