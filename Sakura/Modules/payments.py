@@ -142,21 +142,21 @@ async def successful_payment_handler(client: Client, message: Message) -> None:
             first_name=user_info.get("first_name"),
             last_name=user_info.get("last_name"),
             amount=amount,
-            charge_id=payment.telegram_charge_id
+            charge_id=payment.telegram_payment_charge_id
         )
 
     if amount <= 10:
         log_action("INFO", f"🔄 Refunding payment of {amount} stars (kindness gesture)", user_info)
         await asyncio.sleep(4)
-        state.payment_storage[payment.telegram_charge_id] = {
+        state.payment_storage[payment.telegram_payment_charge_id] = {
             'user_id': user_id,
             'amount': amount,
-            'charge_id': payment.telegram_charge_id
+            'charge_id': payment.telegram_payment_charge_id
         }
         try:
             await client.refund_star_payment(
                 user_id=user_id,
-                telegram_payment_charge_id=payment.telegram_charge_id
+                telegram_payment_charge_id=payment.telegram_payment_charge_id
             )
             keyboard = [[InlineKeyboardButton("Buy flowers again 🌸", callback_data="get_flowers_again")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
