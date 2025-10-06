@@ -27,6 +27,9 @@ from Sakura.Services.tracking import track_user
 async def handle_messages(client: Client, message: Message) -> None:
     """Handle all types of messages"""
     try:
+        if message.from_user and message.from_user.is_self:
+            return
+
         user_info = fetch_user(message)
         user_id = message.from_user.id
         chat_type = message.chat.type.name.lower()
