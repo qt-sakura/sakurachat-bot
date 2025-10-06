@@ -1,6 +1,7 @@
 import asyncio
 import uvloop
 from pyrogram import Client
+from pyrogram.errors import FloodWait
 from Sakura.Core.config import API_ID, API_HASH, BOT_TOKEN, DATABASE_URL, OWNER_ID
 from Sakura.Core.logging import logger
 from Sakura.Core.server import start_server_thread
@@ -13,13 +14,19 @@ from Sakura.Modules.effects import initialize_effects_client, start_effects, sto
 from Sakura import state
 from Sakura.Modules.commands import COMMANDS
 
+
 async def setup_commands(app: Client) -> None:
     """Setup bot commands menu"""
     try:
         await app.set_bot_commands(COMMANDS)
         logger.info("✅ Bot commands menu set successfully")
+    except FloodWait as e:
+        logger.warning(f"⏳ FloodWait: Sleeping for {e.value} seconds before retrying set_bot_commands...")
+        await asyncio.sleep(e.value)
+        return await setup_commands(app)  # retry after sleep
     except Exception as e:
         logger.error(f"Failed to set bot commands: {e}")
+
 
 async def post_init(app: Client):
     """Post initialization tasks"""
@@ -34,6 +41,7 @@ async def post_init(app: Client):
     state.cleanup_task = asyncio.create_task(cleanup_conversations())
     logger.info("🌸 Sakura Bot initialization completed!")
 
+
 async def post_shutdown(app: Client):
     """Post shutdown tasks"""
     if state.cleanup_task and not state.cleanup_task.done():
@@ -46,6 +54,7 @@ async def post_shutdown(app: Client):
     await close_database()
     await close_cache()
     logger.info("🌸 Sakura Bot shutdown completed!")
+
 
 async def main() -> None:
     """Main function to initialize and run the bot"""
@@ -80,6 +89,11 @@ async def main() -> None:
         await post_init(app)
         logger.info("🌸 Sakura Bot is now online!")
         await asyncio.Event().wait()
+    except FloodWait as e:
+        logger.warning(f"⏳ FloodWait triggered: Sleeping for {e.value} seconds...")
+        await asyncio.sleep(e.value)
+        logger.info("🔄 Retrying main after FloodWait...")
+        return await main()  # restart bot after wait
     except KeyboardInterrupt:
         logger.info("🛑 Bot stopped by user.")
     except Exception as e:
@@ -91,6 +105,7 @@ async def main() -> None:
         if app.is_connected:
             await app.stop()
         logger.info("🌸 Sakura Bot has been shut down.")
+
 
 if __name__ == "__main__":
     try:
