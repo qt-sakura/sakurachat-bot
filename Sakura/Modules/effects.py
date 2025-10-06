@@ -30,8 +30,7 @@ async def animate_reaction(client: Client, chat_id: int, message_id: int, emoji:
         await client.send_reaction(
             chat_id=chat_id,
             message_id=message_id,
-            emoji=emoji,
-            is_big=True
+            emoji=emoji
         )
         return True
     except Exception as e:
