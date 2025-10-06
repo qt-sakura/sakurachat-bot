@@ -16,7 +16,6 @@ async def send_effect(client: Client, chat_id: int, text: str, reply_markup=None
             chat_id=chat_id,
             text=text,
             reply_markup=reply_markup,
-            message_effect_id=random.choice(EFFECTS),
             parse_mode=ParseMode.HTML
         )
         return True
@@ -53,7 +52,6 @@ async def photo_effect(client: Client, chat_id: int, photo_url: str, caption: st
             photo=photo_url,
             caption=caption,
             reply_markup=reply_markup,
-            message_effect_id=random.choice(EFFECTS),
             parse_mode=ParseMode.HTML
         )
         return True
