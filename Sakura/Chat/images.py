@@ -32,13 +32,11 @@ async def reply_image(client: Client, message: Message, user_message: str, user_
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["love"])
             await animate_reaction(
-                client,
                 chat_id=message.chat.id,
                 message_id=message.id,
                 emoji=emoji_to_react
             )
             await animate_reaction(
-                client,
                 chat_id=message.chat.id,
                 message_id=message.reply_to_message.id,
                 emoji=emoji_to_react
@@ -57,7 +55,7 @@ async def reply_image(client: Client, message: Message, user_message: str, user_
             caption = message.reply_to_message.caption or ""
 
             response = await get_response(
-                caption, user_name, user_info, user_info["user_id"], image_bytes=bytes(image_bytes)
+                caption, user_name, user_info, user_info["user_id"], image_bytes=image_bytes
             )
 
             await message.reply_text(response)

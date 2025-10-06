@@ -36,13 +36,11 @@ async def reply_poll(client: Client, message: Message, user_message: str, user_i
         try:
             emoji_to_react = random.choice(CONTEXTUAL_REACTIONS["confused"])
             await animate_reaction(
-                client,
                 chat_id=message.chat.id,
                 message_id=message.id,
                 emoji=emoji_to_react
             )
             await animate_reaction(
-                client,
                 chat_id=message.chat.id,
                 message_id=message.reply_to_message.id,
                 emoji=emoji_to_react

@@ -26,7 +26,7 @@ async def meow_command_handler(client: Client, message: Message) -> None:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 if message.chat.type == ChatType.PRIVATE:
-                    await animate_reaction(client, message.chat.id, message.id, random_emoji)
+                    await animate_reaction(message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
             except Exception as e:
@@ -61,7 +61,7 @@ async def fams_command_handler(client: Client, message: Message) -> None:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 if message.chat.type == ChatType.PRIVATE:
-                    await animate_reaction(client, message.chat.id, message.id, random_emoji)
+                    await animate_reaction(message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
             except Exception as e:
