@@ -1,26 +1,26 @@
-# Use a smaller Python image
+# Base slim image
 FROM python:3.13-slim
 
-# Set the working directory
+# Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* /usr/share/man /usr/share/doc /usr/share/groff /usr/share/info
 
-# Upgrade pip
-RUN pip install --no-cache-dir --upgrade pip
+# Upgrade pip tool
+RUN pip install --no-cache-dir --upgrade pip --root-user-action=ignore
 
-# Copy requirements first
+# Copy requirements file
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python deps
+RUN pip install --no-cache-dir -r requirements.txt --root-user-action=ignore
 
-# Copy the rest of the application
+# Copy app files
 COPY . .
 
-# Default command
+# Run application
 CMD ["python3", "kawai.py"]
