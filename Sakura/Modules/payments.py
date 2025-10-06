@@ -120,12 +120,16 @@ async def send_invoice(client: Client, chat_id: int, user_info: dict, amount: in
                 'payload': f"sakura_star_{user_info['user_id']}",
                 'provider_token': "",
                 'currency': "XTR",
-                'prices': orjson.dumps([{'label': '✨ Sakura Star', 'amount': amount}]),
+                'prices': [{'label': '✨ Sakura Star', 'amount': amount}],
                 'message_effect_id': message_effect_id
             }
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, data=payload) as response:
-                    result = await response.json()
+                async with session.post(
+                    url,
+                    data=orjson.dumps(payload),
+                    headers={'Content-Type': 'application/json'}
+                ) as response:
+                    result = await response.json(loads=orjson.loads)
                     if not result.get('ok'):
                         log_action("ERROR", f"❌ API Error sending invoice with effect: {result.get('description')}", user_info)
                         # Fallback to regular invoice
