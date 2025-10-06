@@ -20,4 +20,4 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # Run main Python script
-CMD ["python3", "kawai.py"]
+CMD ["python3", "sakura.py"]
