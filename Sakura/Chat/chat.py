@@ -71,7 +71,7 @@ async def get_response(
                 log_action("WARNING", "🤷‍♀️ No message content to send to AI.", user_info)
             return get_fallback()
 
-        messages.append({"role": "user", "content": user_message})
+        messages.append({"role": "user", "content": current_message_content})
 
         logger.debug("Sending request to SambaNova API.")
         completion = await asyncio.to_thread(
