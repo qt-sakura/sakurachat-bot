@@ -6,6 +6,6 @@ orjson
 asyncpg
 requests
 tgcrypto
-pyrogram
+kurigram
 elevenlabs
 aiohttp[speedups]
