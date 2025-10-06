@@ -1,7 +1,7 @@
 import random
 import time
 from pyrogram import Client, filters
-from pyrogram.types import Message, BotCommand
+from pyrogram.types import Message, BotCommand, LinkPreviewOptions
 from pyrogram.enums import ParseMode, ChatType
 from Sakura.Core.helpers import fetch_user, log_action, get_mention, get_error
 from Sakura.Services.tracking import track_user
@@ -143,7 +143,7 @@ async def ping_command_handler(client: Client, message: Message) -> None:
     await msg.edit_text(
         f"🏓 <a href='{PING_LINK}'>Pong!</a> {response_time}ms",
         parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True
+        link_preview_options=LinkPreviewOptions(is_disabled=True)
     )
     log_action("INFO", "✅ Ping completed", user_info)
 

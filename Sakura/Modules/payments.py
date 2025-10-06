@@ -1,7 +1,7 @@
 import random
 import asyncio
 from pyrogram import Client, filters
-from pyrogram.types import Message, LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup, PreCheckoutQuery
+from pyrogram.types import Message, LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup, PreCheckoutQuery, LinkPreviewOptions
 from pyrogram.enums import ParseMode, ChatType
 from Sakura.Core.helpers import fetch_user, log_action, get_error
 from Sakura.Core.logging import logger
@@ -95,7 +95,7 @@ async def fams_command_handler(client: Client, message: Message) -> None:
         if message.chat.type == ChatType.PRIVATE:
             await send_effect(client, message.chat.id, buyers_text)
         else:
-            await message.reply_text(buyers_text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+            await message.reply_text(buyers_text, parse_mode=ParseMode.HTML, link_preview_options=LinkPreviewOptions(is_disabled=True))
 
     except Exception as e:
         user_info = fetch_user(message)

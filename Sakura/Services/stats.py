@@ -2,7 +2,7 @@ import time
 import psutil
 import datetime
 from pyrogram import Client
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions
 from pyrogram.enums import ParseMode
 from Sakura.Core.helpers import log_action
 from Sakura import state
@@ -93,7 +93,7 @@ async def send_stats(chat_id: int, client: Client, is_refresh: bool = False):
                 text=stats_message,
                 parse_mode=ParseMode.HTML,
                 reply_markup=reply_markup,
-                disable_web_page_preview=True
+                link_preview_options=LinkPreviewOptions(is_disabled=True)
             )
 
     except Exception as e:
