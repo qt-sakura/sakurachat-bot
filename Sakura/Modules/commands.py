@@ -2,7 +2,7 @@ import random
 import time
 from pyrogram import Client, filters
 from pyrogram.types import Message, BotCommand
-from pyrogram.enums import ParseMode
+from pyrogram.enums import ParseMode, ChatType
 from Sakura.Core.helpers import fetch_user, log_action, get_mention, get_error
 from Sakura.Services.tracking import track_user
 from Sakura.Modules.reactions import EMOJI_REACT
@@ -36,14 +36,14 @@ async def start_command_handler(client: Client, message: Message) -> None:
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
-                if message.chat.type == "private":
+                if message.chat.type == ChatType.PRIVATE:
                     await animate_reaction(client, message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
             except Exception as e:
                 log_action("WARNING", f"⚠️ Failed to add emoji reaction: {e}", user_info)
 
-        if message.chat.type == "private" and START_STICKERS:
+        if message.chat.type == ChatType.PRIVATE and START_STICKERS:
             await sticker_action(client, message.chat.id, user_info)
             random_sticker = random.choice(START_STICKERS)
             await client.send_sticker(chat_id=message.chat.id, sticker=random_sticker)
@@ -55,7 +55,7 @@ async def start_command_handler(client: Client, message: Message) -> None:
         user_mention = get_mention(message.from_user)
         caption = START_MESSAGES["initial_caption"].format(user_mention=user_mention)
 
-        if message.chat.type == "private":
+        if message.chat.type == ChatType.PRIVATE:
             await photo_effect(client, message.chat.id, random_image, caption, keyboard)
         else:
             await client.send_photo(
@@ -83,7 +83,7 @@ async def help_command_handler(client: Client, message: Message) -> None:
         if EMOJI_REACT:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
-                if message.chat.type == "private":
+                if message.chat.type == ChatType.PRIVATE:
                     await animate_reaction(client, message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
@@ -96,7 +96,7 @@ async def help_command_handler(client: Client, message: Message) -> None:
         caption = HELP_MESSAGES["minimal"].format(user_mention=user_mention)
         random_image = random.choice(SAKURA_IMAGES)
 
-        if message.chat.type == "private":
+        if message.chat.type == ChatType.PRIVATE:
             await photo_effect(client, message.chat.id, random_image, caption, keyboard)
         else:
             await client.send_photo(
