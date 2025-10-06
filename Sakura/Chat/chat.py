@@ -92,8 +92,8 @@ async def get_response(
             logger.debug("Sending request to OpenRouter API.")
             completion = await client_to_use.chat.completions.create(
                 extra_headers={
-                    "HTTP-Referer": "https://t.me/SakuraHarunoBot",
-                    "X-Title": "Sakura Bot",
+                    "HTTP-Referer": "https://t.me/imSakuraBot",
+                    "X-Title": "Sakura",
                 },
                 model=model_to_use,
                 messages=messages
