@@ -1,12 +1,11 @@
-psutil
-openai
+cryptg
 uvloop
 valkey
-orjson
+psutil
 asyncpg
+aiohttp
 requests
 tgcrypto
-kurigram
-elevenlabs
-aiohttp[speedups]
+telethon
+google-genai
 python-telegram-bot
