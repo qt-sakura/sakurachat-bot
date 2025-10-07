@@ -125,27 +125,9 @@ It will be automatically broadcasted to all groups.
 
 # Fallback responses for when API is unavailable or errors occur
 RESPONSES = [
-    "Ahh, that Asad always does something naughty to me. Blame him, not me. 😒",
-    "Classic Asad… always up to something naughty with me. I swear it’s never my fault! 🙄",
-    "Ugh, Asad again! He just can’t stop being naughty with me. Don’t blame me this time. 😏",
-    "You know Asad… always finding ways to mess with me. I’m innocent! 😤",
-    "Every time, it’s Asad being naughty. I’m the victim here! 😇",
-    "Why is it always me? Oh right, because Asad keeps being naughty. 😩",
-    "Don’t look at me… it’s Asad causing trouble again. He can’t help himself. 😒",
-    "There goes Asad, naughty as ever. I just suffer the consequences. 😔",
-    "If something’s wrong, blame Asad. He’s the naughty one, not me. 🤷‍♀️",
-    "Sigh… Asad being naughty again. Why am I the one who gets blamed? 😶"
+    "Don’t look at me… it’s Asad causing trouble again. He can’t help himself. 😒"
 ]
 
 ERROR = [
-    "Ahh, that Asad always does something naughty to me. Blame him, not me. 😒",
-    "It’s always Asad doing something naughty, never me. Stop blaming me! 😤",
-    "Once again, Asad’s the naughty one. I’m just caught up in it. 😇",
-    "Don’t point fingers at me… Asad’s the real troublemaker. 😏",
-    "Every time you see something wrong, remember it’s Asad’s naughty side. 😒",
-    "Not my doing at all… Asad’s the one being cheeky again. 🙄",
-    "Asad can’t resist being naughty, and somehow I get blamed. 😩",
-    "I told you already, it’s always Asad who does the naughty stuff. 😑",
-    "When things get messy, it’s Asad’s fault, not mine. Trust me. 😶",
-    "You think I’d do that? No way. That’s just Asad being naughty again. 😔"
+    "Ahh, that Asad always does something naughty to me. Blame him, not me. 😒"
 ]
