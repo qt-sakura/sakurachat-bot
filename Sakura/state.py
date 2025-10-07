@@ -1,7 +1,7 @@
 from typing import Dict, Set, Optional, List
 from pyrogram import Client
 from valkey.asyncio import Valkey as AsyncValkey
-from google import genai
+from sambanova import SambaNova
 
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
@@ -16,4 +16,4 @@ cleanup_task = None
 valkey_client: Optional[AsyncValkey] = None
 payment_storage: Dict[str, dict] = {}
 effects_client: Optional[Client] = None
-gemini_client: Optional[genai.Client] = None
+sambanova_client: Optional[SambaNova] = None
