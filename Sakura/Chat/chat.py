@@ -79,9 +79,9 @@ async def get_response(
 
         logger.debug("Sending request to Google GenAI API.")
 
-        # Use the native async client as per the documentation.
+        # Use the native async client with the corrected 'model' parameter.
         response = await state.gemini_client.aio.models.generate_content(
-            model_name=model_to_use,
+            model=model_to_use,
             contents=gemini_history,
             generation_config={
                 "temperature": 0.1,
