@@ -83,7 +83,7 @@ async def get_response(
         response = await state.gemini_client.aio.models.generate_content(
             model=model_to_use,
             contents=gemini_history,
-            generation_config={
+            config={
                 "temperature": 0.1,
                 "top_p": 0.1
             }
