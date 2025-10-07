@@ -125,9 +125,9 @@ It will be automatically broadcasted to all groups.
 
 # Fallback responses for when API is unavailable or errors occur
 RESPONSES = [
-    "Don’t look at me… it’s Asad causing trouble again. He can’t help himself. 😒"
+    "🙃"
 ]
 
 ERROR = [
-    "Ahh, that Asad always does something naughty to me. Blame him, not me. 😒"
+    "🙃"
 ]
