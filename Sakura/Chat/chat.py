@@ -3,7 +3,7 @@ import io
 from typing import Optional, Dict
 from PIL import Image
 
-from google import genai
+import google.generativeai as genai
 from Sakura.Core.config import OWNER_ID, AI_MODEL, GEMINI_API_KEY
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
