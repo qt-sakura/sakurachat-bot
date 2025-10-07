@@ -53,25 +53,29 @@ async def get_response(
         messages = [{"role": "system", "content": prompt_to_use}]
         messages.extend(history)
 
-        current_message_content = []
-        if user_message:
-            current_message_content.append({"type": "text", "text": user_message})
-
         if image_bytes:
+            # Multimodal message
+            content = []
+            if user_message:
+                content.append({"type": "text", "text": user_message})
+
             image_data = base64.b64encode(image_bytes).decode('utf-8')
-            current_message_content.append({
+            content.append({
                 "type": "image_url",
                 "image_url": {
                     "url": f"data:image/jpeg;base64,{image_data}"
                 }
             })
+        else:
+            # Text-only message
+            content = user_message
 
-        if not current_message_content:
+        if not content:
             if user_info:
                 log_action("WARNING", "🤷‍♀️ No message content to send to AI.", user_info)
             return get_fallback()
 
-        messages.append({"role": "user", "content": current_message_content})
+        messages.append({"role": "user", "content": content})
 
         logger.debug("Sending request to SambaNova API.")
         completion = await asyncio.to_thread(
