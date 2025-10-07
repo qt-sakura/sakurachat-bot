@@ -3,8 +3,8 @@ import io
 from typing import Optional, Dict
 from PIL import Image
 
-import google.generativeai as genai
-from Sakura.Core.config import OWNER_ID, AI_MODEL, GEMINI_API_KEY
+from google import genai
+from Sakura.Core.config import AI_MODEL, GEMINI_API_KEY
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Database.conversation import get_history
@@ -19,8 +19,10 @@ def init_client():
 
     logger.info("🫡 Initializing Google GenAI API key.")
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        state.genai_client = genai.GenerativeModel(AI_MODEL)
+        # The API key is typically set as an environment variable (GOOGLE_API_KEY)
+        # which google-genai reads automatically.
+        # We are setting it here from our config for explicit configuration.
+        state.genai_client = genai.Client(api_key=GEMINI_API_KEY)
         logger.info("✅ Chat client (Google GenAI) initialized successfully")
     except Exception as e:
         logger.error(f"❌ Failed to initialize chat client: {e}")
@@ -48,8 +50,12 @@ async def get_response(
             log_action("INFO", f"🧠 Using model: {model_to_use}", user_info)
 
         history = await get_history(user_id)
-        messages = [{"role": "system", "content": prompt_to_use}]
-        messages.extend(history)
+
+        # The google-genai library doesn't have the same concept of chat history as openai or others.
+        # We will build a single prompt including the history.
+        full_prompt = [prompt_to_use]
+        for message in history:
+            full_prompt.append(f"{message['role']}: {message['content']}")
 
         content = [user_message] if user_message else []
         if image_bytes:
@@ -65,24 +71,23 @@ async def get_response(
                 log_action("WARNING", "🤷‍♀️ No message content to send to AI.", user_info)
             return get_fallback()
 
-        messages.append({"role": "user", "content": content})
+        full_prompt.append(f"user: {' '.join(str(c) for c in content if isinstance(c, str))}")
+
+        # Add images to content for the API
+        final_content = []
+        if user_message:
+            final_content.append(user_message)
+        if image_bytes:
+            img = Image.open(io.BytesIO(image_bytes))
+            final_content.append(img)
+
 
         logger.debug("Sending request to Google GenAI API.")
 
-        # Correctly format history for the Google GenAI API
-        api_history = []
-        for msg in messages:
-            role = "assistant" if msg["role"] == "assistant" else msg["role"]
-            api_history.append({"role": role, "parts": msg["content"] if isinstance(msg["content"], list) else [msg["content"]]})
-
-        # The last message is the user's current message
-        user_content = api_history.pop()["parts"]
-
-        chat = state.genai_client.start_chat(history=api_history)
-
         completion = await asyncio.to_thread(
-            chat.send_message,
-            user_content
+            state.genai_client.generate_content,
+            model=model_to_use,
+            contents=final_content
         )
         logger.debug("Received response from Google GenAI API.")
 
