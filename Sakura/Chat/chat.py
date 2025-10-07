@@ -1,12 +1,10 @@
 import asyncio
-from typing import Optional, Dict, Any
-from PIL import Image
-import io
+import base64
+from typing import Optional, Dict
 
-from google import genai
-from google.genai.types import Part
+from sambanova import SambaNova
 
-from Sakura.Core.config import AI_MODEL, GEMINI_API_KEY
+from Sakura.Core.config import OWNER_ID, AI_MODEL, SAMBANOVA_API_KEY
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Database.conversation import get_history
@@ -14,83 +12,82 @@ from Sakura.Chat.prompts import SAKURA_PROMPT
 from Sakura import state
 
 def init_client():
-    """Initialize Google GenAI client for chat."""
-    if not GEMINI_API_KEY:
-        logger.warning("⚠️ No Gemini API key found, chat functionality will be disabled.")
+    """Initialize SambaNova client for chat."""
+    if not SAMBANOVA_API_KEY:
+        logger.warning("⚠️ No SambaNova API key found, chat functionality will be disabled.")
         return
 
-    logger.info("🫡 Initializing Google GenAI API key.")
+    logger.info("🫡 Initializing SambaNova API key.")
     try:
-        # Correctly initialize the client for the Gemini Developer API using an API key.
-        state.gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-        logger.info("✅ Chat client (Google GenAI) initialized successfully")
+        state.sambanova_client = SambaNova(
+            api_key=SAMBANOVA_API_KEY,
+            base_url="https://api.sambanova.ai/v1",
+        )
+        logger.info("✅ Chat client (SambaNova) initialized successfully")
     except Exception as e:
         logger.error(f"❌ Failed to initialize chat client: {e}")
 
 async def get_response(
     user_message: str,
     user_id: int,
-    user_info: Dict[str, Any] = None,
+    user_info: Dict[str, any] = None,
     image_bytes: Optional[bytes] = None
 ) -> str:
-    """Get response from Google GenAI API."""
+    """Get response from SambaNova API."""
     if user_info:
         log_action("DEBUG", f"🤖 Getting AI response for message: '{user_message[:50]}...'", user_info)
 
-    if not state.gemini_client:
+    if not state.sambanova_client:
         if user_info:
             log_action("WARNING", "❌ Chat client not available, using fallback response", user_info)
         return get_fallback()
 
     try:
         model_to_use = AI_MODEL
+        prompt_to_use = SAKURA_PROMPT
+
         if user_info:
             log_action("INFO", f"🧠 Using model: {model_to_use}", user_info)
 
-        # Build conversation history
-        db_history = await get_history(user_id)
-
-        # Start with the system prompt, then add history
-        gemini_history = [{'role': 'user', 'parts': [SAKURA_PROMPT]}, {'role': 'model', 'parts': ["Understood. I will now act as Sakura."]}]
-        for msg in db_history:
-            role = 'model' if msg['role'] == 'assistant' else 'user'
-            gemini_history.append({'role': role, 'parts': [msg['content']]})
-
-        # Prepare current message parts (text and/or image)
-        current_message_parts = []
-        if user_message:
-            current_message_parts.append(user_message)
+        history = await get_history(user_id)
+        messages = [{"role": "system", "content": prompt_to_use}]
+        messages.extend(history)
 
         if image_bytes:
-            try:
-                img = Image.open(io.BytesIO(image_bytes))
-                current_message_parts.append(img)
-            except Exception as e:
-                logger.error(f"🖼️ Failed to process image: {e}")
-                return "I'm sorry, I had trouble understanding that image. Please try another one."
+            # Multimodal message
+            content = []
+            if user_message:
+                content.append({"type": "text", "text": user_message})
 
-        if not current_message_parts:
+            image_data = base64.b64encode(image_bytes).decode('utf-8')
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_data}"
+                }
+            })
+        else:
+            # Text-only message
+            content = user_message
+
+        if not content:
             if user_info:
                 log_action("WARNING", "🤷‍♀️ No message content to send to AI.", user_info)
             return get_fallback()
 
-        # Add the current message to the end of the history
-        gemini_history.append({'role': 'user', 'parts': current_message_parts})
+        messages.append({"role": "user", "content": content})
 
-        logger.debug("Sending request to Google GenAI API.")
-
-        # Use the native async client with the corrected 'model' parameter.
-        response = await state.gemini_client.aio.models.generate_content(
+        logger.debug("Sending request to SambaNova API.")
+        completion = await asyncio.to_thread(
+            state.sambanova_client.chat.completions.create,
             model=model_to_use,
-            contents=gemini_history,
-            config={
-                "temperature": 0.1,
-                "top_p": 0.1
-            }
+            messages=messages,
+            temperature=0.1,
+            top_p=0.1
         )
-        logger.debug("Received response from Google GenAI API.")
+        logger.debug("Received response from SambaNova API.")
 
-        ai_response = response.text.strip() if response.text else get_fallback()
+        ai_response = completion.choices[0].message.content.strip() if completion.choices[0].message.content else get_fallback()
 
         if user_info:
             log_action("INFO", f"✅ AI response generated: '{ai_response[:50]}...'", user_info)
