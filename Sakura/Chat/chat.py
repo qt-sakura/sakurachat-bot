@@ -21,9 +21,8 @@ def init_client():
 
     logger.info("🫡 Initializing Google GenAI API key.")
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        # As per the latest docs, we initialize the client instance
-        state.gemini_client = genai.Client()
+        # Correctly initialize the client for the Gemini Developer API using an API key.
+        state.gemini_client = genai.Client(api_key=GEMINI_API_KEY)
         logger.info("✅ Chat client (Google GenAI) initialized successfully")
     except Exception as e:
         logger.error(f"❌ Failed to initialize chat client: {e}")
@@ -80,10 +79,8 @@ async def get_response(
 
         logger.debug("Sending request to Google GenAI API.")
 
-        # The SDK's generate_content is synchronous, so we run it in a thread
-        # to avoid blocking the asyncio event loop.
-        response = await asyncio.to_thread(
-            state.gemini_client.models.generate_content,
+        # Use the native async client as per the documentation.
+        response = await state.gemini_client.aio.models.generate_content(
             model_name=model_to_use,
             contents=gemini_history,
             generation_config={
