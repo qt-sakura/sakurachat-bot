@@ -1,10 +1,10 @@
 import asyncio
-import base64
+import io
 from typing import Optional, Dict
+from PIL import Image
 
-from sambanova import SambaNova
-
-from Sakura.Core.config import OWNER_ID, AI_MODEL, SAMBANOVA_API_KEY
+from google import genai
+from Sakura.Core.config import OWNER_ID, AI_MODEL, GEMINI_API_KEY
 from Sakura.Core.logging import logger
 from Sakura.Core.helpers import log_action, get_fallback, get_error
 from Sakura.Database.conversation import get_history
@@ -12,18 +12,16 @@ from Sakura.Chat.prompts import SAKURA_PROMPT
 from Sakura import state
 
 def init_client():
-    """Initialize SambaNova client for chat."""
-    if not SAMBANOVA_API_KEY:
-        logger.warning("⚠️ No SambaNova API key found, chat functionality will be disabled.")
+    """Initialize Google GenAI client for chat."""
+    if not GEMINI_API_KEY:
+        logger.warning("⚠️ No Google GenAI API key found, chat functionality will be disabled.")
         return
 
-    logger.info("🫡 Initializing SambaNova API key.")
+    logger.info("🫡 Initializing Google GenAI API key.")
     try:
-        state.sambanova_client = SambaNova(
-            api_key=SAMBANOVA_API_KEY,
-            base_url="https://api.sambanova.ai/v1",
-        )
-        logger.info("✅ Chat client (SambaNova) initialized successfully")
+        genai.configure(api_key=GEMINI_API_KEY)
+        state.genai_client = genai.GenerativeModel(AI_MODEL)
+        logger.info("✅ Chat client (Google GenAI) initialized successfully")
     except Exception as e:
         logger.error(f"❌ Failed to initialize chat client: {e}")
 
@@ -33,11 +31,11 @@ async def get_response(
     user_info: Dict[str, any] = None,
     image_bytes: Optional[bytes] = None
 ) -> str:
-    """Get response from SambaNova API."""
+    """Get response from Google GenAI API."""
     if user_info:
         log_action("DEBUG", f"🤖 Getting AI response for message: '{user_message[:50]}...'", user_info)
 
-    if not state.sambanova_client:
+    if not state.genai_client:
         if user_info:
             log_action("WARNING", "❌ Chat client not available, using fallback response", user_info)
         return get_fallback()
@@ -53,22 +51,14 @@ async def get_response(
         messages = [{"role": "system", "content": prompt_to_use}]
         messages.extend(history)
 
+        content = [user_message] if user_message else []
         if image_bytes:
-            # Multimodal message
-            content = []
-            if user_message:
-                content.append({"type": "text", "text": user_message})
-
-            image_data = base64.b64encode(image_bytes).decode('utf-8')
-            content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{image_data}"
-                }
-            })
-        else:
-            # Text-only message
-            content = user_message
+            try:
+                img = Image.open(io.BytesIO(image_bytes))
+                content.append(img)
+            except Exception as e:
+                logger.error(f"Failed to process image: {e}")
+                return get_error()
 
         if not content:
             if user_info:
@@ -77,17 +67,26 @@ async def get_response(
 
         messages.append({"role": "user", "content": content})
 
-        logger.debug("Sending request to SambaNova API.")
-        completion = await asyncio.to_thread(
-            state.sambanova_client.chat.completions.create,
-            model=model_to_use,
-            messages=messages,
-            temperature=0.1,
-            top_p=0.1
-        )
-        logger.debug("Received response from SambaNova API.")
+        logger.debug("Sending request to Google GenAI API.")
 
-        ai_response = completion.choices[0].message.content.strip() if completion.choices[0].message.content else get_fallback()
+        # Correctly format history for the Google GenAI API
+        api_history = []
+        for msg in messages:
+            role = "assistant" if msg["role"] == "assistant" else msg["role"]
+            api_history.append({"role": role, "parts": msg["content"] if isinstance(msg["content"], list) else [msg["content"]]})
+
+        # The last message is the user's current message
+        user_content = api_history.pop()["parts"]
+
+        chat = state.genai_client.start_chat(history=api_history)
+
+        completion = await asyncio.to_thread(
+            chat.send_message,
+            user_content
+        )
+        logger.debug("Received response from Google GenAI API.")
+
+        ai_response = completion.text.strip() if completion.text else get_fallback()
 
         if user_info:
             log_action("INFO", f"✅ AI response generated: '{ai_response[:50]}...'", user_info)
