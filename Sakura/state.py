@@ -1,7 +1,7 @@
 from typing import Dict, Set, Optional, List
 from pyrogram import Client
 from valkey.asyncio import Valkey as AsyncValkey
-from google import genai
+import google.generativeai as genai
 
 # GLOBAL STATE & MEMORY SYSTEM
 user_ids: Set[int] = set()
