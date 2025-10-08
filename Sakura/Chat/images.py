@@ -57,6 +57,7 @@ async def reply_image(client: Client, message: Message, user_message: str, user_
             response = await get_response(
                 user_message=caption,
                 user_id=user_info["user_id"],
+                user_name=user_info.get("first_name", "User"),
                 user_info=user_info,
                 image_bytes=image_bytes
             )
