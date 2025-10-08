@@ -6,6 +6,6 @@ asyncpg
 requests
 tgcrypto
 kurigram
-sambanova
+google-genai
 elevenlabs
 aiohttp[speedups]

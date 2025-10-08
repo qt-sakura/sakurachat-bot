@@ -28,6 +28,14 @@ async def add_history(user_id: int, message: str, is_user: bool = True):
     if len(state.conversation_history[user_id]) > CHAT_LENGTH:
         state.conversation_history[user_id] = state.conversation_history[user_id][-CHAT_LENGTH:]
 
+
+async def update_history(user_id: int, user_message: str, ai_response: str):
+    """Add both user message and AI response to history."""
+    await add_history(user_id, user_message, is_user=True)
+    await add_history(user_id, ai_response, is_user=False)
+    logger.debug(f"📜 Updated conversation history for user {user_id}")
+
+
 async def get_history(user_id: int) -> list:
     """Get conversation history as a list of dicts."""
     history = []

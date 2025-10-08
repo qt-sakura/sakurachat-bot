@@ -5,7 +5,7 @@ from Sakura.Core.helpers import fetch_user, log_action, get_error
 from Sakura.Modules.reactions import CONTEXTUAL_REACTIONS
 from Sakura.Modules.effects import animate_reaction
 from Sakura.Modules.typing import send_typing
-from Sakura.Chat.response import get_response
+from Sakura.Chat.chat import get_response
 
 async def handle_image(client: Client, message: Message) -> None:
     """Handle image messages with AI analysis"""
@@ -31,10 +31,9 @@ async def handle_image(client: Client, message: Message) -> None:
         image_bytes = image_file.read()
         log_action("DEBUG", f"📥 Image downloaded: {len(image_bytes)} bytes", user_info)
 
-        user_name = message.from_user.first_name or ""
         caption = message.caption or ""
 
-        response = await get_response(caption, user_name, user_info, message.from_user.id, image_bytes=image_bytes)
+        response = await get_response(caption, message.from_user.id, user_info, image_bytes=image_bytes)
 
         log_action("DEBUG", f"📤 Sending image analysis: '{response[:50]}...'", user_info)
         await message.reply_text(response)
