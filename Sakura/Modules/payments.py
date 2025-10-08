@@ -29,7 +29,7 @@ async def meow_command_handler(client: Client, message: Message) -> None:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 if message.chat.type == ChatType.PRIVATE:
-                    await animate_reaction(client, message.chat.id, message.id, random_emoji)
+                    await animate_reaction(message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
             except Exception as e:
@@ -67,7 +67,7 @@ async def fams_command_handler(client: Client, message: Message) -> None:
             try:
                 random_emoji = random.choice(EMOJI_REACT)
                 if message.chat.type == ChatType.PRIVATE:
-                    await animate_reaction(client, message.chat.id, message.id, random_emoji)
+                    await animate_reaction(message.chat.id, message.id, random_emoji)
                 else:
                     await add_reaction(client, message, random_emoji, user_info)
             except Exception as e:
@@ -82,7 +82,7 @@ async def fams_command_handler(client: Client, message: Message) -> None:
                 "No one has bought flowers yet! Be the first to support with /meow 💝"
             )
             if message.chat.type == ChatType.PRIVATE:
-                await send_effect(client, message.chat.id, no_buyers_text)
+                await send_effect(message.chat.id, no_buyers_text)
             else:
                 await message.reply_text(no_buyers_text, parse_mode=ParseMode.HTML)
             return
@@ -99,7 +99,7 @@ async def fams_command_handler(client: Client, message: Message) -> None:
         buyers_text += f"\n🌸 <i>Total buyers: {len(purchases)}</i>"
 
         if message.chat.type == ChatType.PRIVATE:
-            await send_effect(client, message.chat.id, buyers_text)
+            await send_effect(message.chat.id, buyers_text)
         else:
             await message.reply_text(buyers_text, parse_mode=ParseMode.HTML, link_preview_options=LinkPreviewOptions(is_disabled=True))
 
@@ -193,7 +193,7 @@ async def successful_payment_handler(client: Client, message: Message) -> None:
             refund_msg = random.choice(REFUND_MESSAGES)
 
             if message.chat.type == ChatType.PRIVATE:
-                await send_effect(client, message.chat.id, refund_msg, reply_markup)
+                await send_effect(message.chat.id, refund_msg, reply_markup)
             else:
                 await message.reply_text(refund_msg, reply_markup=reply_markup)
             log_action("INFO", "✅ Refund completed successfully", user_info)
