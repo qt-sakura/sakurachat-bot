@@ -27,8 +27,9 @@ async def handle_poll(client: Client, message: Message) -> None:
 
     try:
         poll = message.poll
-        poll_question = poll.question
-        poll_options = [option.text for option in poll.options]
+        # Sanitize text to prevent encoding errors down the line
+        poll_question = poll.question.encode('utf-8', 'ignore').decode('utf-8')
+        poll_options = [opt.text.encode('utf-8', 'ignore').decode('utf-8') for opt in poll.options]
         log_action("DEBUG", f"📊 Poll question: '{poll_question}' with {len(poll_options)} options", user_info)
 
         response = await analyze_poll(poll_question, poll_options, user_info, message.from_user.id)
