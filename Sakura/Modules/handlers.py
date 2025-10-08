@@ -9,7 +9,7 @@ from Sakura.Modules.reactions import handle_reaction
 from Sakura.Chat.images import reply_image
 from Sakura.Chat.polls import reply_poll
 from Sakura.Modules.typing import send_typing
-from Sakura.Chat.response import get_response
+from Sakura.Chat.chat import get_response
 from Sakura.Chat.voice import generate_voice
 from Sakura.Database.cache import set_last_message, get_last_message
 from Sakura.Services.broadcast import execute_broadcast
@@ -88,8 +88,7 @@ async def handle_messages(client: Client, message: Message) -> None:
             return
 
         await send_typing(client, message.chat.id, user_info)
-        user_name = message.from_user.first_name or ""
-        ai_response = await get_response(user_message, user_name, user_info, user_id)
+        ai_response = await get_response(user_message, user_id, user_info)
 
         await set_last_message(user_id, ai_response)
 
