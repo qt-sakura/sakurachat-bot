@@ -53,8 +53,10 @@ async def get_response(
             prompt = f"{SAKURA_PROMPT}\n\nUser name: {user_name}{context}\nCurrent message: {user_message}\n\nSakura's response:"
             final_contents.append(prompt)
 
-        model = state.gemini_client.get_model(f"models/{AI_MODEL}")
-        response = await model.generate_content_async(final_contents)
+        response = await state.gemini_client.aio.models.generate_content(
+            model=AI_MODEL,
+            contents=final_contents
+        )
 
         ai_response = response.text.strip() if response.text else get_fallback()
 
