@@ -53,8 +53,10 @@ async def reply_poll(client: Client, message: Message, user_message: str, user_i
 
         try:
             poll = message.reply_to_message.poll
-            poll_question = poll.question
-            poll_options = [option.text for option in poll.options]
+
+            # Sanitize the poll question and options to prevent encoding errors
+            poll_question = poll.question.encode('utf-8', 'ignore').decode('utf-8')
+            poll_options = [option.text.encode('utf-8', 'ignore').decode('utf-8') for option in poll.options]
 
             response = await analyze_poll(
                 poll_question, poll_options, user_info, user_info["user_id"]
