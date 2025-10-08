@@ -10,7 +10,6 @@ from Sakura.Database.database import connect_database, close_database
 from Sakura.Database.valkey import connect_cache, close_cache
 from Sakura.Services.cleanup import cleanup_conversations
 from Sakura.Chat.chat import init_client
-from Sakura.Modules.effects import initialize_effects_client, start_effects, stop_effects
 from Sakura import state
 from Sakura.Modules.commands import COMMANDS
 
@@ -73,7 +72,6 @@ async def main() -> None:
     logger.info("🚀 Initializing clients...")
     start_server_thread()
     init_client()
-    initialize_effects_client()
 
     app = Client(
         "sakura",
@@ -85,7 +83,6 @@ async def main() -> None:
 
     try:
         await app.start()
-        await start_effects()
         await post_init(app)
         logger.info("🌸 Sakura Bot is now online!")
         await asyncio.Event().wait()
@@ -101,7 +98,6 @@ async def main() -> None:
     finally:
         logger.info("🔌 Shutting down...")
         await post_shutdown(app)
-        await stop_effects()
         if app.is_connected:
             await app.stop()
         logger.info("🌸 Sakura Bot has been shut down.")
