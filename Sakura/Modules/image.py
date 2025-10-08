@@ -28,7 +28,7 @@ async def handle_image(client: Client, message: Message) -> None:
     try:
         log_action("DEBUG", "📥 Downloading image...", user_info)
         image_file = await client.download_media(message.photo.file_id, in_memory=True)
-        image_bytes = image_file.read()
+        image_bytes = image_file.getvalue()
         log_action("DEBUG", f"📥 Image downloaded: {len(image_bytes)} bytes", user_info)
 
         caption = message.caption or ""

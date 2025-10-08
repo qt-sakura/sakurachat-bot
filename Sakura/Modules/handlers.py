@@ -59,9 +59,6 @@ async def handle_messages(client: Client, message: Message) -> None:
         elif message.photo:
             await handle_image(client, message)
             return
-        elif message.poll:
-            await handle_poll(client, message)
-            return
 
         # Default to text-based handling
         user_message = message.text or message.caption or "Media message"
