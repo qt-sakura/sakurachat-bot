@@ -7,6 +7,9 @@ from Sakura.Database.database import remove_user, remove_group
 @Client.on_chat_member_updated()
 async def my_chat_member_handler(client: Client, update: ChatMemberUpdated):
     """Handle when the bot's chat member status changes."""
+    if not update.new_chat_member or not update.new_chat_member.user:
+        return
+
     if update.new_chat_member.user.id != client.me.id:
         return
 
