@@ -1,1 +1,1 @@
-start: python kawai.py
+worker: python -m Sakura
